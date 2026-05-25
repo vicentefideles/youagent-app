@@ -202,3 +202,23 @@ export const calendarApi = {
   connect:    (jwt: string)  => `${BASE_URL}/auth/google?jwt=${jwt}`,
   disconnect: ()             => api.delete('/auth/google'),
 }
+
+// Telnyx — provisionamento de números
+export const telnyxApi = {
+  buscarNumeros: (ddd: string, tipo?: string) =>
+    api.get(`/telnyx/numeros/buscar?ddd=${ddd}&tipo=${tipo || 'local'}`),
+  getSolicitacao: () =>
+    api.get('/telnyx/numeros/solicitacao'),
+  solicitar: (data: {
+    ddd: string; tipo_numero: string; numero_solicitado: string;
+    cnpj?: string; razao_social?: string; nome_representante?: string;
+    cpf_representante?: string; endereco?: string; cep?: string;
+    cidade?: string; estado?: string;
+  }) => api.post('/telnyx/numeros/solicitar', data),
+  adminTodasSolicitacoes: (status?: string) =>
+    api.get(`/telnyx/numeros/admin/todas${status ? `?status=${status}` : ''}`),
+  adminAtualizar: (id: string, data: { status?: string; notas_admin?: string; numero_aprovado?: string; motivo_rejeicao?: string }) =>
+    api.patch(`/telnyx/numeros/admin/${id}`, data),
+  adminProvisionar: (id: string) =>
+    api.post(`/telnyx/numeros/provisionar/${id}`, {}),
+}

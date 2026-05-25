@@ -31,6 +31,7 @@ import ReceptivoPage from '@/pages/receptivo/ReceptivoPage'
 import VendedorPageRestrita from '@/pages/vendedor/VendedorPageRestrita'
 import AdminCustosPage from '@/pages/admin/AdminCustosPage'
 import AdminDevPage from '@/pages/admin/AdminDevPage'
+import AdminTelnyxPage from '@/pages/admin/AdminTelnyxPage'
 import DocumentosPage from '@/pages/documentos/DocumentosPage'
 
 const queryClient = new QueryClient({
@@ -126,6 +127,7 @@ export default function App() {
             <Route path="admin/plataforma" element={<AdminPlataformaPage />} />
             <Route path="admin/custos"     element={<AdminCustosPage />} />
             <Route path="admin/dev"        element={<AdminDevPage />} />
+            <Route path="admin/telnyx"     element={<AdminTelnyxPage />} />
 
             <Route path="vendedor-restrito" element={<VendedorPageRestrita />} />
           </Route>

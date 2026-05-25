@@ -5,7 +5,7 @@ import {
   Settings, Users, LogOut, ChevronLeft, Bot,
   Zap, Menu, Megaphone, UserCheck, Shield,
   TrendingUp, PhoneIncoming, CreditCard, LayoutGrid,
-  Upload, DollarSign, Code2, Lock,
+  Upload, DollarSign, Code2, Lock, PhoneCall,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import clsx from 'clsx'
@@ -121,6 +121,7 @@ const SIDEBAR_CONFIG: Record<UserRole, SidebarGroup[]> = {
         { label: 'Admin Plataforma',icon: <Shield size={17} />,       to: '/admin/plataforma' },
         { label: 'Admin Custos',    icon: <DollarSign size={17} />,   to: '/admin/custos' },
         { label: 'Admin Dev',       icon: <Code2 size={17} />,        to: '/admin/dev' },
+        { label: 'Admin Telnyx',    icon: <PhoneCall size={17} />,    to: '/admin/telnyx' },
       ],
     },
   ],
@@ -147,6 +148,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/admin/plataforma': 'Admin — Plataforma',
   '/admin/custos':     'Admin — Custos',
   '/admin/dev':        'Admin — Dev',
+  '/admin/telnyx':     'Admin — Telnyx',
   '/vendedor-restrito':'Área do Vendedor',
 }
 

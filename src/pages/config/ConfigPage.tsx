@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { claudeApi } from '@/services/api'
+import TelnyxNumeroSection from '@/components/TelnyxNumeroSection'
 import {
   Building2,
   Plug,
@@ -19,6 +20,8 @@ import {
 } from 'lucide-react'
 import { useProfile } from '@/context/ProfileContext'
 import type { ConfigSection } from '@/context/ProfileContext'
+import { useAuthStore } from '@/store/authStore'
+import ModuloBloqueado from '@/components/ModuloBloqueado'
 
 // Extended section IDs not yet in ProfileContext
 type ExtConfigSection = ConfigSection | 'horarios' | 'clientes'
@@ -135,7 +138,15 @@ function SectionIntegracoes() {
   const [waEnabled, setWaEnabled] = useState(true)
 
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      {/* Número de Telefone Telnyx */}
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-1">Número de Telefone</h3>
+        <p className="text-sm text-gray-500 mb-4">Seu número +55 para os agentes de IA realizarem ligações.</p>
+        <TelnyxNumeroSection />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -172,6 +183,7 @@ function SectionIntegracoes() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm text-gray-900">ElevenLabs</span>
+
               <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 font-medium">Configurado</span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Síntese de voz</p>
@@ -237,6 +249,7 @@ function SectionIntegracoes() {
             <input readOnly defaultValue="https://api.etztech.com.br/webhooks/whatsapp" className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-gray-50 font-mono focus:outline-none" />
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
@@ -1455,6 +1468,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function ConfigPage() {
   const { allowedConfigSections, currentRole } = useProfile()
+  const isAtivo = useAuthStore((state) => state.isAtivo())
 
   const visibleItems = NAV_ITEMS.filter(item => {
     // For items with explicit roles list, check role directly
@@ -1508,11 +1522,11 @@ export default function ConfigPage() {
         {/* Painel */}
         <div>
           {active === 'empresa'               && <SectionEmpresa />}
-          {active === 'integracoes'           && <SectionIntegracoes />}
+          {active === 'integracoes'           && (isAtivo ? <SectionIntegracoes /> : <ModuloBloqueado nomeModulo="Integrações" />)}
           {active === 'integracoes-avancadas' && <SectionIntegracoesAvancadas />}
           {active === 'seguranca'             && <SectionSeguranca />}
           {active === 'notificacoes'          && <SectionNotificacoes />}
-          {active === 'equipe'                && <SectionEquipe />}
+          {active === 'equipe'                && (isAtivo ? <SectionEquipe /> : <ModuloBloqueado nomeModulo="Gestão de Equipe" />)}
           {active === 'horarios'              && <SectionHorarios />}
           {active === 'clientes'              && <SectionClientes />}
           {active === 'dev'                   && <SectionDev />}
