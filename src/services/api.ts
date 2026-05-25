@@ -1,0 +1,204 @@
+import axios from 'axios'
+import { JWT_KEY } from '@/constants/auth'
+
+const BASE_URL = 'https://app.etztech.com/api/v1'
+
+export const api = axios.create({
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
+})
+
+// Injeta JWT em todas as requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(JWT_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Redireciona para login se 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem(JWT_KEY)
+      window.location.href = '/login'
+    }
+    return Promise.reject(err)
+  }
+)
+
+// Auth
+export const authApi = {
+  login: (email: string, token: string) =>
+    api.post('/auth/login', { email, token }),
+}
+
+// Agentes
+export const agentesApi = {
+  list:   ()       => api.get('/agentes'),
+  create: (data: unknown) => api.post('/agentes', data),
+  update: (id: string, data: unknown) => api.put(`/agentes/${id}`, data),
+  delete: (id: string) => api.delete(`/agentes/${id}`),
+}
+
+// Campanhas
+export const campanhasApi = {
+  list:   ()       => api.get('/campanhas'),
+  create: (data: unknown) => api.post('/campanhas', data),
+  update: (id: string, data: unknown) => api.put(`/campanhas/${id}`, data),
+}
+
+// Contatos
+export const contatosApi = {
+  list:       (campanhaId: string)  => api.get(`/contatos?campanha_id=${campanhaId}`),
+  bulkInsert: (data: unknown)       => api.post('/contatos/bulk', data),
+}
+
+// Campanhas — completo
+export const campanhasApiV2 = {
+  list:   ()                          => api.get('/campanhas'),
+  create: (data: unknown)             => api.post('/campanhas', data),
+  update: (id: string, data: unknown) => api.put(`/campanhas/${id}`, data),
+  iniciar: (id: string)               => api.post(`/campanhas/${id}/iniciar`, {}),
+  pausar:  (id: string)               => api.patch(`/campanhas/${id}`, { status: 'pausada' }),
+}
+
+// Ligações
+export const ligacoesApi = {
+  list:     (params?: { agente_id?: string }) => {
+    const qs = params?.agente_id ? `?agente_id=${params.agente_id}` : ''
+    return api.get(`/ligacoes${qs}`)
+  },
+  create:   (data: unknown) => api.post('/ligacoes', data),
+  encerrar: (callControlId: string) => api.delete(`/ligacoes/${callControlId}/encerrar`),
+}
+
+// Reuniões
+export const reunioesApi = {
+  list:   (params?: { agente_id?: string; cliente_id?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
+    return api.get(`/reunioes${qs}`)
+  },
+  create: (data: unknown) => api.post('/reunioes', data),
+}
+
+// Inteligência
+export const inteligenciaApi = {
+  get: () => api.get('/inteligencia'),
+  getQualidade: () => api.get('/inteligencia/qualidade'),
+  getCross: () => api.get('/inteligencia/cross'),
+}
+
+// WhatsApp
+export const whatsappApi = {
+  list:   ()             => api.get('/whatsapp'),
+  send:   (data: unknown) => api.post('/whatsapp', data),
+}
+
+// Planos
+export const planosApi = {
+  list: () => api.get('/planos'),
+}
+
+// Dashboard
+export const dashboardApi = {
+  get: () => api.get('/dashboard'),
+}
+
+// Equipe
+export const equipeApi = {
+  list:   ()                          => api.get('/equipe'),
+  create: (data: unknown)             => api.post('/equipe', data),
+  update: (id: string, data: unknown) => api.patch(`/equipe/${id}`, data),
+  delete: (id: string)                => api.delete(`/equipe/${id}`),
+}
+
+// Pipeline / Deals
+export const dealsApi = {
+  list:   ()                          => api.get('/deals'),
+  create: (data: unknown)             => api.post('/deals', data),
+  update: (id: string, data: unknown) => api.patch(`/deals/${id}`, data),
+  delete: (id: string)                => api.delete(`/deals/${id}`),
+}
+
+// Receptivo
+export const receptivoApi = {
+  list:   ()                          => api.get('/receptivo'),
+  create: (data: unknown)             => api.post('/receptivo', data),
+  update: (id: string, data: unknown) => api.patch(`/receptivo/${id}`, data),
+}
+
+// Relatórios
+export const relatoriosApi = {
+  get: () => api.get('/relatorios'),
+}
+
+// Inteligência — qualidade e simulador
+export const inteligenciaQualidadeApi = {
+  list:   ()             => api.get('/inteligencia/qualidade'),
+  save:   (data: unknown) => api.post('/inteligencia/qualidade', data),
+}
+export const inteligenciaSimuladorApi = {
+  list:    ()             => api.get('/inteligencia/simulador'),
+  create:  (data: unknown) => api.post('/inteligencia/simulador', data),
+  ativar:  (id: string)   => api.patch(`/inteligencia/simulador/${id}/ativar`, {}),
+}
+
+// Emails
+export const emailsApi = {
+  inbox:    () => api.get('/emails?tipo=inbox'),
+  enviados: () => api.get('/emails?tipo=enviado'),
+  marcarLido: (id: string) => api.patch(`/emails/${id}`, { lido: true }),
+}
+
+// Claude AI
+export const claudeApi = {
+  status: () => api.get('/claude/status'),
+  pesquisarMercado: (data: { empresa?: string; segmento?: string; produto?: string }) =>
+    api.post('/claude/pesquisar-mercado', data),
+  gerarModelo: (data: { tipo: string; contexto?: string; campanha?: string }) =>
+    api.post('/claude/gerar-modelo', data),
+  chat: (messages: Array<{ role: string; content: string }>) =>
+    api.post('/claude/chat', { messages }),
+  briefingHandoff: (data: { transcricao?: string; contato_nome?: string; empresa?: string; gatilhos_detectados?: string[] }) =>
+    api.post('/claude/briefing-handoff', data),
+  sugerirHorario: (data: { segmento?: string; historico_ligacoes?: Array<{ hora: number; resultado: string }> }) =>
+    api.post('/claude/sugerir-horario', data),
+  analisarLista: (data: { campanha_id?: string; segmento?: string; total_contatos?: number; amostra?: Array<{ nome?: string; empresa?: string; cargo?: string }> }) =>
+    api.post('/claude/analisar-lista', data),
+  gerarCross: (data: { gatilho: string; exemplos: string[] }) =>
+    api.post('/claude/gerar-cross', data),
+  scoreInteligencia: () => api.get('/claude/score-inteligencia'),
+}
+
+// Clientes — onboarding e admin
+export const clientesApi = {
+  criar: (data: unknown) => api.post('/clientes', data),
+  buscar: (id: string) => api.get(`/clientes/${id}`),
+  enviarDocumentos: (id: string, data: unknown) => api.post(`/clientes/${id}/documentos`, data),
+  gerarContrato: (id: string) => api.post(`/clientes/${id}/gerar-contrato`, {}),
+  buscarContrato: (id: string) => api.get(`/clientes/${id}/contrato`),
+  assinarContrato: (id: string, nomeAssinatura: string) =>
+    api.post(`/clientes/${id}/assinar-contrato`, { nome_assinatura: nomeAssinatura }),
+}
+
+// Admin — clientes
+export const adminClientesApi = {
+  list: (status?: string) => {
+    const qs = status ? `?status=${status}` : ''
+    return api.get(`/admin/clientes${qs}`)
+  },
+  ativar: (id: string | number) => api.patch(`/admin/clientes/${id}`, { action: 'ativar' }),
+  rejeitar: (id: string | number, motivo: string) =>
+    api.patch(`/admin/clientes/${id}`, { action: 'rejeitar', motivo_rejeicao: motivo }),
+}
+
+// Google Calendar
+export const calendarApi = {
+  status:     ()             => api.get('/auth/google/status'),
+  connect:    (jwt: string)  => `${BASE_URL}/auth/google?jwt=${jwt}`,
+  disconnect: ()             => api.delete('/auth/google'),
+}

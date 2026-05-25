@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:/Users/vicen/OneDrive/Área de Trabalho/voxagent/prototype/\" 2>&1 | head -20)",
+      "Read(//c/Users/vicen/OneDrive/Área de Trabalho/voxagent/prototype/**)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(npx eslint *)",
+      "Bash(ls -la \"C:\\\\Users\\\\vicen\\\\OneDrive\\\\Área de Trabalho\\\\voxagent\\\\prototype\\\\\")",
+      "Read(//c/Users/vicen/OneDrive/Área de Trabalho/voxagent/**)"
+    ]
+  }
+}
