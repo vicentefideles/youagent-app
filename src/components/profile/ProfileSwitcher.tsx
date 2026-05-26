@@ -5,15 +5,17 @@ import clsx from 'clsx'
 import { useProfile, PROFILES } from '@/context/ProfileContext'
 import { useAuthStore } from '@/store/authStore'
 
-const ACCOUNT_PROFILES = PROFILES.filter((p) => p.role !== 'platform_admin')
-const PLATFORM_PROFILES = PROFILES.filter((p) => p.role === 'platform_admin')
-
 export default function ProfileSwitcher() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { currentProfile, setCurrentProfile } = useProfile()
-  const { logout } = useAuthStore()
+  const { logout, user } = useAuthStore()
   const navigate = useNavigate()
+
+  // Filtra perfis pelo role do JWT — cliente vê só perfis de conta, admin vê só admin
+  const isPlatformAdmin = user?.role === 'platform_admin'
+  const ACCOUNT_PROFILES = isPlatformAdmin ? [] : PROFILES.filter((p) => p.role !== 'platform_admin')
+  const PLATFORM_PROFILES = isPlatformAdmin ? PROFILES.filter((p) => p.role === 'platform_admin') : []
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -86,28 +88,34 @@ export default function ProfileSwitcher() {
           className="absolute right-0 top-full mt-2 w-[260px] bg-white border border-gray-200
                      rounded-xl shadow-lg z-50 transition-all duration-200 overflow-hidden"
         >
-          {/* Account profiles */}
-          <div className="px-3 py-2 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-              Perfis da conta
-            </p>
-          </div>
-          <div className="py-1">
-            {ACCOUNT_PROFILES.map(renderProfileButton)}
-          </div>
+          {/* Account profiles — só para clientes */}
+          {ACCOUNT_PROFILES.length > 0 && (
+            <>
+              <div className="px-3 py-2 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  Perfis da conta
+                </p>
+              </div>
+              <div className="py-1">
+                {ACCOUNT_PROFILES.map(renderProfileButton)}
+              </div>
+            </>
+          )}
 
-          {/* Divider */}
-          <div className="border-t border-gray-100" />
-
-          {/* Platform admin profiles */}
-          <div className="px-3 py-2 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-              Admin plataforma
-            </p>
-          </div>
-          <div className="py-1">
-            {PLATFORM_PROFILES.map(renderProfileButton)}
-          </div>
+          {/* Platform admin profiles — só para platform_admin */}
+          {PLATFORM_PROFILES.length > 0 && (
+            <>
+              {ACCOUNT_PROFILES.length > 0 && <div className="border-t border-gray-100" />}
+              <div className="px-3 py-2 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  Admin plataforma
+                </p>
+              </div>
+              <div className="py-1">
+                {PLATFORM_PROFILES.map(renderProfileButton)}
+              </div>
+            </>
+          )}
 
           {/* Logout */}
           <div className="border-t border-gray-100 p-2">
