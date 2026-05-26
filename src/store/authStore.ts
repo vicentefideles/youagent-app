@@ -8,6 +8,7 @@ interface Cliente {
   email: string
   plano?: string
   status?: string
+  role?: string   // 'cliente' | 'platform_admin'
 }
 
 interface AuthState {

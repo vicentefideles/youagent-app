@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Phone, BarChart2, Brain, Mail,
@@ -9,11 +9,13 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import clsx from 'clsx'
-import { ProfileProvider, useProfile } from '@/context/ProfileContext'
+import { ProfileProvider, useProfile, PROFILES } from '@/context/ProfileContext'
 import type { UserRole } from '@/context/ProfileContext'
 import NotificationCenter from '@/components/notifications/NotificationCenter'
 import ProfileSwitcher from '@/components/profile/ProfileSwitcher'
 import BannerPendente from '@/components/BannerPendente'
+import ModalNovaCampanha from '@/components/campanhas/ModalNovaCampanha'
+import ModalImportarLista from '@/components/campanhas/ModalImportarLista'
 
 interface NavItem {
   label: string
@@ -224,11 +226,21 @@ function NavSection({
 
 function AppLayoutInner() {
   const { user, logout, status, isAtivo } = useAuthStore()
-  const { currentRole } = useProfile()
+  const { currentRole, setCurrentProfile } = useProfile()
   const navigate = useNavigate()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showNovaCampanha, setShowNovaCampanha] = useState(false)
+  const [showImportarLista, setShowImportarLista] = useState(false)
+
+  // Sincroniza o perfil local com o role do JWT ao montar
+  useEffect(() => {
+    if (user?.role === 'platform_admin') {
+      const adminProfile = PROFILES.find(p => p.role === 'platform_admin')
+      if (adminProfile) setCurrentProfile(adminProfile)
+    }
+  }, [user?.role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const contaAtiva = isAtivo()
   const showLock = !contaAtiva
@@ -310,7 +322,7 @@ function AppLayoutInner() {
   )
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-brand-50 overflow-hidden">
 
       {/* Sidebar desktop */}
       <aside className={clsx(
@@ -365,7 +377,15 @@ function AppLayoutInner() {
 
           {/* Contextual action button */}
           {showContextualButton && contextualAction && (
-            <button className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5">
+            <button
+              className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5"
+              onClick={() => {
+                const path = location.pathname
+                if (path === '/dashboard' || path === '/campanhas') setShowNovaCampanha(true)
+                else if (path === '/discadora') setShowImportarLista(true)
+                else if (path === '/email') navigate('/email', { state: { openCompose: true } })
+              }}
+            >
               {contextualAction.icon}
               <span className="hidden sm:inline">{contextualAction.label}</span>
             </button>
@@ -397,6 +417,38 @@ function AppLayoutInner() {
           <Outlet />
         </main>
       </div>
+
+      {showNovaCampanha && (
+        <ModalNovaCampanha
+          agentes={[]}
+          onSalvar={async () => { setShowNovaCampanha(false) }}
+          onFechar={() => setShowNovaCampanha(false)}
+        />
+      )}
+      {showImportarLista && (
+        <ModalImportarLista
+          campanha={{
+            id: '',
+            nome: 'Importar contatos',
+            tipo: 'outbound',
+            status: 'ativa',
+            modalidade: 'online',
+            estado: '',
+            agressividade: 'media',
+            hora_inicio: '09:00',
+            hora_fim: '18:00',
+            limite_diario: 100,
+            pausa_almoco: true,
+            dias_operacao: ['seg','ter','qua','qui','sex'],
+            icp_ativo: false,
+            icp_threshold: 60,
+            duracao_reuniao: '30',
+            criado_em: new Date().toISOString(),
+          }}
+          onConcluido={() => { setShowImportarLista(false) }}
+          onFechar={() => setShowImportarLista(false)}
+        />
+      )}
     </div>
   )
 }
