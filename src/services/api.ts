@@ -103,7 +103,9 @@ export const whatsappApi = {
 
 // Planos
 export const planosApi = {
-  list: () => api.get('/planos'),
+  list:     () => api.get('/planos'),
+  assinar:  (plano: string) => api.post('/planos/assinar', { plano }),
+  cancelar: (imediato?: boolean) => api.delete('/planos/cancelar', { data: { imediato: imediato ?? false } }),
 }
 
 // Dashboard
@@ -113,10 +115,11 @@ export const dashboardApi = {
 
 // Equipe
 export const equipeApi = {
-  list:   ()                          => api.get('/equipe'),
-  create: (data: unknown)             => api.post('/equipe', data),
-  update: (id: string, data: unknown) => api.patch(`/equipe/${id}`, data),
-  delete: (id: string)                => api.delete(`/equipe/${id}`),
+  list:     ()                          => api.get('/equipe'),
+  metricas: ()                          => api.get('/equipe/metricas'),
+  create:   (data: unknown)             => api.post('/equipe', data),
+  update:   (id: string, data: unknown) => api.patch(`/equipe/${id}`, data),
+  delete:   (id: string)                => api.delete(`/equipe/${id}`),
 }
 
 // Pipeline / Deals

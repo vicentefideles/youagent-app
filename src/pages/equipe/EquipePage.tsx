@@ -705,24 +705,34 @@ export default function EquipePage() {
     queryFn: () => equipeApi.list().then((r) => r.data as ApiVendedor[]),
   })
 
+  const { data: metricas = [] } = useQuery({
+    queryKey: ['equipe-metricas'],
+    queryFn: () => equipeApi.metricas().then(r => r.data as Array<{id: string; ligacoes: number; reunioes: number; showRate: number; conversao: number}>),
+  })
+
+  const metricasMap = Object.fromEntries(metricas.map(m => [m.id, m]))
+
   const vendedores: Vendedor[] = isLoading
     ? []
-    : rawEquipe.map((v) => ({
-        id: v.id,
-        nome: v.nome,
-        email: v.email ?? '',
-        cargo: (v.cargo as Vendedor['cargo']) ?? 'Closer',
-        status: v.ativo ? 'Ativo' : 'Inativo',
-        telefone: '',
-        agentesAtivos: 0,
-        ligacoes: 0,
-        reunioes: 0,
-        showRate: 0,
-        conversao: 0,
-        meta: v.meta_mensal ?? 0,
-        realizado: 0,
-        avatar: getInitials(v.nome),
-      }))
+    : rawEquipe.map((v) => {
+        const m = metricasMap[v.id] || {}
+        return {
+          id: v.id,
+          nome: v.nome,
+          email: v.email ?? '',
+          cargo: (v.cargo as Vendedor['cargo']) ?? 'Closer',
+          status: v.ativo ? 'Ativo' : 'Inativo',
+          telefone: '',
+          agentesAtivos: 0,
+          ligacoes: (m as {ligacoes?: number}).ligacoes || 0,
+          reunioes: (m as {reunioes?: number}).reunioes || 0,
+          showRate: (m as {showRate?: number}).showRate || 0,
+          conversao: (m as {conversao?: number}).conversao || 0,
+          meta: v.meta_mensal ?? 0,
+          realizado: 0,
+          avatar: getInitials(v.nome),
+        }
+      })
 
   const criarMutation = useMutation({
     mutationFn: (data: NovoVendedor) =>
