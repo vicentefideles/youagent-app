@@ -18,6 +18,7 @@ import {
   PhoneOutgoing,
   PhoneIncoming,
   Settings,
+  Loader2,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -472,11 +473,13 @@ function Step3({
 function Step4({
   form,
   activated,
+  activating,
   onActivate,
   onReset,
 }: {
   form: FormData
   activated: boolean
+  activating?: boolean
   onActivate: () => void
   onReset: () => void
 }) {
@@ -562,10 +565,20 @@ function Step4({
 
       <button
         onClick={onActivate}
-        className="flex items-center justify-center gap-2 w-full py-3.5 bg-green-600 text-white font-semibold text-base rounded-xl hover:bg-green-700 transition-colors"
+        disabled={activating}
+        className="flex items-center justify-center gap-2 w-full py-3.5 bg-green-600 text-white font-semibold text-base rounded-xl hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
       >
-        <Bot size={20} />
-        Ativar Agente
+        {activating ? (
+          <>
+            <Loader2 size={20} className="animate-spin" />
+            Ativando...
+          </>
+        ) : (
+          <>
+            <Bot size={20} />
+            Ativar Agente
+          </>
+        )}
       </button>
     </div>
   )
@@ -926,6 +939,7 @@ export default function OnboardingPage() {
             <Step4
               form={form}
               activated={activated}
+              activating={activating}
               onActivate={handleActivate}
               onReset={reset}
             />
