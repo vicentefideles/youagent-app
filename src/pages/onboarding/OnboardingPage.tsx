@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ChevronLeft,
   Bot,
-  Play,
   Building2,
   Package,
   Target,
@@ -68,7 +67,7 @@ const INITIAL_FORM: FormData = {
   'wiz-qualif-q1': 'Vocês já usam alguma ferramenta de prospecção ativa?',
   'wiz-qualif-q2': 'Qual o volume mensal de reuniões da equipe hoje?',
   'wiz-qualif-q3': 'Você é o responsável pela decisão de novas ferramentas?',
-  voz: '',
+  voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
 }
 
@@ -418,6 +417,78 @@ function Step2({
   )
 }
 
+type FiltroGenero = 'Todos' | 'Feminino' | 'Masculino'
+
+function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  const [filtro, setFiltro] = useState<FiltroGenero>('Todos')
+
+  const grupos = (['pt-BR', 'pt-PT'] as const).map(idioma => ({
+    idioma,
+    label: idioma === 'pt-BR' ? 'Português — Brasil' : 'Português — Portugal',
+    vozes: VOZES_TELNYX.filter(
+      v => v.idioma === idioma && (filtro === 'Todos' || v.genero === filtro)
+    ),
+  })).filter(g => g.vozes.length > 0)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-medium text-gray-700">Voz do agente</p>
+        <div className="flex gap-1">
+          {(['Todos', 'Feminino', 'Masculino'] as FiltroGenero[]).map(f => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFiltro(f)}
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                filtro === f
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {grupos.map(g => (
+          <div key={g.idioma}>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{g.label}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {g.vozes.map(v => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onChange('voz', v.id)}
+                  className={`text-left p-3 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                    form.voz === v.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg">{v.genero === 'Feminino' ? '👩‍💼' : '👨‍💼'}</span>
+                    {form.voz === v.id && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                  </div>
+                  <p className="font-semibold text-gray-900 text-sm leading-tight">{v.nome}</p>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{v.modelo}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      v.genero === 'Feminino' ? 'bg-pink-50 text-pink-600' : 'bg-sky-50 text-sky-600'
+                    }`}>{v.genero}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Step3({
   form,
   onChange,
@@ -491,37 +562,7 @@ function Step3({
         </div>
       </div>
 
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Voz do agente</p>
-        <div className="grid grid-cols-2 gap-3">
-          {VOZES_CARDS.map(v => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => onChange('voz', v.id)}
-              className={`text-left p-4 rounded-xl border-2 transition-all flex flex-col gap-2 ${
-                form.voz === v.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">{v.emoji}</span>
-                <Play size={13} className="opacity-40" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">{v.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{v.descricao}</p>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {v.tags.map(tag => (
-                  <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{tag}</span>
-                ))}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+      <VozSelector form={form} onChange={onChange} />
 
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">Tom de comunicação</p>
