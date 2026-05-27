@@ -70,12 +70,14 @@ export const campanhasApiV2 = campanhasApi
 
 // Ligações
 export const ligacoesApi = {
-  list:     (params?: { agente_id?: string }) => {
-    const qs = params?.agente_id ? `?agente_id=${params.agente_id}` : ''
+  list:     (params?: { agente_id?: string; status?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
     return api.get(`/ligacoes${qs}`)
   },
   create:   (data: unknown) => api.post('/ligacoes', data),
   encerrar: (callControlId: string) => api.delete(`/ligacoes/${callControlId}/encerrar`),
+  transferir: (callControlId: string, data: { numero_destino: string; vendedor_nome?: string }) =>
+    api.post(`/ligacoes/${callControlId}/transferir`, data),
 }
 
 // Reuniões

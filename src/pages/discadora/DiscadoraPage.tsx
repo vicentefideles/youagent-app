@@ -236,17 +236,18 @@ interface MonitorIA {
 
 function TabFila() {
   const { data: filaData = [] } = useQuery({
-    queryKey: ['ligacoes'],
-    queryFn: () => ligacoesApi.list().then(r => (r.data as any[]).map(l => ({
-      id: String(l.id),
-      empresa: l.empresa_nome ?? l.empresa ?? '',
-      contato: l.contato_nome ?? l.contato ?? '',
-      cargo: l.cargo ?? '',
-      telefone: l.telefone ?? '',
-      agente: l.agente_nome ?? l.agente ?? '',
+    queryKey: ['ligacoes-ativas'],
+    queryFn: () => ligacoesApi.list({ status: 'em_andamento' }).then(r => (r.data as any[]).map(l => ({
+      id: String(l.call_control_id ?? l.id ?? Math.random()),
+      _callControlId: String(l.call_control_id ?? l.id ?? ''),
+      empresa: l.contatos?.empresa ?? l.empresa_nome ?? l.empresa ?? '—',
+      contato: l.contatos?.nome ?? l.contato_nome ?? l.contato ?? '—',
+      cargo: l.contatos?.cargo ?? l.cargo ?? '',
+      telefone: l.numero_destino ?? l.telefone ?? '',
+      agente: l.agentes?.nome ?? l.agente_nome ?? l.agente ?? '—',
       campanha: l.campanha_nome ?? l.campanha ?? '',
-      segmento: l.segmento ?? '',
-      status: (l.status ?? 'na_fila') as StatusLigacao,
+      segmento: l.contatos?.segmento ?? l.segmento ?? '',
+      status: (l.status === 'em_andamento' ? 'em_ligacao' : l.status ?? 'na_fila') as StatusLigacao,
       icp: l.icp ?? 0,
       potencial: l.potencial ?? 0,
       tentativa: l.tentativa ?? 1,
@@ -255,7 +256,8 @@ function TabFila() {
       snippet: l.snippet,
       gatilhoDetectado: l.gatilho_detectado,
       transferindo: l.transferindo ?? false,
-    } as EntradaFila)))
+    } as EntradaFila & { _callControlId: string }))),
+    refetchInterval: 5000,
   })
   const [fila, setFila] = useState<EntradaFila[]>([])
 
@@ -320,11 +322,12 @@ function TabFila() {
     queryKey: ['equipe'],
     queryFn: () => equipeApi.list().then(r => r.data as any[]),
   })
-  const transferCandidates: Vendedor[] = equipeRaw.length > 0
+  const transferCandidates: (Vendedor & { telefone?: string })[] = equipeRaw.length > 0
     ? equipeRaw.map(v => ({
         nome: v.nome ?? v.name ?? '—',
         status: (v.status === 'em_chamada' ? 'em_chamada' : v.status === 'ausente' ? 'ausente' : 'disponivel') as Vendedor['status'],
         reunioes_hoje: v.reunioes_hoje ?? v.reunioes_count ?? 0,
+        telefone: v.telefone ?? v.phone,
       }))
     : TRANSFER_CANDIDATES
 
@@ -375,7 +378,19 @@ function TabFila() {
   function toggleTranscricao(id: string) {
     setTranscricaoAberta(prev => ({ ...prev, [id]: !prev[id] }))
   }
-  function iniciarTransferencia(agentId: string, vendedor: string) {
+  async function iniciarTransferencia(agentId: string, vendedor: string, telefone?: string) {
+    const item = fila.find(f => f.id === agentId) as (EntradaFila & { _callControlId?: string }) | undefined
+    const callControlId = item?._callControlId ?? agentId
+    if (callControlId && telefone) {
+      try {
+        await ligacoesApi.transferir(callControlId, {
+          numero_destino: telefone,
+          vendedor_nome: vendedor,
+        })
+      } catch (err) {
+        console.error('Erro ao transferir:', err)
+      }
+    }
     setTransferidoPara(prev => ({ ...prev, [agentId]: vendedor }))
   }
 
@@ -809,7 +824,7 @@ function TabFila() {
                           </div>
                           {v.status === 'disponivel' ? (
                             <button
-                              onClick={() => iniciarTransferencia(item.id, v.nome)}
+                              onClick={() => iniciarTransferencia(item.id, v.nome, v.telefone)}
                               className="text-2xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-2 py-1 transition-colors"
                             >
                               Transferir
@@ -1823,6 +1838,25 @@ function TabAgendados() {
 // ─── ABA GRAVAÇÕES ───────────────────────────────────────────────────────────
 
 function TabGravacoes() {
+  const { data: gravacoes = [] } = useQuery({
+    queryKey: ['gravacoes'],
+    queryFn: () => ligacoesApi.list({ status: 'encerrada' }).then(r =>
+      (r.data as any[])
+        .filter(l => l.url_gravacao)
+        .map(l => ({
+          id: String(l.call_control_id ?? l.id ?? Math.random()),
+          empresa: l.contatos?.empresa ?? l.empresa_nome ?? l.numero_destino ?? '—',
+          contato: l.contatos?.nome ?? l.contato_nome ?? '—',
+          agente: l.agentes?.nome ?? l.agente_nome ?? '—',
+          campanha: l.campanha_nome ?? l.campanha ?? '',
+          duracao: l.duracao_segundos ? `${Math.floor(l.duracao_segundos / 60)}m${String(l.duracao_segundos % 60).padStart(2,'0')}s` : l.duracao ?? '—',
+          data: l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' · ' + new Date(l.encerrada_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '—',
+          resultado: (l.resultado ?? 'retornar') as 'agendou' | 'retornar' | 'nao_atendeu',
+          icp: l.icp ?? 0,
+          url_gravacao: l.url_gravacao,
+        }))
+    ),
+  })
   const [playing, setPlaying] = useState<string | null>(null)
   const [progresso, setProgresso] = useState(0)
   const [treinadas, setTreinadas] = useState<Set<string>>(new Set())
@@ -1863,7 +1897,14 @@ function TabGravacoes() {
             <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
           ))}
         </div>
-        {GRAVACOES.map((g, i) => (
+        {gravacoes.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <Mic size={32} className="mb-3 opacity-30" />
+            <p className="text-sm font-medium">Nenhuma gravação disponível</p>
+            <p className="text-xs mt-1">As gravações de chamadas encerradas aparecerão aqui.</p>
+          </div>
+        )}
+        {gravacoes.map((g, i) => (
           <div key={g.id} className={clsx('grid grid-cols-[2fr_1fr_1fr_1fr_1fr_180px] px-4 py-3 border-b border-gray-100 items-center', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
             <div>
               <div className="text-sm font-medium text-gray-900">{g.empresa}</div>
@@ -1903,8 +1944,8 @@ function TabGravacoes() {
               <Pause size={14}/>
             </button>
             <div>
-              <div className="text-xs font-semibold text-white">{GRAVACOES.find(g => g.id === playing)?.empresa}</div>
-              <div className="text-2xs text-gray-400">{GRAVACOES.find(g => g.id === playing)?.agente}</div>
+              <div className="text-xs font-semibold text-white">{gravacoes.find(g => g.id === playing)?.empresa}</div>
+              <div className="text-2xs text-gray-400">{gravacoes.find(g => g.id === playing)?.agente}</div>
             </div>
           </div>
           <div className="flex-1 flex items-center gap-3">
@@ -1912,7 +1953,7 @@ function TabGravacoes() {
             <div className="flex-1 h-1.5 bg-gray-700 rounded-full cursor-pointer">
               <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${progresso}%` }} />
             </div>
-            <span className="text-2xs text-gray-400 font-mono w-10">{GRAVACOES.find(g => g.id === playing)?.duracao}</span>
+            <span className="text-2xs text-gray-400 font-mono w-10">{gravacoes.find(g => g.id === playing)?.duracao}</span>
           </div>
           <div className="flex items-center gap-2">
             <Volume2 size={14} className="text-gray-400"/>
