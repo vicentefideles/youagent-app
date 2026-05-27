@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { campanhasApi, reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
@@ -71,7 +71,7 @@ interface LeadUploadPreview {
 
 // Legacy mock removed — TabFila and TabAoVivo use real API data
 
-const AGENDAMENTOS: Agendamento[] = [
+const AGENDAMENTOS_FALLBACK: Agendamento[] = [
   { id:'a1', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', cargo:'Diretor Comercial', telefone:'(11) 98765-4321', email:'marcos@grupoabc.com.br', modalidade:'online', cidade:'São Paulo', cnpj:'12.345.678/0001-90', segmento:'Comércio / Varejo', resumoLigacao:'Cliente demonstrou interesse em reduzir custo de SDRs. Mencionou que tem equipe de 5 vendedores. Aceitou a reunião para conhecer o modelo de IA.', agente:'Ana', duracaoLigacao:'2m34s', dataHora:'14/05 · 14h00', meetLink:'meet.google.com/abc-123', vendedor:'João Silva', vendedorIniciais:'JS', status:'confirmado', noShowRisk:18, campanha:'SP — Campanha Maio' },
   { id:'a2', empresa:'Indústria Delta', contato:'Roberto Alves', cargo:'Gerente Geral', telefone:'(31) 97654-3210', email:'roberto@deltaindustria.com.br', modalidade:'presencial', cidade:'Belo Horizonte', segmento:'Manufatura', resumoLigacao:'Empresa com 120 funcionários procurando escalar o time comercial sem aumentar headcount. Muito receptivo à proposta.', agente:'Carlos', duracaoLigacao:'3m12s', dataHora:'16/05 · 10h00', vendedor:'Carlos Vidal', vendedorIniciais:'CV', status:'confirmado', noShowRisk:32, campanha:'GO — Campanha Maio' },
   { id:'a3', empresa:'Tech Nova Sistemas', contato:'Carla Mendes', cargo:'Gestora Comercial', telefone:'(11) 96543-2109', email:'carla@technova.com.br', modalidade:'online', cidade:'São Paulo', segmento:'SaaS / Tech', resumoLigacao:'Interesse imediato em substituir o processo manual de prospecção. Solicitou demo completa da plataforma.', agente:'Ana', duracaoLigacao:'1m45s', dataHora:'15/05 · 09h30', meetLink:'meet.google.com/xyz-456', vendedor:'Maria Rodrigues', vendedorIniciais:'MR', status:'pendente', noShowRisk:24, campanha:'SP — Campanha Maio' },
@@ -379,8 +379,15 @@ function TabFila() {
   function toggleAll(checked: boolean) {
     setSelecionados(checked ? filaFiltrada.map(f => f.id) : [])
   }
-  function injetarScript(id: string) {
-    setScriptFeedback(prev => ({ ...prev, [id]: '✓ Frase enviada ao agente' }))
+  async function injetarScript(id: string) {
+    const texto = scriptInput[id]
+    if (!texto) return
+    try {
+      await ligacoesApi.falar(id, { texto })
+      setScriptFeedback(prev => ({ ...prev, [id]: '✓ Injetado' }))
+    } catch {
+      setScriptFeedback(prev => ({ ...prev, [id]: 'Erro ao injetar' }))
+    }
     setTimeout(() => setScriptFeedback(prev => ({ ...prev, [id]: '' })), 2500)
     setScriptInput(prev => ({ ...prev, [id]: '' }))
   }
@@ -414,9 +421,9 @@ function TabFila() {
       <div className="grid grid-cols-5 gap-3">
         {[
           { label:'Em ligação agora', value: ativas, color:'text-emerald-600' },
-          { label:'Na fila', value:384, color:'text-gray-900' },
-          { label:'Retornar contato', value:67, color:'text-amber-600' },
-          { label:'Ligações hoje', value:24, color:'text-brand-600' },
+          { label:'Na fila', value: filaData.length, color:'text-gray-900' },
+          { label:'Retornar contato', value: filaData.filter(f => f.status === 'retornar').length, color:'text-amber-600' },
+          { label:'Agendadas hoje', value: filaData.filter(f => f.status === 'agendado').length, color:'text-brand-600' },
           { label:'Latência total', value:`${latency.total}ms`, color: latColor(latency.total), sub: latency.total < 500 ? 'Dentro do limite ✓' : 'Acima do limite ⚠' },
         ].map(k => (
           <div key={k.label} className="kpi-card">
@@ -758,13 +765,8 @@ function TabFila() {
                       )}
                     </div>
                     {transcricaoAberta[item.id] && (
-                      <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto">
-                        {(TRANSCRICOES[item.id] ?? []).map((l, i) => (
-                          <div key={i} className="flex gap-2">
-                            <span className={clsx('text-2xs font-bold flex-shrink-0 w-14', l.cor)}>{l.quem}:</span>
-                            <span className="text-2xs text-gray-300 leading-relaxed">{l.texto}</span>
-                          </div>
-                        ))}
+                      <div className="max-h-36 overflow-y-auto">
+                        <TranscriptAoVivo callControlId={(item as any)._callControlId ?? item.id} enabled={transcricaoAberta[item.id]} />
                       </div>
                     )}
                     {!transcricaoAberta[item.id] && (
@@ -1134,12 +1136,21 @@ interface NovaCampanhaState {
 }
 
 function ModalNovaCampanha({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient()
   const [state, setState] = useState<NovaCampanhaState>({
     nome: '', tipo: 'outbound', agente: '', meta: '',
     regiao: '', agressividade: 'media',
     fonteInbound: '', diasSemContato: '30',
     faixaEtaria: '', intervaloEnvio: '24', sequenciaEtapas: '3',
   })
+
+  async function handleCriarCampanha() {
+    try {
+      await campanhasApi.create(state)
+      queryClient.invalidateQueries({ queryKey: ['campanhas'] })
+    } catch { /* silencioso */ }
+    onClose()
+  }
 
   if (!open) return null
 
@@ -1262,7 +1273,7 @@ function ModalNovaCampanha({ open, onClose }: { open: boolean; onClose: () => vo
 
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
           <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
-          <button onClick={onClose} className="btn-primary flex-1 justify-center">Criar campanha</button>
+          <button onClick={handleCriarCampanha} className="btn-primary flex-1 justify-center">Criar campanha</button>
         </div>
       </div>
     </div>
@@ -1713,7 +1724,7 @@ function TabAgendados() {
         campanha: r.campanha_nome ?? r.campanha ?? '',
         resultado: r.resultado,
       }))
-    : AGENDAMENTOS
+    : AGENDAMENTOS_FALLBACK
 
   const fechamentos = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'fechou').length
   const noShows = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'noshow').length

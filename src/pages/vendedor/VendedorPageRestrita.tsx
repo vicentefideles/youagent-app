@@ -7,10 +7,10 @@
  * - currentProfile.nome é usado como filtro automático
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { reunioesApi, emailsApi, calendarApi } from '@/services/api'
+import { reunioesApi, emailsApi, calendarApi, equipeApi } from '@/services/api'
 import {
   Calendar,
   CalendarDays,
@@ -1508,6 +1508,12 @@ function TabMensagens({
   const [novaDestinatario, setNovaDestinatario] = useState('')
   const [novaTexto, setNovaTexto] = useState('')
 
+  // Fix 3 — Dropdown destinatário via equipeApi
+  const { data: equipe = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+
   const recebidas = mensagens.filter((m) => m.tipo === 'recebida')
   const enviadas = mensagens.filter((m) => m.tipo === 'enviada')
   const naoLidas = recebidas.filter((m) => !m.lida).length
@@ -1575,8 +1581,13 @@ function TabMensagens({
                 className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="">Selecione...</option>
-                <option>Ana Rodrigues</option>
-                <option>Admin Demo</option>
+                {equipe.length > 0
+                  ? equipe.map((m: any) => <option key={m.id} value={m.nome ?? m.name}>{m.nome ?? m.name}</option>)
+                  : (<>
+                      <option>Ana Rodrigues</option>
+                      <option>Admin Demo</option>
+                    </>)
+                }
               </select>
             </div>
             <div>
@@ -1763,10 +1774,38 @@ export default function VendedorPageRestrita() {
     setReunioes(reunioesReais)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawReunioes])
-  const [emails, setEmails] = useState<EmailVendedor[]>(
-    mockEmails.filter((e) => e.vendedor === nomeVendedor)
+  // Emails reais via API
+  const { data: emailsApiData = [] } = useQuery({
+    queryKey: ['emails-vendedor'],
+    queryFn: () => emailsApi.enviados().then(r => (r.data as any[]).map((e): EmailVendedor => ({
+      id: e.id,
+      empresa: e.empresa ?? '',
+      contato: e.contato ?? '',
+      email: e.para ?? '',
+      campanha: e.campanha ?? '',
+      origem: (e.origem ?? 'manual') as EmailVendedor['origem'],
+      template: e.assunto ?? '(sem assunto)',
+      hora: e.criado_em ?? '',
+      status: (e.lido ? 'Enviado' : e.status ?? 'Pendente') as EmailVendedor['status'],
+      vendedor: e.vendedor ?? nomeVendedor,
+    }))),
+  })
+  const mockEmailsFallback = useMemo(
+    () => mockEmails.filter(e => e.vendedor === nomeVendedor),
+    [nomeVendedor]
   )
-  const [mensagens, setMensagens] = useState<MensagemChat[]>(mockMensagens)
+  const [emails, setEmails] = useState<EmailVendedor[]>([])
+  useEffect(() => {
+    if (emailsApiData.length > 0) {
+      setEmails(emailsApiData)
+    } else if (emails.length === 0) {
+      setEmails(mockEmailsFallback)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailsApiData])
+
+  // Fix 2 — mensagens: estado vazio (sem mock como estado inicial)
+  const [mensagens, setMensagens] = useState<MensagemChat[]>([])
 
   // Computed badges
   const reunioesHoje = reunioes.filter((r) => r.data === HOJE).length
