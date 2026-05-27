@@ -76,7 +76,8 @@
 @layer components {
   /* Card */
   .card {
-    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
+    @apply bg-white rounded-xl shadow-sm;
+    border: 1px solid rgba(196,181,253,0.25);
   }
 
   /* Input */
@@ -133,5 +134,5 @@
   }
 
   /* Divider */
-  .divider { @apply border-t border-gray-100; }
+  .divider { border-top: 1px solid rgba(196,181,253,0.2); }
 }

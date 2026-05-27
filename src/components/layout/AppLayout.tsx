@@ -262,7 +262,7 @@ function AppLayoutInner() {
 
       {/* Logo */}
       <div className={clsx(
-        'flex items-center gap-3 px-4 py-5 border-b border-gray-100',
+        'flex items-center gap-3 px-4 py-5',
         collapsed && 'justify-center px-3'
       )}>
         <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-200
@@ -294,9 +294,9 @@ function AppLayoutInner() {
 
       {/* User */}
       <div className={clsx(
-        'border-t border-gray-100 p-3',
+        'p-3',
         collapsed && 'flex justify-center'
-      )}>
+      )} style={{ borderTop: '1px solid rgba(196,181,253,0.25)' }}>
         {!collapsed ? (
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-brand-100 flex items-center justify-center flex-shrink-0">
@@ -326,18 +326,23 @@ function AppLayoutInner() {
 
       {/* Sidebar desktop */}
       <aside className={clsx(
-        'hidden lg:flex flex-col bg-white border-r border-gray-100 flex-shrink-0',
+        'hidden lg:flex flex-col flex-shrink-0',
         'transition-all duration-200 relative',
         collapsed ? 'w-[60px]' : 'w-[220px]'
-      )}>
+      )} style={{
+        background: 'rgba(255,255,255,0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderRight: '1px solid rgba(196,181,253,0.3)',
+      }}>
         {sidebarContent}
 
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-20 w-6 h-6 bg-white border border-gray-200
-                     rounded-full flex items-center justify-center shadow-sm
-                     text-gray-400 hover:text-gray-700 hover:border-gray-300 transition-colors z-10"
+          className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center
+                     shadow-sm text-brand-400 hover:text-brand-600 transition-colors z-10"
+          style={{ background: 'white', border: '1px solid rgba(196,181,253,0.5)' }}
         >
           <ChevronLeft size={12} className={clsx('transition-transform', collapsed && 'rotate-180')} />
         </button>
@@ -352,7 +357,7 @@ function AppLayoutInner() {
       {/* Sidebar mobile */}
       <aside className={clsx(
         'lg:hidden fixed left-0 top-0 bottom-0 z-50 w-[220px]',
-        'bg-white border-r border-gray-100 transition-transform duration-200',
+        'transition-transform duration-200',
         mobileOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         {sidebarContent}
@@ -362,8 +367,13 @@ function AppLayoutInner() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Topbar */}
-        <header className="flex items-center gap-3 px-5 h-14 border-b border-gray-100
-                           bg-white flex-shrink-0">
+        <header className="flex items-center gap-3 px-5 h-14 flex-shrink-0"
+                style={{
+                  background: 'rgba(255,255,255,0.80)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  borderBottom: '1px solid rgba(196,181,253,0.25)',
+                }}>
           <button className="lg:hidden btn-ghost p-2" onClick={() => setMobileOpen(true)}>
             <Menu size={18} />
           </button>
