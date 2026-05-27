@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   FlaskConical, Shield, Users, Clock, BookOpen, Database,
   BarChart2, Sliders, TrendingUp, Share2, GitBranch, Play,
   Target, TestTube2, Globe, Cpu, CheckCircle,
   ChevronRight, Upload, Trash2, RotateCcw, Zap,
-  AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles,
+  AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2,
 } from 'lucide-react'
-import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api } from '@/services/api'
+import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi } from '@/services/api'
 
 type TabId =
   | 'testes' | 'qualidade' | 'coletiva' | 'horarios' | 'campanhas'
@@ -2391,6 +2391,18 @@ function TabCampanhas() {
 export default function InteligenciaPage() {
   const [activeTab, setActiveTab] = useState<TabId>('testes')
   const [scoreIA, setScoreIA] = useState<number | null>(null)
+  const [calculando, setCalculando] = useState(false)
+  const queryClient = useQueryClient()
+
+  const recalcularScores = async () => {
+    setCalculando(true)
+    try {
+      await qualidadeCalcularApi.calcular()
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-qualidade'] })
+    } finally {
+      setCalculando(false)
+    }
+  }
 
   useEffect(() => {
     claudeApi.scoreInteligencia()
@@ -2420,7 +2432,23 @@ export default function InteligenciaPage() {
 
   const tabContent: Record<TabId, React.ReactNode> = {
     testes: <TabTestes />,
-    qualidade: <TabQualidade agentesQualidade={agentesQualidade} />,
+    qualidade: (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-gray-700">Qualidade dos Agentes</span>
+          <button
+            onClick={recalcularScores}
+            disabled={calculando}
+            className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 flex items-center gap-1.5"
+            style={{ background: calculando ? undefined : '#4F46E5' }}
+          >
+            {calculando ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            Recalcular scores
+          </button>
+        </div>
+        <TabQualidade agentesQualidade={agentesQualidade} />
+      </div>
+    ),
     coletiva: <TabColetiva />,
     horarios: <TabHorarios />,
     campanhas: <TabCampanhas />,

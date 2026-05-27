@@ -236,6 +236,22 @@ export const calendarApi = {
   disconnect: ()             => api.delete('/auth/google'),
 }
 
+// Admin Suporte
+export const adminSuporteApi = {
+  ligacoes:       () => api.get('/admin/suporte/ligacoes'),
+  emails:         () => api.get('/admin/suporte/emails'),
+  tickets:        () => api.get('/admin/suporte/tickets'),
+  resolverTicket: (id: string) => api.patch(`/admin/suporte/tickets/${id}`, { status: 'resolvido' }),
+  responderTicket:(id: string, resposta: string) => api.post(`/admin/suporte/tickets/${id}/responder`, { resposta }),
+  clientesVisao:  () => api.get('/admin/suporte/clientes-visao'),
+  equipe:         () => api.get('/admin/suporte/equipe'),
+}
+
+// Qualidade calculada
+export const qualidadeCalcularApi = {
+  calcular: () => api.post('/inteligencia/qualidade/calcular', {}),
+}
+
 // Telnyx — provisionamento de números
 export const telnyxApi = {
   buscarNumeros: (ddd: string, tipo?: string) =>

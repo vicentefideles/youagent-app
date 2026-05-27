@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { api, emailsApi } from '@/services/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, emailsApi, adminSuporteApi } from '@/services/api';
 import {
   Headphones,
   Phone,
@@ -505,12 +506,35 @@ function TabLigacoes() {
   const [date, setDate] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const filtered = MOCK_CALLS.filter((c) => {
+  const { data: calls = [], isLoading: loadingCalls } = useQuery({
+    queryKey: ['admin-suporte-ligacoes'],
+    queryFn: () => adminSuporteApi.ligacoes().then(r => r.data as any[]),
+  });
+
+  const ligacoes: CallRecord[] = calls.length > 0
+    ? calls.map((c: any) => ({
+        id: c.id ?? c._id ?? String(Math.random()),
+        company: c.company ?? c.empresa ?? '',
+        contact: c.contact ?? c.contato ?? '',
+        duration: c.duration ?? c.duracao ?? '—',
+        status: c.status ?? 'Atendida',
+        agent: c.agent ?? c.agente ?? '',
+        datetime: c.datetime ?? c.data ?? '',
+      }))
+    : MOCK_CALLS;
+
+  const filtered = ligacoes.filter((c) => {
     const matchEmpresa = c.company.toLowerCase().includes(empresa.toLowerCase());
     const matchStatus = status === 'Todos' || c.status === status;
     const matchDate = !date || c.datetime?.includes(date);
     return matchEmpresa && matchStatus && matchDate;
   });
+
+  if (loadingCalls) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -591,11 +615,32 @@ function TabEmail() {
   const [empresa, setEmpresa] = useState('');
   const [status, setStatus] = useState('Todos');
 
-  const filtered = MOCK_EMAILS.filter((e) => {
+  const { data: emailsData = [], isLoading: loadingEmails } = useQuery({
+    queryKey: ['admin-suporte-emails'],
+    queryFn: () => adminSuporteApi.emails().then(r => r.data as any[]),
+  });
+
+  const emailList: EmailRecord[] = emailsData.length > 0
+    ? emailsData.map((e: any) => ({
+        id: e.id ?? e._id ?? String(Math.random()),
+        company: e.company ?? e.empresa ?? '',
+        subject: e.subject ?? e.assunto ?? '',
+        status: e.status ?? 'Enviado',
+        date: e.date ?? e.data ?? '',
+      }))
+    : MOCK_EMAILS;
+
+  const filtered = emailList.filter((e) => {
     const matchEmpresa = e.company.toLowerCase().includes(empresa.toLowerCase());
     const matchStatus = status === 'Todos' || e.status === status;
     return matchEmpresa && matchStatus;
   });
+
+  if (loadingEmails) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -1023,12 +1068,37 @@ function TabSuporte() {
   const [filtroStatus, setFiltroStatus] = useState('Todos');
   const [ticketAberto, setTicketAberto] = useState<Ticket | null>(null);
   const [resposta, setResposta] = useState('');
+  const queryClient = useQueryClient();
 
-  const filtrados = MOCK_TICKETS.filter(t => {
+  const { data: ticketsData = [], isLoading: loadingTickets } = useQuery({
+    queryKey: ['admin-suporte-tickets'],
+    queryFn: () => adminSuporteApi.tickets().then(r => r.data as any[]),
+  });
+
+  const tickets: Ticket[] = ticketsData.length > 0
+    ? ticketsData.map((t: any) => ({
+        id: t.id ?? t._id ?? String(Math.random()),
+        empresa: t.empresa ?? t.company ?? '',
+        titulo: t.titulo ?? t.title ?? '',
+        prioridade: t.prioridade ?? t.priority ?? 'Média',
+        status: t.status ?? 'Aberto',
+        data: t.data ?? t.date ?? '',
+        responsavel: t.responsavel ?? t.assigned_to ?? '',
+        descricao: t.descricao ?? t.description ?? '',
+      }))
+    : MOCK_TICKETS;
+
+  const filtrados = tickets.filter(t => {
     const okP = filtroPrio === 'Todos' || t.prioridade === filtroPrio;
     const okS = filtroStatus === 'Todos' || t.status === filtroStatus;
     return okP && okS;
   });
+
+  if (loadingTickets) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
     <div className="flex gap-4">
@@ -1087,7 +1157,8 @@ function TabSuporte() {
           <div className="flex gap-2">
             <button
               onClick={() => {
-                api.patch('/admin/suporte/tickets/' + ticketAberto?.id, { status: 'resolvido' }).catch(console.error)
+                adminSuporteApi.resolverTicket(ticketAberto?.id ?? '').catch(console.error)
+                queryClient.invalidateQueries({ queryKey: ['admin-suporte-tickets'] })
                 setTicketAberto(null)
                 setResposta('')
               }}
@@ -1098,8 +1169,9 @@ function TabSuporte() {
             <button
               onClick={() => {
                 if (!resposta.trim()) return
-                setTicketAberto(prev => prev ? { ...prev, status: 'Resolvido', } : null)
-                api.post('/admin/suporte/tickets/' + ticketAberto?.id + '/responder', { resposta }).catch(console.error)
+                adminSuporteApi.responderTicket(ticketAberto?.id ?? '', resposta).catch(console.error)
+                queryClient.invalidateQueries({ queryKey: ['admin-suporte-tickets'] })
+                setTicketAberto(prev => prev ? { ...prev, status: 'Resolvido' } : null)
                 setResposta('')
               }}
               className="flex-1 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1128,7 +1200,34 @@ function Tab360() {
   const [busca, setBusca] = useState('');
   const [selecionado, setSelecionado] = useState<ClienteVisao | null>(null);
 
-  const filtrados = MOCK_CLIENTES_VISAO.filter(c => c.empresa.toLowerCase().includes(busca.toLowerCase()));
+  const { data: clientesData = [], isLoading: loadingClientes } = useQuery({
+    queryKey: ['admin-suporte-clientes-visao'],
+    queryFn: () => adminSuporteApi.clientesVisao().then(r => r.data as any[]),
+  });
+
+  const clientesVisao: ClienteVisao[] = clientesData.length > 0
+    ? clientesData.map((c: any) => ({
+        id: c.id ?? c._id ?? String(Math.random()),
+        empresa: c.empresa ?? c.company ?? '',
+        plano: c.plano ?? c.plan ?? '',
+        inicio: c.inicio ?? c.start_date ?? '',
+        agentes: c.agentes ?? c.agents_count ?? 0,
+        ligacoesTotais: c.ligacoesTotais ?? c.total_calls ?? 0,
+        mrr: c.mrr ?? 0,
+        nps: c.nps ?? 0,
+        taxaConversao: c.taxaConversao ?? c.conversion_rate ?? 0,
+        churnRisk: c.churnRisk ?? c.churn_risk ?? 'Baixo',
+        timeline: Array.isArray(c.timeline) ? c.timeline : [],
+      }))
+    : MOCK_CLIENTES_VISAO;
+
+  const filtrados = clientesVisao.filter(c => c.empresa.toLowerCase().includes(busca.toLowerCase()));
+
+  if (loadingClientes) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -1198,6 +1297,26 @@ function TabInbox() {
   const [selecionado, setSelecionado] = useState<InboxEmail | null>(null);
   const [replyText, setReplyText] = useState('');
 
+  const { data: inboxData = [] } = useQuery({
+    queryKey: ['admin-suporte-emails-inbox'],
+    queryFn: () => adminSuporteApi.emails().then(r => {
+      const d = r.data as any[];
+      return d.filter((e: any) => e.tipo === 'inbox' || e.type === 'inbox' || !e.tipo);
+    }),
+  });
+
+  const inboxList: InboxEmail[] = inboxData.length > 0
+    ? inboxData.map((e: any) => ({
+        id: e.id ?? e._id ?? String(Math.random()),
+        empresa: e.empresa ?? e.company ?? '',
+        assunto: e.assunto ?? e.subject ?? '',
+        preview: e.preview ?? e.body?.substring(0, 80) ?? '',
+        data: e.data ?? e.date ?? '',
+        lido: e.lido ?? e.read ?? false,
+        thread: Array.isArray(e.thread) ? e.thread : [],
+      }))
+    : MOCK_INBOX;
+
   return (
     <div className="flex gap-4" style={{ minHeight: '480px' }}>
       <div className="w-72 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col shrink-0">
@@ -1205,7 +1324,7 @@ function TabInbox() {
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Caixa de entrada</span>
         </div>
         <div className="flex-1 divide-y divide-gray-100 overflow-y-auto">
-          {MOCK_INBOX.map(email => (
+          {inboxList.map(email => (
             <button key={email.id} onClick={() => setSelecionado(email)} className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${selecionado?.id === email.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''}`}>
               <div className="flex items-center justify-between mb-0.5">
                 <span className={`text-sm font-medium ${email.lido ? 'text-gray-600' : 'text-gray-900'}`}>{email.empresa}</span>
@@ -1283,14 +1402,32 @@ function EnviadoStatusBadge({ s }: { s: EmailEnviado['status'] }) {
 }
 
 function TabEnviados() {
-  const enviados = MOCK_ENVIADOS.length;
-  const lidos = MOCK_ENVIADOS.filter(e => e.status === 'Lido').length;
-  const taxaResposta = Math.round((lidos / enviados) * 100);
+  const { data: enviadosData = [] } = useQuery({
+    queryKey: ['admin-suporte-emails-enviados'],
+    queryFn: () => adminSuporteApi.emails().then(r => {
+      const d = r.data as any[];
+      return d.filter((e: any) => e.tipo === 'enviado' || e.type === 'sent');
+    }),
+  });
+
+  const enviadosList: EmailEnviado[] = enviadosData.length > 0
+    ? enviadosData.map((e: any) => ({
+        id: e.id ?? e._id ?? String(Math.random()),
+        destinatario: e.destinatario ?? e.to ?? '',
+        empresa: e.empresa ?? e.company ?? '',
+        assunto: e.assunto ?? e.subject ?? '',
+        data: e.data ?? e.date ?? '',
+        status: e.status ?? 'Entregue',
+      }))
+    : MOCK_ENVIADOS;
+
+  const lidos = enviadosList.filter(e => e.status === 'Lido').length;
+  const taxaResposta = enviadosList.length > 0 ? Math.round((lidos / enviadosList.length) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="Enviados hoje" value="12" />
+        <KpiCard label="Enviados hoje" value={String(enviadosList.length)} />
         <KpiCard label="Taxa de resposta" value={`${taxaResposta}%`} />
       </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -1303,7 +1440,10 @@ function TabEnviados() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {MOCK_ENVIADOS.map(e => (
+            {enviadosList.length === 0 && (
+              <tr><td colSpan={5} className="text-center py-8 text-gray-400 text-sm">Nenhum e-mail enviado ainda</td></tr>
+            )}
+            {enviadosList.map(e => (
               <tr key={e.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-700">{e.destinatario}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{e.empresa}</td>
@@ -1335,12 +1475,30 @@ function TabHistorico() {
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
 
-  const empresas = [...new Set(MOCK_HISTORICO.map(h => h.empresa))];
-  const filtrados = MOCK_HISTORICO.filter(h => {
+  const { data: historicoData = [], isLoading: loadingHistorico } = useQuery({
+    queryKey: ['admin-suporte-historico'],
+    queryFn: () => adminSuporteApi.clientesVisao().then(r => {
+      // Se o endpoint retornar interações, use-as; senão fallback para mock
+      const d = r.data as any;
+      if (Array.isArray(d) && d.length > 0 && d[0].tipo) return d as Interacao[];
+      return [] as Interacao[];
+    }),
+  });
+
+  const historico: Interacao[] = historicoData.length > 0 ? historicoData : MOCK_HISTORICO;
+
+  const empresas = [...new Set(historico.map(h => h.empresa))];
+  const filtrados = historico.filter(h => {
     const okE = !filtroEmpresa || h.empresa === filtroEmpresa;
     const okT = filtroTipo === 'Todos' || h.tipo === filtroTipo;
     return okE && okT;
   });
+
+  if (loadingHistorico) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
