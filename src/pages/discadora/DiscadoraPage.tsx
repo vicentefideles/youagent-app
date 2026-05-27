@@ -47,11 +47,6 @@ interface LatencyState {
   total: number
 }
 
-interface TranscriptLine {
-  quem: 'Agente' | 'Cliente'
-  texto: string
-  cor: string
-}
 
 interface Vendedor {
   nome: string
@@ -84,34 +79,6 @@ const CAMPANHAS_DISC = [
   { id:'mg', nome:'MG — Campanha Maio', cor:'purple', total:1000, feitas:298, faltam:160, conv:'5.4%', agendados:16, fila:188, consumo:84, alerta:'Lista quase esgotada — prepare uma nova! Estimativa: 2 dias', status:'ativa', agr:'Alta' },
   { id:'go', nome:'GO — Campanha Maio', cor:'emerald', total:920, feitas:156, faltam:544, conv:'9.1%', agendados:14, fila:220, consumo:41, alerta:null, status:'pausada', agr:'Baixa' },
 ]
-
-const TRANSCRICOES: Record<string, TranscriptLine[]> = {
-  '1': [
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Bom dia! Aqui é a Ana da ETZ. Posso falar com Marcos Silva?' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Sim, sou eu. O que é?' },
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Marcos, somos especialistas em agentes de IA para prospecção comercial. Vocês têm interesse em reduzir o custo de SDRs?' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Interessante... preciso de uma solução pra mês que vem. Quanto custa?' },
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Ótimo! Posso agendar uma demonstração para esta semana?' },
-  ],
-  '2': [
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Boa tarde, posso falar com Patricia Ramos?' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Falando. Mas estou com pouco tempo.' },
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Será rápido! Você tem disponibilidade hoje à tarde para uma demo de 20 minutos?' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Disponível hoje à tarde, sim. Me envia o convite.' },
-  ],
-  '3': [
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Bom dia, Renata! Aqui é a Julia.' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Oi Julia.' },
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Você é a decisora para compras de tecnologia na Construtora Primavera?' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Sou sócia-diretora, então sim. Mas precisamos de uma solução urgente.' },
-  ],
-  '4': [
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Bruno, tudo bem? Aqui é o Rafael da ETZ.' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Oi Rafael. Pode falar.' },
-    { quem: 'Agente', cor: 'text-blue-400', texto: 'Nossa IA faz prospecção automática B2B. Você gostaria de ver uma demo do sistema funcionando?' },
-    { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Quero ver uma demo do sistema, sim. Quando pode?' },
-  ],
-}
 
 // ─── TRANSCRIÇÃO AO VIVO (polling) ─────────────────────────────────────────
 

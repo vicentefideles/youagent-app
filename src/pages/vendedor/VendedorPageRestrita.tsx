@@ -166,53 +166,6 @@ const mockEmails: EmailVendedor[] = [
   },
 ]
 
-const mockMensagens: MensagemChat[] = [
-  {
-    id: 1,
-    de: 'Ana Rodrigues',
-    para: 'João Silva',
-    texto: 'Parabéns pelo fechamento de ontem com DataSoft! Rafael ficou muito satisfeito. Continue assim.',
-    hora: '23/05 16:30',
-    lida: false,
-    tipo: 'recebida',
-  },
-  {
-    id: 2,
-    de: 'Ana Rodrigues',
-    para: 'João Silva',
-    texto: 'Reunião com TechVision confirmada para hoje 14h. Carla é VP Comercial — lembre de focar no ROI.',
-    hora: '24/05 08:00',
-    lida: false,
-    tipo: 'recebida',
-  },
-  {
-    id: 3,
-    de: 'Ana Rodrigues',
-    para: 'João Silva',
-    texto: 'Lembrete: preencher resultado das reuniões desta semana até sexta.',
-    hora: '22/05 09:00',
-    lida: true,
-    tipo: 'recebida',
-  },
-  {
-    id: 4,
-    de: 'João Silva',
-    para: 'Ana Rodrigues',
-    texto: 'Ana, tenho dúvida sobre os gatilhos de urgência na campanha SP. Como ajustar a sensibilidade?',
-    hora: '21/05 11:00',
-    lida: true,
-    tipo: 'enviada',
-  },
-  {
-    id: 5,
-    de: 'João Silva',
-    para: 'Ana Rodrigues',
-    texto: 'Reunião com Pedro Alves da Acme Corp confirmada para amanhã 10h. Estou preparado!',
-    hora: '23/05 15:00',
-    lida: true,
-    tipo: 'enviada',
-  },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
