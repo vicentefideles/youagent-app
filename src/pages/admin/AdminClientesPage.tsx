@@ -14,17 +14,17 @@ import {
   Loader2,
   X,
 } from 'lucide-react'
-import { api } from '@/services/api'
+import { api, adminClientesApi } from '@/services/api'
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 
 interface ClienteAtivo {
-  id: number
+  id: string | number
   empresa: string
   responsavel: string
   email: string
-  plano: 'Starter' | 'Growth' | 'Enterprise'
+  plano: string
   agentes: number
   reunioes: number
   mrr: number
@@ -33,8 +33,21 @@ interface ClienteAtivo {
   proximaRenovacao: string
 }
 
+interface ClienteAPI {
+  id: string | number
+  nome?: string
+  empresa?: string
+  razao_social?: string
+  email?: string
+  plano?: string
+  status?: string
+  criado_em?: string
+  assinado_em?: string
+  nome_representante?: string
+}
+
 interface Contrato {
-  id: number
+  id: string | number
   empresa: string
   plano: string
   valor: number
@@ -55,23 +68,62 @@ interface Campanha {
   taxa: number
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Pricing map (MRR por plano) ──────────────────────────────────────────────
 
-const mockAtivos: ClienteAtivo[] = [
-  { id: 1, empresa: 'Apex Corretora', responsavel: 'Thiago Moura', email: 'thiago@apexcorr.com.br', plano: 'Enterprise', agentes: 8, reunioes: 142, mrr: 5990, status: 'Saudável', desde: '2025-11-01', proximaRenovacao: '2026-11-01' },
-  { id: 2, empresa: 'Genova Consultoria', responsavel: 'Ana Beatriz', email: 'ana@genova.com.br', plano: 'Growth', agentes: 3, reunioes: 67, mrr: 2490, status: 'Saudável', desde: '2026-01-15', proximaRenovacao: '2027-01-15' },
-  { id: 3, empresa: 'Prime Imóveis SP', responsavel: 'Lucas Ferreira', email: 'lucas@primeimoveis.com.br', plano: 'Starter', agentes: 1, reunioes: 18, mrr: 890, status: 'Em risco', desde: '2026-03-01', proximaRenovacao: '2027-03-01' },
-  { id: 4, empresa: 'TechSales Brasil', responsavel: 'Juliana Costa', email: 'juliana@techsales.com.br', plano: 'Growth', agentes: 4, reunioes: 53, mrr: 2490, status: 'Churning', desde: '2025-09-10', proximaRenovacao: '2026-09-10' },
-  { id: 5, empresa: 'Conecta RH', responsavel: 'Paulo Mendes', email: 'paulo@conectarh.com.br', plano: 'Starter', agentes: 2, reunioes: 34, mrr: 890, status: 'Saudável', desde: '2026-02-20', proximaRenovacao: '2027-02-20' },
-]
+const PLANO_MRR: Record<string, number> = {
+  Starter: 890,
+  Growth: 2490,
+  Enterprise: 5990,
+}
 
-const mockContratos: Contrato[] = [
-  { id: 1, empresa: 'Apex Corretora', plano: 'Enterprise', valor: 5990, inicio: '2025-11-01', termino: '2026-11-01', status: 'Ativo' },
-  { id: 2, empresa: 'Genova Consultoria', plano: 'Growth', valor: 2490, inicio: '2026-01-15', termino: '2027-01-15', status: 'Ativo' },
-  { id: 3, empresa: 'Prime Imóveis SP', plano: 'Starter', valor: 890, inicio: '2026-03-01', termino: '2027-03-01', status: 'Ativo' },
-  { id: 4, empresa: 'TechSales Brasil', plano: 'Growth', valor: 2490, inicio: '2025-09-10', termino: '2026-09-10', status: 'Pendente' },
-  { id: 5, empresa: 'Conecta RH', plano: 'Starter', valor: 890, inicio: '2026-02-20', termino: '2027-02-20', status: 'Ativo' },
-]
+// ─── API → ClienteAtivo mapper ────────────────────────────────────────────────
+
+function mapApiToClienteAtivo(c: ClienteAPI): ClienteAtivo {
+  const plano = c.plano || 'Starter'
+  const criado = c.criado_em || ''
+  const renovacao = criado
+    ? new Date(new Date(criado).setFullYear(new Date(criado).getFullYear() + 1)).toISOString()
+    : ''
+  return {
+    id: c.id,
+    empresa: c.empresa || c.nome || '—',
+    responsavel: c.nome_representante || '—',
+    email: c.email || '—',
+    plano,
+    agentes: 1, // TODO: obter agentes reais via endpoint dedicado
+    reunioes: 0, // TODO: obter reuniões reais via endpoint dedicado
+    mrr: PLANO_MRR[plano] ?? 0,
+    status: 'Saudável', // TODO: calcular saúde real quando disponível
+    desde: criado,
+    proximaRenovacao: renovacao,
+  }
+}
+
+// ─── API → Contrato mapper ────────────────────────────────────────────────────
+
+function mapApiToContrato(c: ClienteAPI): Contrato {
+  const plano = c.plano || 'Starter'
+  const inicio = c.criado_em || ''
+  const termino = inicio
+    ? new Date(new Date(inicio).setFullYear(new Date(inicio).getFullYear() + 1)).toISOString()
+    : ''
+  const apiStatus = c.status || ''
+  let contratoStatus: Contrato['status'] = 'Ativo'
+  if (apiStatus === 'documentos_rejeitados' || apiStatus === 'aguardando_ativacao' || apiStatus === 'cadastrado') {
+    contratoStatus = 'Pendente'
+  } else if (termino && new Date(termino) < new Date()) {
+    contratoStatus = 'Expirado'
+  }
+  return {
+    id: c.id,
+    empresa: c.empresa || c.nome || '—',
+    plano,
+    valor: PLANO_MRR[plano] ?? 0,
+    inicio,
+    termino,
+    status: contratoStatus,
+  }
+}
 
 const mockCampanhas: Campanha[] = [
   { id: 1, empresa: 'Apex Corretora', nome: 'Reativação Q2 2026', canal: 'Email', tipo: 'Reativação', status: 'Ativa', enviados: 1240, abertos: 496, taxa: 40 },
@@ -456,10 +508,32 @@ function TabPipeline() {
 
 function TabAtivos() {
   const navigate = useNavigate()
-  const total = mockAtivos.length
-  const mrrTotal = mockAtivos.reduce((acc, c) => acc + c.mrr, 0)
-  const saudaveis = mockAtivos.filter((c) => c.status === 'Saudável').length
-  const emRisco = mockAtivos.filter((c) => c.status === 'Em risco' || c.status === 'Churning').length
+  const [clientes, setClientes] = useState<ClienteAtivo[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    adminClientesApi.list('ativo')
+      .then(res => {
+        const data = (res.data as ClienteAPI[]) || []
+        setClientes(data.map(mapApiToClienteAtivo))
+      })
+      .catch(() => setClientes([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const total = clientes.length
+  const mrrTotal = clientes.reduce((acc, c) => acc + c.mrr, 0)
+  const saudaveis = clientes.filter((c) => c.status === 'Saudável').length
+  const emRisco = clientes.filter((c) => c.status === 'Em risco' || c.status === 'Churning').length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-12 text-gray-500">
+        <Loader2 size={18} className="animate-spin" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -484,7 +558,14 @@ function TabAtivos() {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {mockAtivos.map((c) => (
+          {clientes.length === 0 && (
+            <tr>
+              <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
+                Nenhum cliente ativo encontrado.
+              </td>
+            </tr>
+          )}
+          {clientes.map((c) => (
             <tr key={c.id} className="hover:bg-gray-50 transition-colors">
               <Td>
                 <div>
@@ -497,7 +578,7 @@ function TabAtivos() {
               <Td><span className="font-mono">{c.reunioes}</span></Td>
               <Td><span className="font-mono font-medium">{formatBRL(c.mrr)}</span></Td>
               <Td><StatusBadge status={c.status} /></Td>
-              <Td className="text-gray-500 text-xs">{formatDate(c.proximaRenovacao)}</Td>
+              <Td className="text-gray-500 text-xs">{c.proximaRenovacao ? formatDate(c.proximaRenovacao) : '—'}</Td>
               <Td>
                 <div className="flex items-center gap-2">
                   <button
@@ -527,16 +608,39 @@ function TabAtivos() {
 // ─── Tab: Contratos ───────────────────────────────────────────────────────────
 
 function TabContratos() {
-  const ativos = mockContratos.filter((c) => c.status === 'Ativo')
+  const [contratos, setContratos] = useState<Contrato[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    adminClientesApi.list()
+      .then(res => {
+        const data = (res.data as ClienteAPI[]) || []
+        setContratos(data.map(mapApiToContrato))
+      })
+      .catch(() => setContratos([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const ativos = contratos.filter((c) => c.status === 'Ativo')
   const valorTotal = ativos.reduce((acc, c) => acc + c.valor, 0)
 
   const hoje = new Date()
   const em30dias = new Date(hoje)
   em30dias.setDate(hoje.getDate() + 30)
-  const vencendo = mockContratos.filter((c) => {
+  const vencendo = contratos.filter((c) => {
+    if (!c.termino) return false
     const termino = new Date(c.termino)
     return termino >= hoje && termino <= em30dias
   }).length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-12 text-gray-500">
+        <Loader2 size={18} className="animate-spin" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -559,13 +663,20 @@ function TabContratos() {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {mockContratos.map((c) => (
+          {contratos.length === 0 && (
+            <tr>
+              <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
+                Nenhum contrato encontrado.
+              </td>
+            </tr>
+          )}
+          {contratos.map((c) => (
             <tr key={c.id} className="hover:bg-gray-50 transition-colors">
               <Td><p className="font-medium text-gray-900">{c.empresa}</p></Td>
               <Td><PlanoBadge plano={c.plano} /></Td>
               <Td><span className="font-mono font-medium">{formatBRL(c.valor)}</span></Td>
-              <Td className="text-gray-500 text-xs">{formatDate(c.inicio)}</Td>
-              <Td className="text-gray-500 text-xs">{formatDate(c.termino)}</Td>
+              <Td className="text-gray-500 text-xs">{c.inicio ? formatDate(c.inicio) : '—'}</Td>
+              <Td className="text-gray-500 text-xs">{c.termino ? formatDate(c.termino) : '—'}</Td>
               <Td><ContratoStatusBadge status={c.status} /></Td>
               <Td>
                 <button

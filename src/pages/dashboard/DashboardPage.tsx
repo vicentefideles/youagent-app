@@ -17,7 +17,7 @@ import {
   Layers,
   Globe,
 } from 'lucide-react'
-import { agentesApi, campanhasApi, dashboardApi, clientesApi as clientesApiRaw } from '@/services/api'
+import { agentesApi, campanhasApi, dashboardApi, clientesApi as clientesApiRaw, equipeApi } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -152,7 +152,27 @@ const AVATAR_COLORS = ['bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 'bg-amb
 // ─── Card Meritocracia ─────────────────────────────────────────────────────────
 
 function CardMeritocracia() {
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+
   const [vendedores, setVendedores] = useState<VendedorFila[]>([])
+
+  useEffect(() => {
+    if (equipeRaw.length === 0) return
+    setVendedores(
+      equipeRaw.map((v: any, i: number) => ({
+        id: v.id ?? i,
+        nome: v.nome ?? v.name ?? '—',
+        avatar: (v.nome ?? v.name ?? 'VD').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
+        cargo: v.cargo ?? v.role ?? 'Vendedor',
+        peso: v.peso ?? Math.round(100 / equipeRaw.length),
+        reunioesHoje: v.reunioes_hoje ?? v.reunioes_count ?? 0,
+        taxaShow: v.taxa_show ?? v.show_rate ?? 75,
+      }))
+    )
+  }, [equipeRaw.length])
 
   function ajustarPeso(id: number, delta: number) {
     setVendedores(prev => {

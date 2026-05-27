@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { claudeApi, api, calendarApi } from '@/services/api'
+import { useState, useEffect } from 'react'
+import { claudeApi, api, calendarApi, clientesApi } from '@/services/api'
 import TelnyxNumeroSection from '@/components/TelnyxNumeroSection'
 import {
   Building2,
@@ -45,6 +45,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 // ─── Seção: Empresa ───────────────────────────────────────────────────────────
 
 function SectionEmpresa() {
+  const { user } = useAuthStore()
   const [nome, setNome] = useState('Soluções Tech Ltda')
   const [cnpj, setCnpj] = useState('12.345.678/0001-90')
   const [segmento, setSegmento] = useState('Tecnologia / SaaS')
@@ -60,6 +61,28 @@ function SectionEmpresa() {
   )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Carrega perfil real do cliente no mount
+  useEffect(() => {
+    if (!user?.id) return
+    clientesApi.buscar(user.id)
+      .then(r => {
+        const d = r.data as Record<string, any>
+        if (d.nome) setNome(d.nome)
+        if (d.cnpj) setCnpj(d.cnpj)
+        if (d.segmento) setSegmento(d.segmento)
+        if (d.website ?? d.site) setWebsite(d.website ?? d.site)
+        if (d.porte) setPorte(d.porte)
+        if (d.endereco) setEndereco(d.endereco)
+        if (d.telefone) setTelefone(d.telefone)
+        if (d.descricao) setDescricao(d.descricao)
+        if (d.objecoes) setObjecoes(d.objecoes)
+      })
+      .catch(() => {
+        // Fallback: usa nome e email do authStore se a API falhar
+        if (user.nome) setNome(user.nome)
+      })
+  }, [user?.id])
 
   async function handleSalvarEmpresa() {
     setSaving(true)

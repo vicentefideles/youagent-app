@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import {
   Users,
   TrendingUp,
@@ -9,6 +10,7 @@ import {
   CheckCircle,
   Info,
 } from 'lucide-react'
+import { adminClientesApi } from '@/services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,7 +24,7 @@ interface KpiCard {
 
 interface Cliente {
   empresa: string
-  plano: 'Starter' | 'Growth' | 'Enterprise'
+  plano: string
   data: string
   status: 'Saudável' | 'Em risco'
 }
@@ -43,16 +45,24 @@ interface MrrMonth {
   value: number
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+interface ClienteAPI {
+  id: string | number
+  nome?: string
+  empresa?: string
+  plano?: string
+  status?: string
+  criado_em?: string
+}
 
-const KPIS: KpiCard[] = [
-  { label: 'Clientes Ativos', value: '34', delta: '▲ 3 este mês', up: true, icon: <Users className="w-5 h-5" /> },
-  { label: 'MRR Total', value: 'R$ 67.850', delta: '▲ 8,2%', up: true, icon: <TrendingUp className="w-5 h-5" /> },
-  { label: 'Ligações/Dia', value: '2.847', delta: '▲ 12%', up: true, icon: <Phone className="w-5 h-5" /> },
-  { label: 'Reuniões Geradas', value: '1.204', delta: '▲ 18%', up: true, icon: <Calendar className="w-5 h-5" /> },
-  { label: 'Churn Rate', value: '2,1%', delta: '▼ 0,3%', up: false, icon: <TrendingDown className="w-5 h-5" /> },
-  { label: 'NPS', value: '72', delta: '▲ 4 pts', up: true, icon: <Star className="w-5 h-5" /> },
-]
+// ─── Pricing map ──────────────────────────────────────────────────────────────
+
+const PLANO_MRR: Record<string, number> = {
+  Starter: 890,
+  Growth: 2490,
+  Enterprise: 5990,
+}
+
+// ─── Static data (no backend endpoint yet) ────────────────────────────────────
 
 const MRR_MONTHS: MrrMonth[] = [
   { month: 'Dez', value: 51200 },
@@ -63,31 +73,11 @@ const MRR_MONTHS: MrrMonth[] = [
   { month: 'Mai', value: 67850 },
 ]
 
-const CLIENTES_RECENTES: Cliente[] = [
-  { empresa: 'DataSoft', plano: 'Growth', data: '12/05/2026', status: 'Saudável' },
-  { empresa: 'TechVision', plano: 'Enterprise', data: '08/05/2026', status: 'Em risco' },
-  { empresa: 'InnovaB2B', plano: 'Starter', data: '03/05/2026', status: 'Em risco' },
-  { empresa: 'BetaSolutions', plano: 'Growth', data: '29/04/2026', status: 'Saudável' },
-  { empresa: 'NexoComercial', plano: 'Growth', data: '22/04/2026', status: 'Saudável' },
-]
-
 const ALERTAS: Alerta[] = [
-  { severity: 'red', message: 'DataSoft — 94% do limite de ligações atingido' },
-  { severity: 'amber', message: 'TechVision — Reunião marcada há 15 dias sem retorno' },
-  { severity: 'amber', message: 'InnovaB2B — 3 pagamentos pendentes' },
-  { severity: 'green', message: 'BetaSolutions — Meta mensal atingida (103%)' },
   { severity: 'green', message: 'Sistema — Uptime 99,97% nos últimos 30 dias' },
 ]
 
-const PLANOS_DISTRIB: PlanoDistrib[] = [
-  { name: 'Starter', clientes: 12, mrr: 11964 },
-  { name: 'Growth', clientes: 18, mrr: 35946 },
-  { name: 'Enterprise', clientes: 4, mrr: 19988 },
-]
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const MAX_MRR = Math.max(...MRR_MONTHS.map(m => m.value))
 
 function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })
@@ -108,6 +98,51 @@ function alertIcon(severity: Alerta['severity']) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboardPage() {
+  const [clientes, setClientes] = useState<ClienteAPI[]>([])
+
+  useEffect(() => {
+    adminClientesApi.list()
+      .then(res => setClientes((res.data as ClienteAPI[]) || []))
+      .catch(() => setClientes([]))
+  }, [])
+
+  // Derived KPIs from real data
+  const ativos = clientes.filter(c => c.status === 'ativo')
+  const aguardando = clientes.filter(c => c.status === 'aguardando_ativacao' || c.status === 'cadastrado')
+  const mrrTotal = ativos.reduce((sum, c) => sum + (PLANO_MRR[c.plano ?? ''] ?? 0), 0)
+
+  const KPIS: KpiCard[] = [
+    { label: 'Clientes Ativos', value: String(ativos.length), delta: `${aguardando.length} aguardando`, up: true, icon: <Users className="w-5 h-5" /> },
+    { label: 'MRR Total', value: formatBRL(mrrTotal), delta: '— calculado por plano', up: true, icon: <TrendingUp className="w-5 h-5" /> },
+    // TODO: calcular MRR real com histórico de pagamentos
+    { label: 'Ligações/Dia', value: '—', delta: 'sem endpoint', up: true, icon: <Phone className="w-5 h-5" /> },
+    { label: 'Reuniões Geradas', value: '—', delta: 'sem endpoint', up: true, icon: <Calendar className="w-5 h-5" /> },
+    { label: 'Churn Rate', value: '—', delta: 'sem endpoint', up: false, icon: <TrendingDown className="w-5 h-5" /> },
+    { label: 'NPS', value: '—', delta: 'sem endpoint', up: true, icon: <Star className="w-5 h-5" /> },
+  ]
+
+  // Clientes recentes: last 5 ordered by criado_em (API already returns desc)
+  const clientesRecentes: Cliente[] = clientes.slice(0, 5).map(c => ({
+    empresa: c.empresa || c.nome || '—',
+    plano: c.plano || 'Starter',
+    data: c.criado_em ? new Date(c.criado_em).toLocaleDateString('pt-BR') : '—',
+    status: c.status === 'ativo' ? 'Saudável' : 'Em risco',
+  }))
+
+  // Distribuição por plano
+  const planosMap: Record<string, number> = {}
+  ativos.forEach(c => {
+    const p = c.plano || 'Starter'
+    planosMap[p] = (planosMap[p] ?? 0) + 1
+  })
+  const PLANOS_DISTRIB: PlanoDistrib[] = ['Starter', 'Growth', 'Enterprise'].map(name => ({
+    name,
+    clientes: planosMap[name] ?? 0,
+    mrr: (planosMap[name] ?? 0) * (PLANO_MRR[name] ?? 0),
+  }))
+
+  const MAX_MRR = Math.max(...MRR_MONTHS.map(m => m.value))
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -169,8 +204,13 @@ export default function AdminDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {CLIENTES_RECENTES.map(c => (
-                <tr key={c.empresa} className="hover:bg-gray-50/50">
+              {clientesRecentes.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-6 text-center text-sm text-gray-400">Nenhum cliente encontrado.</td>
+                </tr>
+              )}
+              {clientesRecentes.map((c, i) => (
+                <tr key={i} className="hover:bg-gray-50/50">
                   <td className="py-3 font-medium text-gray-900">{c.empresa}</td>
                   <td className="py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${planoBadgeClass(c.plano)}`}>

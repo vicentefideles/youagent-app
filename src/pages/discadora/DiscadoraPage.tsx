@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { campanhasApi, reunioesApi, ligacoesApi, claudeApi } from '@/services/api'
+import { campanhasApi, reunioesApi, ligacoesApi, claudeApi, equipeApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -314,6 +314,19 @@ function TabFila() {
       return next
     })
   }, [])
+
+  // Vendedores para transferência via API
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+  const transferCandidates: Vendedor[] = equipeRaw.length > 0
+    ? equipeRaw.map(v => ({
+        nome: v.nome ?? v.name ?? '—',
+        status: (v.status === 'em_chamada' ? 'em_chamada' : v.status === 'ausente' ? 'ausente' : 'disponivel') as Vendedor['status'],
+        reunioes_hoje: v.reunioes_hoje ?? v.reunioes_count ?? 0,
+      }))
+    : TRANSFER_CANDIDATES
 
   // Latência em tempo real
   const [latency, setLatency] = useState<LatencyState>({ telnyx: 112, eleven: 87, llm: 203, total: 402 })
@@ -774,7 +787,7 @@ function TabFila() {
                   <div>
                     <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-2">⚡ Vendedores disponíveis</div>
                     <div className="flex flex-col gap-2">
-                      {TRANSFER_CANDIDATES.map(v => (
+                      {transferCandidates.map(v => (
                         <div
                           key={v.nome}
                           className={clsx(
