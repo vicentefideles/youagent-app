@@ -8,7 +8,7 @@ import {
   ChevronRight, Upload, Trash2, RotateCcw, Zap,
   AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2,
 } from 'lucide-react'
-import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi } from '@/services/api'
+import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi } from '@/services/api'
 
 type TabId =
   | 'testes' | 'qualidade' | 'coletiva' | 'horarios' | 'campanhas'
@@ -89,13 +89,15 @@ function KpiCard({
 function TabTestes() {
   const [abVote, setAbVote] = useState<Record<string, string>>({})
   const [cicloRodou, setCicloRodou] = useState(false)
-  const rows = [
-    { cenario: 'Supermercados Norte', agente: 'Julia', precisao: 98, estrelas: 5, status: 'Aprovado', kpi: '+12pp', resultado: 'Agendou' },
-    { cenario: 'Grupo ABC', agente: 'Ana', precisao: 91, estrelas: 5, status: 'Aprovado', kpi: '+8pp', resultado: 'Agendou' },
-    { cenario: 'Delta Ind.', agente: 'Carlos', precisao: 78, estrelas: 3, status: 'Em ajuste', kpi: '-2pp', resultado: 'Retornar' },
-    { cenario: 'Tech SP', agente: 'Julia', precisao: 84, estrelas: 4, status: 'Aprovado', kpi: '+5pp', resultado: 'Agendou' },
-    { cenario: 'Comercio GO', agente: 'Ana', precisao: 72, estrelas: 3, status: 'Em ajuste', kpi: '+1pp', resultado: 'Transferido' },
-  ]
+
+  const { data: testesData } = useQuery({
+    queryKey: ['inteligencia-testes'],
+    queryFn: () => api.get('/inteligencia/testes').then(r => r.data as any),
+  })
+  const testRows: any[] = testesData?.rows ?? []
+  const testStats = testesData?.stats ?? { taxaSucesso: 0 }
+
+  const rows = testRows
   return (
     <div className="space-y-4">
       <div
@@ -120,16 +122,16 @@ function TabTestes() {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-4 border-t-4 border-t-emerald-500">
-          <p className="text-xs text-gray-500 mb-1">Precisão do script</p>
-          <p className="text-2xl font-mono font-bold text-emerald-600">94%</p>
+          <p className="text-xs text-gray-500 mb-1">Taxa de sucesso</p>
+          <p className="text-2xl font-mono font-bold text-emerald-600">{testStats.taxaSucesso ?? testStats.precisao ?? '—'}%</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 border-t-4 border-t-blue-500">
           <p className="text-xs text-gray-500 mb-1">Score de qualidade</p>
-          <p className="text-2xl font-mono font-bold text-blue-600">4.8/5</p>
+          <p className="text-2xl font-mono font-bold text-blue-600">{testStats.scoreQualidade ?? '—'}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 border-t-4 border-t-purple-500">
           <p className="text-xs text-gray-500 mb-1">Conformidade LGPD</p>
-          <p className="text-2xl font-mono font-bold text-purple-600">100%</p>
+          <p className="text-2xl font-mono font-bold text-purple-600">{testStats.conformidadeLgpd ?? '—'}%</p>
         </div>
       </div>
 
@@ -147,16 +149,19 @@ function TabTestes() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="py-6 text-center text-xs text-gray-400">Nenhum teste disponível.</td></tr>
+            )}
+            {rows.map((r: any, i: number) => (
               <tr key={i} className="border-b border-gray-50 last:border-0">
-                <td className="py-2 text-gray-700">{r.cenario}</td>
-                <td className="py-2 text-gray-500">{r.agente}</td>
-                <td className="py-2 font-mono text-gray-900">{r.precisao}%</td>
-                <td className="py-2 text-amber-400 tracking-tighter">{'★'.repeat(r.estrelas)}{'☆'.repeat(5 - r.estrelas)}</td>
+                <td className="py-2 text-gray-700">{r.cenario ?? r.scenario ?? '—'}</td>
+                <td className="py-2 text-gray-500">{r.agente ?? r.agent ?? '—'}</td>
+                <td className="py-2 font-mono text-gray-900">{r.precisao ?? r.accuracy ?? 0}%</td>
+                <td className="py-2 text-amber-400 tracking-tighter">{'★'.repeat(Math.min(r.estrelas ?? r.stars ?? 0, 5))}{'☆'.repeat(Math.max(5 - (r.estrelas ?? r.stars ?? 0), 0))}</td>
                 <td className="py-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${r.status === 'Aprovado' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{r.status}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${(r.status ?? '') === 'Aprovado' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{r.status ?? '—'}</span>
                 </td>
-                <td className={`py-2 font-mono text-xs font-semibold ${r.kpi.startsWith('+') ? 'text-emerald-600' : 'text-red-500'}`}>{r.kpi}</td>
+                <td className={`py-2 font-mono text-xs font-semibold ${String(r.kpi ?? '').startsWith('+') ? 'text-emerald-600' : 'text-red-500'}`}>{r.kpi ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -596,11 +601,12 @@ function TabConhecimento() {
   const [textoLivre, setTextoLivre] = useState('')
   const cats = ['livro', 'artigo', 'video', 'audio', 'texto']
   const catLabel: Record<string, string> = { livro: 'Livro/PDF', artigo: 'Artigo/Link', video: 'Vídeo', audio: 'Áudio', texto: 'Texto livre' }
-  const library = [
-    { icon: '📘', title: 'SPIN Selling', author: 'Neil Rackham', pages: 248, insights: 34, color: '#2563eb' },
-    { icon: '📗', title: 'A Arte da Guerra', author: 'Sun Tzu', pages: 136, insights: 21, color: '#059669' },
-    { icon: '📙', title: 'Prospecção Fanática', author: 'Jeb Blount', pages: 302, insights: 41, color: '#d97706' },
-  ]
+
+  const { data: conhecimentoData } = useQuery({
+    queryKey: ['inteligencia-conhecimento'],
+    queryFn: () => api.get('/inteligencia/conhecimento').then(r => r.data as any),
+  })
+  const library: any[] = conhecimentoData?.items ?? conhecimentoData ?? []
   return (
     <div className="space-y-4">
       <div
@@ -756,14 +762,17 @@ function TabConhecimento() {
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Biblioteca</h3>
             <div className="space-y-2">
-              {library.map((b, i) => (
+              {library.length === 0 && (
+                <p className="text-xs text-gray-400 text-center py-4">Nenhum material cadastrado ainda.</p>
+              )}
+              {library.map((b: any, i: number) => (
                 <div key={i} className="flex items-center gap-3 border border-gray-100 rounded-lg p-2">
-                  <div className="w-8 h-10 rounded flex items-center justify-center text-lg shrink-0" style={{ background: b.color + '22' }}>
-                    {b.icon}
+                  <div className="w-8 h-10 rounded flex items-center justify-center text-lg shrink-0" style={{ background: (b.color ?? '#2563eb') + '22' }}>
+                    {b.icon ?? '📄'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 truncate">{b.title}</p>
-                    <p className="text-xs text-gray-400">{b.author} · {b.pages}p · {b.insights} insights</p>
+                    <p className="text-xs font-semibold text-gray-800 truncate">{b.title ?? b.titulo ?? '—'}</p>
+                    <p className="text-xs text-gray-400">{b.author ?? b.autor ?? '—'} · {b.pages ?? b.paginas ?? '—'}p · {b.insights ?? 0} insights</p>
                   </div>
                   <button className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
                 </div>
@@ -793,12 +802,13 @@ function TabConhecimento() {
 }
 
 function TabBanco() {
-  const [items, setItems] = useState([
-    { label: 'Energia solar ficou 18% mais cara — argumento de urgência', pct: 82, cat: 'Economia e custos', validade: '30d', fonte: 'G1 Economia' },
-    { label: 'Decisor ausente — gatekeeper flow com rapport', pct: 68, cat: 'Dado setorial', validade: '60d', fonte: 'Interno' },
-    { label: 'Concorrente X perdeu 3 clientes em MG por suporte ruim', pct: 74, cat: 'Concorrente/Caso', validade: '45d', fonte: 'CRM' },
-    { label: 'Indústria automotiva cresceu 12% — contexto positivo', pct: 91, cat: 'Tendência de mercado', validade: '30d', fonte: 'ANFAVEA' },
-  ])
+  const { data: bancoData } = useQuery({
+    queryKey: ['inteligencia-banco'],
+    queryFn: () => api.get('/inteligencia/banco').then(r => r.data as any),
+  })
+  const argumentosApi: any[] = bancoData?.argumentos ?? bancoData ?? []
+  const [localItems, setLocalItems] = useState<any[]>([])
+  const argumentos = [...argumentosApi, ...localItems]
   const [novoArg, setNovoArg] = useState({ categoria: '', descricao: '', validade: '', fonte: '' })
   return (
     <div className="space-y-4">
@@ -859,15 +869,12 @@ function TabBanco() {
             className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
             onClick={async () => {
               if (!novoArg.categoria || !novoArg.descricao) { alert('Preencha os campos obrigatórios'); return }
+              const newItem = { label: novoArg.descricao, pct: 0, cat: novoArg.categoria, validade: novoArg.validade ? `${novoArg.validade}d` : '—', fonte: novoArg.fonte || 'Manual' }
               try {
                 await api.post('/inteligencia/banco', novoArg)
-                setItems(prev => [{ label: novoArg.descricao, pct: 0, cat: novoArg.categoria, validade: novoArg.validade ? `${novoArg.validade}d` : '—', fonte: novoArg.fonte || 'Manual' }, ...prev])
-                setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
-              } catch {
-                // fallback: só atualiza estado local
-                setItems(prev => [{ label: novoArg.descricao, pct: 0, cat: novoArg.categoria, validade: novoArg.validade ? `${novoArg.validade}d` : '—', fonte: novoArg.fonte || 'Manual' }, ...prev])
-                setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
-              }
+              } catch { /* fallback to local */ }
+              setLocalItems(prev => [newItem, ...prev])
+              setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
             }}
           >
             Adicionar ao banco
@@ -903,22 +910,25 @@ function TabBanco() {
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Inteligências cadastradas</h3>
         <div className="space-y-2">
-          {items.map((item, i) => (
+          {argumentos.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-4">Nenhum argumento cadastrado ainda.</p>
+          )}
+          {argumentos.map((item: any, i: number) => (
             <div key={i} className="border border-gray-100 rounded-lg p-3">
               <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="text-xs font-medium text-gray-800 flex-1">{item.label}</p>
-                <button onClick={() => setItems(p => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition-colors shrink-0">
+                <p className="text-xs font-medium text-gray-800 flex-1">{item.label ?? item.descricao ?? '—'}</p>
+                <button onClick={() => setLocalItems(p => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition-colors shrink-0">
                   <Trash2 size={12} />
                 </button>
               </div>
               <div className="flex items-center gap-2 mb-1.5">
-                <Bar pct={item.pct} color="bg-emerald-500" />
-                <span className="text-xs font-mono text-emerald-600 w-8">{item.pct}%</span>
+                <Bar pct={item.pct ?? 0} color="bg-emerald-500" />
+                <span className="text-xs font-mono text-emerald-600 w-8">{item.pct ?? 0}%</span>
               </div>
               <div className="flex gap-2 flex-wrap">
-                <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{item.cat}</span>
-                <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">Validade: {item.validade}</span>
-                <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">Fonte: {item.fonte}</span>
+                <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{item.cat ?? item.categoria ?? '—'}</span>
+                <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">Validade: {item.validade ?? '—'}</span>
+                <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">Fonte: {item.fonte ?? '—'}</span>
               </div>
             </div>
           ))}
@@ -1328,15 +1338,16 @@ interface CrossPendente {
 }
 
 function TabCross() {
-  const [votes, setVotes] = useState<Record<number, 'approved' | 'rejected' | null>>({ 0: null, 1: null, 2: null })
+  const [votes, setVotes] = useState<Record<number, 'approved' | 'rejected' | null>>({})
 
   // Dados da API
-  const [pendentesApi, setPendentesApi] = useState<CrossPendente[]>([])
-  useEffect(() => {
-    inteligenciaApi.getCross()
-      .then(res => setPendentesApi((res.data as CrossPendente[]) || []))
-      .catch(() => {})
-  }, [])
+  const { data: crossData = [] } = useQuery({
+    queryKey: ['inteligencia-cross'],
+    queryFn: () => inteligenciaApi.getCross().then(res => (res.data as CrossPendente[]) || []).catch(() => [] as CrossPendente[]),
+  })
+
+  // Use API data; fallback to empty (no hardcoded items in production view)
+  const pendentesApi = crossData
 
   // Gerar cross com Claude
   const [novoGatilho, setNovoGatilho] = useState('')
@@ -1364,32 +1375,6 @@ function TabCross() {
     }
   }
 
-  const pending = [
-    {
-      tag: 'Urgência',
-      origem: '47 ligações · SP',
-      segmento: 'Indústria e Tech',
-      quote: 'Temos apenas 3 vagas abertas para iniciar em junho. Prefere garantir a sua agora enquanto ainda temos disponibilidade?',
-      destino: 'Aplicar em: MG — Campanha Maio e GO — Campanha Industrial',
-      impacto: '+12pp',
-    },
-    {
-      tag: 'Proposta',
-      origem: '31 ligações · Interior SP',
-      segmento: 'Varejo e Serviços',
-      quote: 'Posso enviar um comparativo direto entre o que vocês fazem hoje e o que nossos clientes do mesmo setor conquistaram. Facilita muito a conversa com a diretoria.',
-      destino: 'Aplicar em: MG — todas campanhas ativas',
-      impacto: '+9pp',
-    },
-    {
-      tag: 'Decisor ausente',
-      origem: '28 ligações · Grande SP',
-      segmento: 'Tecnologia',
-      quote: 'Posso agendar diretamente com o [nome do decisor]? Tenho 15 minutos que valem muito para o projeto de vocês.',
-      destino: 'Aplicar em: GO — Campanha Saúde Digital',
-      impacto: '+7pp',
-    },
-  ]
   return (
     <div className="space-y-4">
       <div
@@ -1421,26 +1406,26 @@ function TabCross() {
       <div id="cross-pending-list" className="bg-white border-l-4 border-l-purple-500 border border-gray-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-gray-900">Argumentos pendentes de aprovação</h3>
-          <span id="cross-pending-count" className="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{pending.filter((_, i) => votes[i] === null).length} pendentes</span>
+          <span id="cross-pending-count" className="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{pendentesApi.filter((_, i) => !votes[i]).length} pendentes</span>
         </div>
+        {pendentesApi.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-4">Nenhum argumento pendente de aprovação.</p>
+        )}
         <div className="space-y-4">
-          {pending.map((a, i) => (
-            <div key={i} className={`border rounded-xl p-4 transition-colors ${votes[i] === 'approved' ? 'border-emerald-200 bg-emerald-50' : votes[i] === 'rejected' ? 'border-red-100 bg-red-50 opacity-60' : 'border-gray-200'}`}>
+          {pendentesApi.map((a, i) => (
+            <div key={a.id ?? i} className={`border rounded-xl p-4 transition-colors ${votes[i] === 'approved' ? 'border-emerald-200 bg-emerald-50' : votes[i] === 'rejected' ? 'border-red-100 bg-red-50 opacity-60' : 'border-gray-200'}`}>
               <div className="flex items-center gap-2 mb-2">
-                <span className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
-                <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">{a.origem}</span>
-                <span className="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full">{a.segmento}</span>
-                <span className="ml-auto font-mono font-bold text-emerald-600 text-sm">{a.impacto} esperado</span>
+                <span className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{a.gatilho}</span>
+                <span className="text-xs text-gray-400">{new Date(a.criado_em).toLocaleDateString('pt-BR')}</span>
+                <span className="ml-auto">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${a.status === 'aprovado' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>{a.status}</span>
+                </span>
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
-                <p className="text-xs text-gray-500 font-semibold mb-1">FRASE VALIDADA (originada em SP):</p>
-                <p className="text-xs text-gray-700 italic">"{a.quote}"</p>
+                <p className="text-xs text-gray-500 font-semibold mb-1">FRASE VALIDADA:</p>
+                <p className="text-xs text-gray-700 italic">"{a.frase}"</p>
               </div>
-              <p className="text-xs text-gray-500 mb-3">
-                <ArrowRight size={11} className="inline mr-1 text-blue-500" />
-                {a.destino}
-              </p>
-              {votes[i] === null ? (
+              {!votes[i] ? (
                 <div className="flex gap-2">
                   <button onClick={() => setVotes(p => ({ ...p, [i]: 'approved' }))} className="flex-1 bg-emerald-600 text-white text-xs py-1.5 rounded-lg hover:bg-emerald-700 transition-colors font-semibold">✓ Aprovar e propagar</button>
                   <button onClick={() => setVotes(p => ({ ...p, [i]: 'rejected' }))} className="flex-1 bg-white border border-red-200 text-red-600 text-xs py-1.5 rounded-lg hover:bg-red-50 transition-colors font-semibold">✗ Recusar</button>
@@ -1498,24 +1483,6 @@ function TabCross() {
           <p className="mt-2 text-xs text-red-500">{crossErro}</p>
         )}
       </div>
-
-      {/* Pendentes da API */}
-      {pendentesApi.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Pendentes (API) — {pendentesApi.length}</h3>
-          <div className="space-y-2">
-            {pendentesApi.map((p, i) => (
-              <div key={i} className="border border-gray-100 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{p.gatilho}</span>
-                  <span className="text-xs text-gray-400">{new Date(p.criado_em).toLocaleDateString('pt-BR')}</span>
-                </div>
-                <p className="text-xs text-gray-700 italic">"{p.frase}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Argumentos já aplicados</h3>
@@ -2251,18 +2218,24 @@ interface CampanhaRow {
   status: 'ativa' | 'pausada'
 }
 
-const CAMPANHAS_INT: CampanhaRow[] = [
-  { nome: 'SP — Indústria Maio',    tipo: 'outbound',  ligacoes: 487, taxaAgend: 8.1, taxaConv: 5.4, icpMedio: 87, status: 'ativa' },
-  { nome: 'MG — Tecnologia Maio',   tipo: 'outbound',  ligacoes: 452, taxaAgend: 5.9, taxaConv: 3.8, icpMedio: 71, status: 'ativa' },
-  { nome: 'GO — Industrial',        tipo: 'outbound',  ligacoes: 345, taxaAgend: 6.1, taxaConv: 4.2, icpMedio: 68, status: 'ativa' },
-  { nome: 'SP — Saúde Digital',     tipo: 'inbound',   ligacoes: 198, taxaAgend: 12.4, taxaConv: 8.1, icpMedio: 91, status: 'ativa' },
-  { nome: 'Nurturing — Não-shows',  tipo: 'nurturing', ligacoes: 134, taxaAgend: 9.7, taxaConv: 6.3, icpMedio: 74, status: 'pausada' },
-  { nome: 'MG — Varejo Q2',         tipo: 'outbound',  ligacoes: 287, taxaAgend: 4.5, taxaConv: 2.9, icpMedio: 58, status: 'pausada' },
-]
-
 function TabCampanhas() {
   const [filtroTipo, setFiltroTipo] = useState<string>('todos')
   const [filtroStatus, setFiltroStatus] = useState<string>('todos')
+
+  const { data: campanhasInt = [] } = useQuery({
+    queryKey: ['campanhas'],
+    queryFn: () => campanhasApi.list().then(r => r.data as any[]),
+  })
+
+  const CAMPANHAS_INT: CampanhaRow[] = (campanhasInt as any[]).map((c: any) => ({
+    nome: c.nome ?? c.name ?? '—',
+    tipo: (['outbound', 'inbound', 'nurturing'].includes(c.tipo ?? c.type ?? '') ? (c.tipo ?? c.type) : 'outbound') as CampanhaRow['tipo'],
+    ligacoes: c.ligacoes ?? c.total_ligacoes ?? 0,
+    taxaAgend: c.taxaAgend ?? c.taxa_agend ?? c.taxa_agendamento ?? 0,
+    taxaConv: c.taxaConv ?? c.taxa_conv ?? c.taxa_conversao ?? 0,
+    icpMedio: c.icpMedio ?? c.icp_medio ?? 0,
+    status: (['ativa', 'pausada'].includes(c.status ?? '') ? c.status : 'ativa') as CampanhaRow['status'],
+  }))
 
   const filtrado = CAMPANHAS_INT.filter(c => {
     const tipoOk = filtroTipo === 'todos' || c.tipo === filtroTipo
@@ -2271,21 +2244,21 @@ function TabCampanhas() {
   })
 
   const ativas = CAMPANHAS_INT.filter(c => c.status === 'ativa')
-  const taxaMedia = (ativas.reduce((s, c) => s + c.taxaConv, 0) / ativas.length).toFixed(1)
-  const melhor = [...ativas].sort((a, b) => b.taxaConv - a.taxaConv)[0]
-  const pior = [...ativas].sort((a, b) => a.taxaConv - b.taxaConv)[0]
+  const taxaMedia = ativas.length > 0 ? (ativas.reduce((s, c) => s + c.taxaConv, 0) / ativas.length).toFixed(1) : '0.0'
+  const melhor = ativas.length > 0 ? [...ativas].sort((a, b) => b.taxaConv - a.taxaConv)[0] : null
+  const pior = ativas.length > 0 ? [...ativas].sort((a, b) => a.taxaConv - b.taxaConv)[0] : null
 
-  const maxAgend = Math.max(...filtrado.map(c => c.taxaAgend))
+  const maxAgend = filtrado.length > 0 ? Math.max(...filtrado.map(c => c.taxaAgend)) : 1
 
   return (
     <div className="space-y-4">
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="Campanhas ativas" value={String(ativas.length)} sub="de 6 total" accent="blue" />
+        <KpiCard label="Campanhas ativas" value={String(ativas.length)} sub={`de ${CAMPANHAS_INT.length} total`} accent="blue" />
         <KpiCard label="Taxa média conversão" value={`${taxaMedia}%`} sub="campanhas ativas" accent="green" />
-        <KpiCard label="Melhor campanha" value={melhor.nome.split(' — ')[0]} sub={`${melhor.taxaConv}% conversão`} accent="purple" />
-        <KpiCard label="Pior campanha" value={pior.nome.split(' — ')[0]} sub={`${pior.taxaConv}% conversão`} accent="amber" />
+        <KpiCard label="Melhor campanha" value={melhor ? melhor.nome.split(' — ')[0] : '—'} sub={melhor ? `${melhor.taxaConv}% conversão` : ''} accent="purple" />
+        <KpiCard label="Pior campanha" value={pior ? pior.nome.split(' — ')[0] : '—'} sub={pior ? `${pior.taxaConv}% conversão` : ''} accent="amber" />
       </div>
 
       {/* Gráfico de barras CSS — taxa de agendamento */}

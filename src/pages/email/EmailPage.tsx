@@ -6,7 +6,7 @@ import {
   Pencil, Brain, ArrowLeft,
   Link, Minus
 } from 'lucide-react'
-import { emailsApi, claudeApi, whatsappApi } from '@/services/api'
+import { emailsApi, claudeApi, whatsappApi, equipeApi } from '@/services/api'
 
 type TabId = 'acoes' | 'fila' | 'modelos' | 'campanhas' | 'equipe' | 'whatsapp' | 'inbox' | 'enviados'
 
@@ -277,18 +277,34 @@ function EmailComposer({
 
 // ─── Aba Fila ────────────────────────────────────────────────────────────────
 function TabFila() {
-  const [rows, setRows] = useState<QueueEmail[]>([
-    { id: 1, empresa: 'Acme Corp', contato: 'João Silva', campanha: 'Campanha SP Maio', origem: 'Não atendeu', template: 'Follow-up padrão', horario: '14:30', status: 'pendente', email: 'joao@acme.com', assunto: 'Tentei te ligar — 2 minutos?', corpo: `Olá João,\n\nTentei entrar em contato mas não consegui.\n\nGostaria de mostrar como podemos ajudar a Acme Corp a escalar o time comercial com IA.\n\nVocê tem 15 minutos essa semana?\n\nAbraços,\nEquipe ETZ` },
-    { id: 2, empresa: 'Delta Ind.', contato: 'Maria Costa', campanha: 'Campanha MG', origem: 'Pediu apresentação', template: 'Apresentação', horario: '15:00', status: 'pendente', email: 'maria@delta.com', assunto: 'Apresentação que você pediu', corpo: `Olá Maria,\n\nConforme conversamos, segue a apresentação completa da nossa solução para empresas como a Delta Ind.\n\nQualquer dúvida estou à disposição.\n\nAbraços,\nEquipe ETZ` },
-    { id: 3, empresa: 'Tech Sul', contato: 'Carlos Ramos', campanha: 'Campanha GO', origem: 'Não atendeu', template: 'Follow-up padrão', horario: '16:00', status: 'agendado', email: 'carlos@techsul.com', assunto: 'Oi Carlos, 5 minutos?', corpo: `Olá Carlos,\n\nPassando para ver se conseguimos conversar.\n\nAbraços,\nEquipe ETZ` },
-  ])
+  const { data: filaRows = [], isLoading: loadingFila } = useQuery({
+    queryKey: ['emails-fila'],
+    queryFn: () => emailsApi.inbox().then(r => (r.data as any[]).filter((e: any) => !e.lido).map((e: any) => ({
+      id: typeof e.id === 'number' ? e.id : Number(e.id) || Date.now(),
+      para: e.para ?? '',
+      assunto: e.assunto ?? '',
+      status: 'pendente' as const,
+      agente: '',
+      campanha: e.campanha ?? '',
+      empresa: e.empresa ?? '',
+      contato: e.de ?? '',
+      origem: e.origem ?? '',
+      template: e.template ?? '',
+      horario: e.criado_em ? new Date(e.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      email: e.para ?? '',
+      corpo: e.corpo ?? '',
+    } as QueueEmail))),
+  })
+
+  const [localOverrides, setLocalOverrides] = useState<Record<number, QueueEmail['status']>>({})
+  const rows: QueueEmail[] = filaRows.map(r => localOverrides[r.id] ? { ...r, status: localOverrides[r.id] } : r)
 
   const [composerEmail, setComposerEmail] = useState<QueueEmail | null>(null)
   const [trainedIds, setTrainedIds] = useState<Set<number>>(new Set())
   const [trainToast, setTrainToast] = useState<number | null>(null)
 
   function handleSend(id: number) {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, status: 'enviado' as const } : r))
+    setLocalOverrides(prev => ({ ...prev, [id]: 'enviado' as const }))
     setComposerEmail(null)
   }
 
@@ -311,10 +327,10 @@ function TabFila() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Pendentes" value={12} sub="aguardando envio" accent="text-amber-600" />
-        <KpiCard label="Enviados hoje" value={34} sub="+8 vs ontem" accent="text-green-600" />
-        <KpiCard label="Via ligação" value={9} sub="gerados pelo agente" accent="text-blue-600" />
-        <KpiCard label="Ação+Cadência" value={5} sub="multi-step ativos" accent="text-purple-600" />
+        <KpiCard label="Pendentes" value={loadingFila ? '…' : rows.filter(r => r.status === 'pendente').length} sub="aguardando envio" accent="text-amber-600" />
+        <KpiCard label="Total na fila" value={loadingFila ? '…' : rows.length} sub="gerados pelo sistema" accent="text-green-600" />
+        <KpiCard label="Enviados" value={loadingFila ? '…' : rows.filter(r => r.status === 'enviado').length} sub="nesta sessão" accent="text-blue-600" />
+        <KpiCard label="Agendados" value={loadingFila ? '…' : rows.filter(r => r.status === 'agendado').length} sub="para envio" accent="text-purple-600" />
       </div>
 
       {trainToast !== null && (
@@ -343,7 +359,7 @@ function TabFila() {
                 for (const r of rows.filter(r => r.status === 'pendente')) {
                   try {
                     await emailsApi.enviar({ para: r.email || r.contato, assunto: r.assunto, corpo: r.corpo || '' })
-                    setRows(prev => prev.map(x => x.id === r.id ? { ...x, status: 'enviado' as const } : x))
+                    setLocalOverrides(prev => ({ ...prev, [r.id]: 'enviado' as const }))
                   } catch (e) { console.error(e) }
                 }
               }}
@@ -400,7 +416,7 @@ function TabFila() {
                             onClick={async () => {
                               try {
                                 await emailsApi.enviar({ para: r.email || r.contato, assunto: r.assunto, corpo: r.corpo || '' })
-                                setRows(prev => prev.map(x => x.id === r.id ? { ...x, status: 'enviado' as const } : x))
+                                setLocalOverrides(prev => ({ ...prev, [r.id]: 'enviado' as const }))
                               } catch (e) { console.error(e) }
                             }}
                             className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700 flex items-center gap-1"
@@ -433,19 +449,26 @@ function TabFila() {
 
 // ─── Aba Ações ───────────────────────────────────────────────────────────────
 function TabAcoes() {
-  const acoes = [
-    { gatilho: 'Preço', empresa: 'Acme Corp', contato: 'João', acao: 'Enviar comparativo de ROI' },
-    { gatilho: 'Sem tempo', empresa: 'Delta Ind.', contato: 'Maria', acao: 'Ligar em horário diferente' },
-    { gatilho: 'Concorrente', empresa: 'Tech Sul', contato: 'Carlos', acao: 'Enviar case de cliente similar' },
-  ]
+  const { data: enviadosData = [] } = useQuery({
+    queryKey: ['emails-acoes'],
+    queryFn: () => emailsApi.enviados().then(r => r.data as any[]).catch(() => []),
+  })
+
+  // Map enviados to ações shape; empty is valid
+  const acoes = (enviadosData as any[]).map((e: any) => ({
+    gatilho: e.gatilho ?? e.campanha ?? '—',
+    empresa: e.empresa ?? '—',
+    contato: e.de ?? e.contato ?? '—',
+    acao: e.acao ?? e.assunto ?? '—',
+  }))
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Pendentes" value={7} sub="ações a executar" accent="text-red-600" />
-        <KpiCard label="Args tentados hoje" value={21} sub="pelo agente de voz" accent="text-blue-600" />
-        <KpiCard label="Convertidos" value={5} sub="reunião marcada" accent="text-green-600" />
-        <KpiCard label="Fallbacks acionados" value={3} sub="encaminhados" accent="text-amber-600" />
+        <KpiCard label="Pendentes" value={acoes.length} sub="ações a executar" accent="text-red-600" />
+        <KpiCard label="Total enviados" value={enviadosData.length} sub="pelo sistema" accent="text-blue-600" />
+        <KpiCard label="Convertidos" value={(enviadosData as any[]).filter((e: any) => e.status === 'clicado').length} sub="reunião marcada" accent="text-green-600" />
+        <KpiCard label="Fallbacks acionados" value={(enviadosData as any[]).filter((e: any) => e.status === 'bounced').length} sub="encaminhados" accent="text-amber-600" />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -462,6 +485,9 @@ function TabAcoes() {
         </div>
 
         <div className="space-y-3">
+          {acoes.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-6">Nenhuma ação pendente.</p>
+          )}
           {acoes.map((a, i) => (
             <div key={i} className="flex items-center justify-between border border-gray-100 rounded-xl p-3 hover:bg-gray-50">
               <div className="flex items-center gap-3">
@@ -489,7 +515,13 @@ function TabModelos() {
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [composerContexto, setComposerContexto] = useState('')
   const [composerCorpo, setComposerCorpo] = useState('')
+  const [composerAssunto, setComposerAssunto] = useState('')
   const [gerandoIA, setGerandoIA] = useState(false)
+
+  const { data: modelos = [], refetch: refetchModelos } = useQuery({
+    queryKey: ['email-modelos'],
+    queryFn: () => emailsApi.modelos().then(r => r.data as any[]).catch(() => []),
+  })
 
   async function gerarComIA() {
     if (gerandoIA) return
@@ -508,21 +540,21 @@ function TabModelos() {
     }
   }
 
+  async function salvarModelo() {
+    await emailsApi.saveModelo({ titulo: composerAssunto, categoria: 'geral', corpo: composerCorpo, assunto: composerAssunto })
+    refetchModelos()
+    setShowComposer(false)
+    setComposerContexto('')
+    setComposerCorpo('')
+    setComposerAssunto('')
+  }
+
   const categories = ['Todos', '🎯 Prospecção', '🔄 Follow-up', '✅ Confirmação', '📄 Proposta', '🎥 Demo', '⚙️ Técnico', '🌱 Nutrição', '⚔️ Concorrente']
 
-  const allModelos = [
-    { titulo: 'Follow-up pós não atendimento', cat: 'Follow-up', assunto: 'Tentei te ligar — 2 minutos?', preview: 'Olá [Nome], tentei entrar em contato mas não consegui. Gostaria de mostrar como podemos...', usos: 47 },
-    { titulo: 'Apresentação comercial', cat: 'Prospecção', assunto: 'Apresentação que você pediu', preview: 'Conforme conversamos, segue a apresentação completa da nossa solução para empresas como...', usos: 31 },
-    { titulo: 'Confirmação de reunião', cat: 'Confirmação', assunto: 'Confirmação: reunião amanhã às [hora]', preview: 'Só confirmando nossa reunião de amanhã! Vou estar online às [hora] prontos para...', usos: 28 },
-    { titulo: 'Contorno de concorrente', cat: 'Concorrente', assunto: 'Uma comparação honesta', preview: 'Entendo que você está avaliando outras opções. Preparei uma comparação objetiva para...', usos: 12 },
-    { titulo: 'Convite para demo', cat: 'Demo', assunto: 'Demo rápida de 20 min?', preview: 'Preparei uma demo personalizada para o seu segmento. Posso mostrar em 20 minutos...', usos: 19 },
-    { titulo: 'Proposta comercial', cat: 'Proposta', assunto: 'Proposta personalizada para [Empresa]', preview: 'Conforme nossa conversa, segue a proposta detalhada com os valores e condições...', usos: 22 },
-  ]
-
   const catLabel = selectedCategory.replace(/^[^\s]+\s/, '')
-  const modelos = selectedCategory === 'Todos'
-    ? allModelos
-    : allModelos.filter(m => m.cat === catLabel)
+  const modelosFiltrados = selectedCategory === 'Todos'
+    ? modelos
+    : modelos.filter((m: any) => (m.cat ?? m.categoria ?? '') === catLabel)
 
   return (
     <div className="space-y-4">
@@ -552,17 +584,20 @@ function TabModelos() {
         ))}
       </div>
 
+      {modelosFiltrados.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-8">Nenhum modelo salvo.</p>
+      )}
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))' }}>
-        {modelos.map((m, i) => (
+        {modelosFiltrados.map((m: any, i: number) => (
           <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
             <div className="flex items-start justify-between gap-2">
-              <span className="font-medium text-gray-900 text-sm">{m.titulo}</span>
-              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full shrink-0">{m.cat}</span>
+              <span className="font-medium text-gray-900 text-sm">{m.titulo ?? m.title ?? '—'}</span>
+              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full shrink-0">{m.cat ?? m.categoria ?? '—'}</span>
             </div>
-            <p className="text-xs text-gray-500 font-medium">Assunto: {m.assunto}</p>
-            <p className="text-xs text-gray-400 line-clamp-2">{m.preview}</p>
+            <p className="text-xs text-gray-500 font-medium">Assunto: {m.assunto ?? m.subject ?? '—'}</p>
+            <p className="text-xs text-gray-400 line-clamp-2">{m.preview ?? (m.corpo ?? '').slice(0, 80)}</p>
             <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
-              <span className="text-xs text-gray-400">Usos: {m.usos}</span>
+              <span className="text-xs text-gray-400">Usos: {m.usos ?? 0}</span>
               <div className="flex gap-2">
                 <button className="text-xs bg-blue-600 text-white rounded px-2.5 py-1 hover:bg-blue-700">Usar</button>
                 <button className="text-xs border border-gray-300 rounded px-2.5 py-1 text-gray-600 hover:bg-gray-50">Editar</button>
@@ -578,7 +613,7 @@ function TabModelos() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 font-medium block mb-1">Nome do modelo</label>
-              <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Follow-up reunião não realizada" />
+              <input value={composerAssunto} onChange={e => setComposerAssunto(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Follow-up reunião não realizada" />
             </div>
             <div>
               <label className="text-xs text-gray-500 font-medium block mb-1">Categoria</label>
@@ -617,7 +652,7 @@ function TabModelos() {
             <button onClick={gerarComIA} disabled={gerandoIA} className="flex items-center gap-1.5 text-sm bg-purple-600 text-white rounded-lg px-3 py-1.5 hover:bg-purple-700 disabled:opacity-60">
               <Sparkles size={14} /> {gerandoIA ? 'Gerando...' : '✨ Criar com IA'}
             </button>
-            <button className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700">
+            <button onClick={salvarModelo} className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700">
               <Save size={14} /> Salvar modelo
             </button>
           </div>
@@ -752,12 +787,19 @@ interface MembroEquipe {
 }
 
 function TabEquipe() {
-  const membros: MembroEquipe[] = [
-    { nome: 'Ana Lima', cargo: 'Gerente Comercial', email: 'ana@empresa.com', status: 'online', reunioesHoje: 4, emailsEnviados: 12 },
-    { nome: 'Carlos Ramos', cargo: 'Closer SP', email: 'carlos@empresa.com', status: 'ocupado', reunioesHoje: 3, emailsEnviados: 8 },
-    { nome: 'Pedro Souza', cargo: 'SDR MG', email: 'pedro@empresa.com', status: 'online', reunioesHoje: 2, emailsEnviados: 15 },
-    { nome: 'Fernanda Rocha', cargo: 'Closer GO', email: 'fernanda@empresa.com', status: 'offline', reunioesHoje: 1, emailsEnviados: 6 },
-  ]
+  const { data: membrosRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+
+  const membros: MembroEquipe[] = (membrosRaw as any[]).map((m: any) => ({
+    nome: m.nome ?? m.name ?? '—',
+    cargo: m.cargo ?? m.role ?? '—',
+    email: m.email ?? '—',
+    status: (['online', 'offline', 'ocupado'].includes(m.status) ? m.status : 'offline') as MembroEquipe['status'],
+    reunioesHoje: m.reunioesHoje ?? m.reunioes_hoje ?? 0,
+    emailsEnviados: m.emailsEnviados ?? m.emails_enviados ?? 0,
+  }))
 
   const statusStyle: Record<MembroEquipe['status'], string> = {
     online:  'bg-green-500',
@@ -843,11 +885,18 @@ function TabWhatsApp() {
   const [waAudiencia, setWaAudiencia] = useState('Não atenderam (últimos 7 dias)')
   const [waMensagem, setWaMensagem] = useState('')
 
-  const historico = [
-    { empresa: 'Acme Corp', contato: 'João Silva', msg: 'Olá João, tentei entrar em contato pelo telefone...', status: 'Entregue', data: 'Hoje 14:30' },
-    { empresa: 'Delta Ind.', contato: 'Maria Costa', msg: 'Maria, conforme conversamos, segue a apresentação...', status: 'Lido', data: 'Hoje 13:00' },
-    { empresa: 'Tech Sul', contato: 'Carlos Ramos', msg: 'Carlos, posso te ligar amanhã às 10h para...', status: 'Respondido', data: 'Ontem 16:45' },
-  ]
+  const { data: wzHistoricoRaw = [] } = useQuery({
+    queryKey: ['whatsapp-historico'],
+    queryFn: () => whatsappApi.list().then(r => r.data as any[]),
+  })
+
+  const historico = (wzHistoricoRaw as any[]).map((h: any) => ({
+    empresa: h.empresa ?? '—',
+    contato: h.contato ?? h.de ?? '—',
+    msg: h.mensagem ?? h.msg ?? h.corpo ?? '—',
+    status: h.status ?? 'Entregue',
+    data: h.criado_em ? new Date(h.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—',
+  }))
 
   const statusColor: Record<string, string> = {
     Entregue: 'text-blue-600 bg-blue-50',
@@ -857,12 +906,20 @@ function TabWhatsApp() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Mensagens enviadas" value={87} sub="esta semana" accent="text-blue-600" />
-        <KpiCard label="Respondidos" value={42} sub="48% de resposta" accent="text-green-600" />
-        <KpiCard label="Taxa de resposta" value="48%" sub="+5% vs semana" accent="text-amber-600" />
-        <KpiCard label="Convertidos → CI" value={11} sub="reuniões agendadas" accent="text-purple-600" />
-      </div>
+      {(() => {
+        const total = historico.length
+        const respondidos = historico.filter(h => h.status === 'Respondido').length
+        const taxaResp = total > 0 ? Math.round((respondidos / total) * 100) : 0
+        const convertidos = historico.filter(h => h.status === 'Respondido').length
+        return (
+          <div className="grid grid-cols-4 gap-3">
+            <KpiCard label="Mensagens enviadas" value={total} sub="no histórico" accent="text-blue-600" />
+            <KpiCard label="Respondidos" value={respondidos} sub={`${taxaResp}% de resposta`} accent="text-green-600" />
+            <KpiCard label="Taxa de resposta" value={`${taxaResp}%`} sub="do histórico total" accent="text-amber-600" />
+            <KpiCard label="Convertidos → CI" value={convertidos} sub="reuniões agendadas" accent="text-purple-600" />
+          </div>
+        )
+      })()}
 
       <div className="flex items-center gap-3 flex-wrap">
         <button
@@ -921,7 +978,7 @@ function TabWhatsApp() {
             />
           </div>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">Estimativa: <strong className="text-gray-900">34 contatos</strong></p>
+            <p className="text-xs text-gray-500">Estimativa: <strong className="text-gray-900">{historico.length} contatos</strong></p>
             <div className="flex gap-2">
               <button onClick={() => setShowComposer(false)} className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-600 hover:bg-gray-50">
                 Cancelar
