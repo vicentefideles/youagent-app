@@ -206,6 +206,8 @@ export const adminClientesApi = {
   ativar: (id: string | number) => api.patch(`/admin/clientes/${id}`, { action: 'ativar' }),
   rejeitar: (id: string | number, motivo: string) =>
     api.patch(`/admin/clientes/${id}`, { action: 'rejeitar', motivo_rejeicao: motivo }),
+  crossGlobal: () => api.get('/admin/cross-global'),
+  aprovarCross: (id: string, aprovado: boolean) => api.patch(`/admin/cross-global/${id}`, { aprovado }),
 }
 
 // Google Calendar

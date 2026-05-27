@@ -1256,6 +1256,92 @@ function ModalNovaCampanha({ open, onClose }: { open: boolean; onClose: () => vo
   )
 }
 
+// ─── MODAL AGRESSIVIDADE ─────────────────────────────────────────────────────
+
+const NIVEIS_AGRESSIVIDADE = [
+  { id: 'baixa',  label: 'Baixa',   calls_min: '1-2', cor: 'bg-green-100 border-green-400 text-green-800',  descricao: 'Ideal para Enterprise — mais pausa entre tentativas' },
+  { id: 'media',  label: 'Média',   calls_min: '3-4', cor: 'bg-blue-100 border-blue-400 text-blue-800',    descricao: 'Equilíbrio entre volume e qualidade' },
+  { id: 'alta',   label: 'Alta',    calls_min: '5-7', cor: 'bg-amber-100 border-amber-400 text-amber-800', descricao: 'Recomendado para SMB — maior volume' },
+  { id: 'maxima', label: 'Máxima',  calls_min: '8+',  cor: 'bg-red-100 border-red-400 text-red-800',       descricao: 'Verificar conformidade ANATEL antes de ativar' },
+]
+
+interface ModalAgressividadeProps {
+  campanhaId: string | null
+  campanhaName: string
+  valorAtual: string
+  onClose: () => void
+}
+
+function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: ModalAgressividadeProps) {
+  const [selecionado, setSelecionado] = useState(valorAtual.toLowerCase())
+  const [salvando, setSalvando] = useState(false)
+
+  async function salvar() {
+    setSalvando(true)
+    try {
+      if (campanhaId) {
+        await campanhasApi.update(campanhaId, { agressividade: selecionado })
+      }
+    } catch (e) { console.error(e) }
+    setSalvando(false)
+    onClose()
+  }
+
+  const showAnatel = selecionado === 'alta' || selecionado === 'maxima'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[460px]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Agressividade da campanha</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{campanhaName}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18}/></button>
+        </div>
+
+        <div className="p-6 flex flex-col gap-3">
+          {NIVEIS_AGRESSIVIDADE.map(n => (
+            <button
+              key={n.id}
+              onClick={() => setSelecionado(n.id)}
+              className={clsx(
+                'flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all',
+                selecionado === n.id ? n.cor + ' ring-2 ring-offset-1 ring-current' : 'border-gray-200 hover:border-gray-300 bg-white'
+              )}
+            >
+              <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border-2 flex-shrink-0', selecionado === n.id ? 'bg-white/70 ' + n.cor : 'bg-gray-100 text-gray-500 border-gray-200')}>
+                {n.calls_min}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-gray-900">{n.label}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{n.descricao}</div>
+              </div>
+              <div className={clsx('w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center', selecionado === n.id ? 'border-current bg-current/20' : 'border-gray-300')}>
+                {selecionado === n.id && <div className="w-2.5 h-2.5 rounded-full bg-current"/>}
+              </div>
+            </button>
+          ))}
+
+          {showAnatel && (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5"/>
+              <span>⚠️ Respeite o limite de tentativas ANATEL: máx. 3x/dia por número</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
+          <button onClick={salvar} disabled={salvando} className="btn-primary flex-1 justify-center disabled:opacity-60">
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── ABA CAMPANHAS ───────────────────────────────────────────────────────────
 
 function TabCampanhas() {
@@ -1282,6 +1368,7 @@ function TabCampanhas() {
   const [campStatus, setCampStatus] = useState<Record<string, string>>({ sp:'ativa', mg:'ativa', go:'pausada' })
   const [configModal, setConfigModal] = useState<ConfigIAModal>({ open: false, campanhaId: null, campanhaName: '' })
   const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false)
+  const [modalAgressividade, setModalAgressividade] = useState<{ id: string; nome: string; agr: string } | null>(null)
 
   // LGPD toggles
   const [lgpdOptOutAuto, setLgpdOptOutAuto] = useState(true)
@@ -1315,6 +1402,14 @@ function TabCampanhas() {
     <>
       <ModalConfigIA modal={configModal} onClose={() => setConfigModal({ open: false, campanhaId: null, campanhaName: '' })} />
       <ModalNovaCampanha open={novaCampanhaOpen} onClose={() => setNovaCampanhaOpen(false)} />
+      {modalAgressividade && (
+        <ModalAgressividade
+          campanhaId={modalAgressividade.id}
+          campanhaName={modalAgressividade.nome}
+          valorAtual={modalAgressividade.agr}
+          onClose={() => setModalAgressividade(null)}
+        />
+      )}
 
       <div className="flex flex-col gap-6">
         {/* Header */}
@@ -1403,7 +1498,7 @@ function TabCampanhas() {
                 </div>
 
                 {/* Ações secundárias */}
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-5 gap-1.5">
                   {[
                     { label:'+ Lista', icon:'📋' },
                     { label:'Leads', icon:'👥' },
@@ -1414,6 +1509,12 @@ function TabCampanhas() {
                       {a.icon} {a.label}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setModalAgressividade({ id: c.id, nome: c.nome, agr: c.agr })}
+                    className="text-2xs font-semibold py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition-colors text-center"
+                  >
+                    ⚡ Agr.
+                  </button>
                 </div>
               </div>
             </div>
@@ -1601,6 +1702,12 @@ function TabAgendados() {
       }))
     : AGENDAMENTOS
 
+  const fechamentos = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'fechou').length
+  const noShows = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'noshow').length
+  const perdidos = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'perdemos').length
+  const emAndamento = agendamentos.filter((r: Agendamento) => r.status === 'agendada').length
+  const taxaConversao = agendamentos.length > 0 ? Math.round((fechamentos / agendamentos.length) * 100) : 0
+
   return (
     <div className="flex flex-col gap-4">
       {/* Filtros */}
@@ -1627,11 +1734,11 @@ function TabAgendados() {
       {/* KPIs */}
       <div className="grid grid-cols-5 gap-3">
         {[
-          { id:'kpi-total-fechados', label:'Fechamentos', value:'0', color:'text-emerald-600', top:'border-t-emerald-500', sub:'0% taxa' },
-          { id:'kpi-noshows', label:'No-show', value:'0', color:'text-amber-600', top:'border-t-amber-500', sub:'reminders ativos' },
-          { id:'kpi-perdidos', label:'Perdidos', value:'0', color:'text-red-600', top:'border-t-red-500', sub:'em nurturing' },
-          { id:'kpi-em-andamento', label:'Em andamento', value:'2', color:'text-brand-600', top:'border-t-brand-500', sub:'aguardando resultado' },
-          { id:'kpi-conv-receita', label:'Taxa reunião→venda', value:'—%', color:'text-purple-600', top:'border-t-purple-500', sub:'meta: 25%' },
+          { id:'kpi-total-fechados', label:'Fechamentos',       value: String(fechamentos),                 color:'text-emerald-600', top:'border-t-emerald-500', sub: `${taxaConversao}% taxa` },
+          { id:'kpi-noshows',        label:'No-show',           value: String(noShows),                     color:'text-amber-600',   top:'border-t-amber-500',   sub:'reminders ativos' },
+          { id:'kpi-perdidos',       label:'Perdidos',          value: String(perdidos),                    color:'text-red-600',     top:'border-t-red-500',     sub:'em nurturing' },
+          { id:'kpi-em-andamento',   label:'Em andamento',      value: String(emAndamento || agendamentos.filter((r: Agendamento) => r.status === 'confirmado' || r.status === 'pendente').length), color:'text-brand-600', top:'border-t-brand-500', sub:'aguardando resultado' },
+          { id:'kpi-conv-receita',   label:'Taxa reunião→venda', value: `${taxaConversao}%`,                color:'text-purple-600',  top:'border-t-purple-500',  sub:'meta: 25%' },
         ].map(k => (
           <div key={k.id} className={clsx('card p-3 border-t-2', k.top)}>
             <div className={clsx('text-2xl font-bold font-mono', k.color)}>{k.value}</div>
@@ -1772,47 +1879,138 @@ function TabAgendados() {
       </div>
 
       {/* Modal Jornada */}
-      {modalJornada && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-popup w-full max-w-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Jornada — {modalJornada.empresa}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{modalJornada.contato} · {modalJornada.cargo}</p>
+      {modalJornada && (() => {
+        const ETAPAS_JORNADA = [
+          { id: 'contato',    label: 'Contato inicial', icon: '📞' },
+          { id: 'qualificado', label: 'Qualificado',    icon: '✅' },
+          { id: 'agendado',   label: 'Agendado',        icon: '📅' },
+          { id: 'realizado',  label: 'Realizado',       icon: '🤝' },
+          { id: 'negociacao', label: 'Negociação',      icon: '💬' },
+          { id: 'proposta',   label: 'Proposta',        icon: '📋' },
+          { id: 'fechado',    label: 'Fechado',         icon: '🏆' },
+        ]
+
+        // Determine current stage from status + resultado
+        const etapaAtual = modalJornada.resultado === 'fechou' ? 'fechado'
+          : modalJornada.resultado === 'perdemos' ? 'realizado'
+          : modalJornada.status === 'realizada' || modalJornada.status === 'realizado' ? 'realizado'
+          : modalJornada.status === 'confirmado' || modalJornada.status === 'pendente' || modalJornada.status === 'agendada' ? 'agendado'
+          : 'qualificado'
+
+        const etapaIdx = ETAPAS_JORNADA.findIndex(e => e.id === etapaAtual)
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in" onClick={() => setModalJornada(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">Jornada do Cliente — {modalJornada.empresa}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{modalJornada.contato} · {modalJornada.cargo}</p>
+                </div>
+                <button onClick={() => setModalJornada(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18}/></button>
               </div>
-              <button onClick={() => setModalJornada(null)} className="btn-ghost p-2"><X size={18}/></button>
-            </div>
-            <div className="p-6">
-              {/* Pipeline */}
-              <div className="flex items-center gap-0 mb-6">
-                {['Agendado','Realizado','Negociação','Proposta','Fechado'].map((etapa, i) => (
-                  <div key={etapa} className="flex items-center flex-1">
-                    <div className={clsx('flex-1 flex flex-col items-center gap-1', i === 0 && 'text-brand-600')}>
-                      <div className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2', i === 0 ? 'bg-brand-500 border-brand-500 text-white' : 'bg-white border-gray-300 text-gray-400')}>{i + 1}</div>
-                      <span className={clsx('text-2xs font-medium', i === 0 ? 'text-brand-600' : 'text-gray-400')}>{etapa}</span>
-                    </div>
-                    {i < 4 && <div className={clsx('h-0.5 flex-1', i < 0 ? 'bg-brand-500' : 'bg-gray-200')} />}
+
+              <div className="p-6 flex flex-col gap-6">
+                {/* Timeline */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Etapas da jornada</h3>
+                  <div className="flex items-start gap-0">
+                    {ETAPAS_JORNADA.map((etapa, i) => {
+                      const passada = i < etapaIdx
+                      const atual   = i === etapaIdx
+                      const futura  = i > etapaIdx
+                      return (
+                        <div key={etapa.id} className="flex items-center flex-1 min-w-0">
+                          <div className="flex flex-col items-center flex-1 min-w-0">
+                            <div className={clsx(
+                              'w-9 h-9 rounded-full flex items-center justify-center text-base border-2 transition-all',
+                              passada ? 'bg-brand-500 border-brand-500 text-white' :
+                              atual   ? 'bg-brand-600 border-brand-600 text-white ring-4 ring-brand-100' :
+                              'bg-white border-gray-200 text-gray-300'
+                            )}>
+                              {passada ? '✓' : etapa.icon}
+                            </div>
+                            <span className={clsx('text-2xs font-medium mt-1.5 text-center leading-tight', atual ? 'text-brand-600 font-bold' : passada ? 'text-gray-600' : 'text-gray-300')}>{etapa.label}</span>
+                          </div>
+                          {i < ETAPAS_JORNADA.length - 1 && (
+                            <div className={clsx('h-0.5 w-6 flex-shrink-0 mt-[-18px]', passada ? 'bg-brand-400' : 'bg-gray-200')}/>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
-              </div>
-              {/* Dados */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
+                </div>
+
+                {/* Dados da empresa */}
                 <div>
-                  <label className="text-xs font-medium text-gray-500 block mb-1.5">Atualizar etapa</label>
-                  <select className="input" value={etapaSelecionada} onChange={e => setEtapaSelecionada(e.target.value)}>
-                    <option>Agendado</option><option>Realizado</option><option>Negociação</option><option>Proposta</option><option>Fechado</option><option>Perdido</option>
-                  </select>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dados da empresa</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Contato</div>
+                      <div className="text-sm font-bold text-gray-900">{modalJornada.contato}</div>
+                      <div className="text-xs text-brand-600">{modalJornada.cargo}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Empresa</div>
+                      <div className="text-sm font-bold text-gray-900">{modalJornada.empresa}</div>
+                      {modalJornada.segmento && <div className="text-xs text-gray-500">{modalJornada.segmento}</div>}
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Telefone</div>
+                      <div className="text-xs font-mono text-gray-700">{modalJornada.telefone || '—'}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">E-mail</div>
+                      <div className="text-xs text-brand-600 truncate">{modalJornada.email || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumo da ligação */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Resumo da ligação</h3>
+                  <div className="bg-gray-50 rounded-xl p-4 border-l-2 border-brand-400">
+                    <p className="text-sm text-gray-700 leading-relaxed">{modalJornada.resumoLigacao || 'Sem resumo disponível.'}</p>
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+                      <div>
+                        <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Vendedor</div>
+                        <div className="text-xs font-medium text-gray-800">{modalJornada.vendedor}</div>
+                      </div>
+                      <div>
+                        <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Data / Hora</div>
+                        <div className="text-xs font-mono text-gray-800">{modalJornada.dataHora}</div>
+                      </div>
+                      {modalJornada.meetLink && (
+                        <div>
+                          <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Link Meet</div>
+                          <a href="#" className="text-xs text-brand-500 hover:underline">{modalJornada.meetLink}</a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Atualizar etapa */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 block mb-1.5">Atualizar etapa</label>
+                    <select className="input" value={etapaSelecionada} onChange={e => setEtapaSelecionada(e.target.value)}>
+                      {ETAPAS_JORNADA.map(e => <option key={e.id} value={e.id}>{e.icon} {e.label}</option>)}
+                      <option value="perdido">❌ Perdido</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 block mb-1.5">Valor da oportunidade</label>
+                    <input className="input" placeholder="R$ 0,00" value={valorOpor} onChange={e => setValorOpor(e.target.value)} />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500 block mb-1.5">Valor da oportunidade</label>
-                  <input className="input" placeholder="R$ 0,00" value={valorOpor} onChange={e => setValorOpor(e.target.value)} />
+                  <label className="text-xs font-medium text-gray-500 block mb-1.5">Nota</label>
+                  <textarea className="input min-h-[80px] resize-none" placeholder="Adicione uma nota sobre esta oportunidade..." value={nota} onChange={e => setNota(e.target.value)} />
                 </div>
               </div>
-              <div className="mb-4">
-                <label className="text-xs font-medium text-gray-500 block mb-1.5">Nota</label>
-                <textarea className="input min-h-[80px] resize-none" placeholder="Adicione uma nota sobre esta oportunidade..." value={nota} onChange={e => setNota(e.target.value)} />
-              </div>
-              <div className="flex gap-3">
+
+              <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
                 <button onClick={() => setModalJornada(null)} className="btn-secondary flex-1">Cancelar</button>
                 <button
                   className="btn-primary flex-1"
@@ -1829,8 +2027,8 @@ function TabAgendados() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -2326,7 +2524,34 @@ function TabAgenda() {
 
 function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
   const [transferidos, setTransferidos] = useState<Record<string, string>>({})
-  const ativas = FILA.filter(l => l.status === 'em_ligacao')
+
+  const { data: ligacoesAtivas = [], isLoading } = useQuery({
+    queryKey: ['ligacoes-ao-vivo'],
+    queryFn: () => ligacoesApi.list({ status: 'em_andamento' }).then(r =>
+      (r.data as any[]).map(l => ({
+        id: String(l.call_control_id ?? l.id ?? Math.random()),
+        empresa: l.contatos?.empresa ?? l.empresa_nome ?? l.numero_destino ?? '—',
+        contato: l.contatos?.nome ?? l.contato_nome ?? '—',
+        cargo: l.contatos?.cargo ?? l.cargo ?? '',
+        telefone: l.numero_destino ?? l.telefone ?? '',
+        agente: l.agentes?.nome ?? l.agente_nome ?? '—',
+        campanha: l.campanha_nome ?? l.campanha ?? '',
+        segmento: l.contatos?.segmento ?? l.segmento ?? '',
+        status: 'em_ligacao' as StatusLigacao,
+        icp: l.icp ?? 0,
+        potencial: l.potencial ?? 0,
+        tentativa: l.tentativa ?? 1,
+        maxTentativas: l.max_tentativas ?? 3,
+        duracao: l.duracao,
+        snippet: l.snippet,
+        gatilhoDetectado: l.gatilho_detectado,
+        transferindo: l.transferindo ?? false,
+      } as EntradaFila)
+    ),
+    refetchInterval: 5000,
+  })
+
+  const ativas = ligacoesAtivas
 
   return (
     <div className="flex flex-col gap-4">
@@ -2344,10 +2569,15 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
         ))}
       </div>
 
-      {ativas.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 animate-pulse"><Radio size={28} className="text-gray-300"/></div>
+          <p className="text-sm text-gray-400">Carregando ligações ativas...</p>
+        </div>
+      ) : ativas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Radio size={28} className="text-gray-400"/></div>
-          <h3 className="text-base font-semibold text-gray-900">Nenhuma ligação ativa</h3>
+          <h3 className="text-base font-semibold text-gray-900">Nenhuma ligação ativa no momento</h3>
           <p className="text-sm text-gray-500 mt-2">As ligações aparecem aqui em tempo real assim que o agente inicia uma chamada</p>
         </div>
       ) : (
