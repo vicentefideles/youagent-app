@@ -57,6 +57,8 @@ export const campanhasApi = {
   update:  (id: string, data: unknown) => api.put(`/campanhas/${id}`, data),
   iniciar: (id: string)               => api.post(`/campanhas/${id}/iniciar`, {}),
   pausar:  (id: string)               => api.patch(`/campanhas/${id}`, { status: 'pausada' }),
+  analisarLista: (id: string, data: { amostra?: Array<{ nome?: string; empresa?: string; cargo?: string }>; total_contatos?: number; segmento?: string }) =>
+    api.post(`/campanhas/${id}/analisar-lista`, data),
 }
 
 // Contatos
@@ -78,6 +80,8 @@ export const ligacoesApi = {
   encerrar: (callControlId: string) => api.delete(`/ligacoes/${callControlId}/encerrar`),
   transferir: (callControlId: string, data: { numero_destino: string; vendedor_nome?: string }) =>
     api.post(`/ligacoes/${callControlId}/transferir`, data),
+  falar: (callControlId: string, data: { texto: string; voz?: string }) =>
+    api.post(`/ligacoes/${callControlId}/falar`, data),
 }
 
 // Reuniões
@@ -195,6 +199,13 @@ export const clientesApi = {
   buscarContrato: (id: string) => api.get(`/clientes/${id}/contrato`),
   assinarContrato: (id: string, nomeAssinatura: string) =>
     api.post(`/clientes/${id}/assinar-contrato`, { nome_assinatura: nomeAssinatura }),
+}
+
+// Admin — cross-global
+export const adminCrossApi = {
+  list: () => api.get('/admin/clientes/cross-global'),
+  aprovar: (id: string, aprovado: boolean) =>
+    api.patch(`/admin/clientes/cross-global/${id}`, { aprovado }),
 }
 
 // Admin — clientes

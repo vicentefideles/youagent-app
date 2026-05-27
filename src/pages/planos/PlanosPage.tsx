@@ -245,6 +245,125 @@ function CardModal({ onClose }: CardModalProps) {
   )
 }
 
+// ─── Calculadora: Quanto você economiza? ─────────────────────────────────────
+
+function EconomiaCacluladora() {
+  const [roiSDRs, setRoiSDRs] = useState(2)
+  const [roiSalario, setRoiSalario] = useState(3500)
+
+  const custoSDRMensal = roiSDRs * roiSalario * 1.72 // encargos CLT
+  const reunioesPorMes = roiSDRs * 12
+  const custoPorReuniaoSDR = Math.round(custoSDRMensal / Math.max(reunioesPorMes, 1))
+
+  const custoETZ = 997 // plano starter
+  const reunioesETZ = Math.round(reunioesPorMes * 1.4)
+  const custoPorReuniaoETZ = Math.round(custoETZ / Math.max(reunioesETZ, 1))
+  const economiaETZ = Math.round(custoSDRMensal - custoETZ)
+
+  function formatBRLShort(v: number) {
+    if (v >= 1000) return `R$ ${(v / 1000).toFixed(1).replace('.', ',')}k`
+    return `R$ ${v.toLocaleString('pt-BR')}`
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-6 text-white"
+      style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}
+    >
+      <h2 className="text-base font-semibold mb-1">Quanto você economiza?</h2>
+      <p className="text-sm text-indigo-200 mb-6">Compare o custo de SDRs humanos com o ETZ</p>
+
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        {/* Slider SDRs */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-indigo-200">Nº de SDRs</label>
+            <span className="text-sm font-bold">{roiSDRs}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={roiSDRs}
+            onChange={e => setRoiSDRs(Number(e.target.value))}
+            className="w-full accent-white"
+          />
+          <div className="flex justify-between text-xs text-indigo-300 mt-1">
+            <span>1</span><span>10</span>
+          </div>
+        </div>
+
+        {/* Slider Salário */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-indigo-200">Salário médio (R$)</label>
+            <span className="text-sm font-bold">{roiSalario.toLocaleString('pt-BR')}</span>
+          </div>
+          <input
+            type="range"
+            min={2000}
+            max={8000}
+            step={500}
+            value={roiSalario}
+            onChange={e => setRoiSalario(Number(e.target.value))}
+            className="w-full accent-white"
+          />
+          <div className="flex justify-between text-xs text-indigo-300 mt-1">
+            <span>R$ 2k</span><span>R$ 8k</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Resultado em destaque */}
+      <div className="bg-white/10 rounded-xl p-4 mb-4 text-center">
+        <p className="text-xs text-indigo-200 mb-1">Economia estimada / mês</p>
+        <p className={`text-4xl font-bold ${economiaETZ >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+          {economiaETZ >= 0 ? '+' : ''}{economiaETZ.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
+        </p>
+      </div>
+
+      {/* Comparativo */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white/10 rounded-xl p-4">
+          <p className="text-xs text-indigo-200 mb-3 font-medium">SDR Humano ({roiSDRs}x)</p>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-xs text-indigo-300">Custo total/mês</span>
+              <span className="text-xs font-bold text-white">{formatBRLShort(custoSDRMensal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-indigo-300">Reuniões/mês</span>
+              <span className="text-xs font-bold text-white">{reunioesPorMes}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-indigo-300">Custo/reunião</span>
+              <span className="text-xs font-bold text-white">{formatBRLShort(custoPorReuniaoSDR)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-4">
+          <p className="text-xs text-green-300 mb-3 font-medium">ETZ Starter</p>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-xs text-indigo-300">Custo total/mês</span>
+              <span className="text-xs font-bold text-white">{formatBRLShort(custoETZ)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-indigo-300">Reuniões/mês</span>
+              <span className="text-xs font-bold text-green-300">{reunioesETZ} (+40%)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-indigo-300">Custo/reunião</span>
+              <span className="text-xs font-bold text-green-300">{formatBRLShort(custoPorReuniaoETZ)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── ROI Calculator ───────────────────────────────────────────────────────────
 
 const PLANO_CUSTOS: Record<string, number> = { starter: 997, growth: 1997, enterprise: 4997 }
@@ -476,6 +595,9 @@ export default function PlanosPage() {
           {erroAssinar}
         </div>
       )}
+
+      {/* Calculadora de economia */}
+      <EconomiaCacluladora />
 
       {/* Plan cards */}
       <div className="grid grid-cols-3 gap-4">

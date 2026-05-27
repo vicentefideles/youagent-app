@@ -13,8 +13,10 @@ import {
   HeadphonesIcon,
   Loader2,
   X,
+  Brain,
+  Check,
 } from 'lucide-react'
-import { api, adminClientesApi } from '@/services/api'
+import { api, adminClientesApi, clientesApi } from '@/services/api'
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -605,25 +607,109 @@ function TabAtivos() {
   )
 }
 
+// ─── Assinatura Status Badge ──────────────────────────────────────────────────
+
+type AssinaturaStatus = 'Aguardando assinatura' | 'Assinado' | 'Pendente' | 'Não gerado'
+
+function AssinaturaStatusBadge({ status }: { status: AssinaturaStatus }) {
+  const map: Record<AssinaturaStatus, string> = {
+    'Assinado': 'bg-green-100 text-green-700',
+    'Aguardando assinatura': 'bg-amber-100 text-amber-700',
+    'Pendente': 'bg-gray-100 text-gray-600',
+    'Não gerado': 'bg-gray-100 text-gray-400',
+  }
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[status]}`}>
+      {status}
+    </span>
+  )
+}
+
 // ─── Tab: Contratos ───────────────────────────────────────────────────────────
 
-function TabContratos() {
-  const [contratos, setContratos] = useState<Contrato[]>([])
-  const [loading, setLoading] = useState(true)
+interface ContratoComAssinatura extends Contrato {
+  assinaturaStatus: AssinaturaStatus
+  clienteApiId: string
+}
 
-  useEffect(() => {
-    adminClientesApi.list()
-      .then(res => {
-        const data = (res.data as ClienteAPI[]) || []
-        setContratos(data.map(mapApiToContrato))
-      })
-      .catch(() => setContratos([]))
-      .finally(() => setLoading(false))
-  }, [])
+function gerarTextoContrato(c: ContratoComAssinatura): string {
+  return `CONTRATO DE PRESTAÇÃO DE SERVIÇOS — ETZ
+
+Empresa: ${c.empresa}
+Plano: ${c.plano}
+Valor mensal: R$ ${c.valor}
+Início: ${c.inicio ? formatDate(c.inicio) : '—'}
+Término: ${c.termino ? formatDate(c.termino) : '—'}
+
+OBJETO DO CONTRATO
+A ETZ Tech se compromete a fornecer acesso à plataforma de agentes de IA para
+agendamento comercial ativo, conforme plano contratado acima.
+
+CONDIÇÕES GERAIS
+- O acesso é pessoal e intransferível.
+- O valor será cobrado mensalmente no cartão cadastrado.
+- O contrato pode ser rescindido com 30 dias de antecedência.
+
+VIGÊNCIA
+Este contrato entra em vigor na data de assinatura e tem duração de 12 meses,
+renovável automaticamente salvo notificação contrária.
+
+________________________________
+Assinatura digital do responsável`
+}
+
+function TabContratos() {
+  const [contratos, setContratos] = useState<ContratoComAssinatura[]>([])
+  const [loading, setLoading] = useState(true)
+  const [gerandoContrato, setGerandoContrato] = useState<string | null>(null)
+  const [modalContrato, setModalContrato] = useState<ContratoComAssinatura | null>(null)
+
+  async function carregarContratos() {
+    setLoading(true)
+    try {
+      const res = await adminClientesApi.list()
+      const data = (res.data as ClienteAPI[]) || []
+      setContratos(data.map(c => {
+        const base = mapApiToContrato(c)
+        let assinaturaStatus: AssinaturaStatus = 'Não gerado'
+        if (c.status === 'ativo') assinaturaStatus = 'Assinado'
+        else if (c.status === 'aguardando_ativacao') assinaturaStatus = 'Aguardando assinatura'
+        else if (c.status === 'cadastrado' || c.status === 'documentos_rejeitados') assinaturaStatus = 'Pendente'
+        return { ...base, assinaturaStatus, clienteApiId: String(c.id) }
+      }))
+    } catch {
+      setContratos([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { carregarContratos() }, [])
+
+  async function handleGerarContrato(clienteId: string) {
+    setGerandoContrato(clienteId)
+    try {
+      await clientesApi.gerarContrato(clienteId)
+      await carregarContratos()
+    } catch {
+      // silencioso — estado atualiza mesmo assim na recarga
+      await carregarContratos()
+    } finally {
+      setGerandoContrato(null)
+    }
+  }
+
+  async function handleMarcarAssinado(clienteId: string) {
+    try {
+      await clientesApi.assinarContrato(clienteId, 'Assinado via Admin')
+      await carregarContratos()
+    } catch {
+      await carregarContratos()
+    }
+  }
 
   const ativos = contratos.filter((c) => c.status === 'Ativo')
   const valorTotal = ativos.reduce((acc, c) => acc + c.valor, 0)
-
   const hoje = new Date()
   const em30dias = new Date(hoje)
   em30dias.setDate(hoje.getDate() + 30)
@@ -659,13 +745,14 @@ function TabContratos() {
             <Th>Início</Th>
             <Th>Término</Th>
             <Th>Status</Th>
+            <Th>Assinatura</Th>
             <Th>Ações</Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {contratos.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
+              <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
                 Nenhum contrato encontrado.
               </td>
             </tr>
@@ -678,24 +765,230 @@ function TabContratos() {
               <Td className="text-gray-500 text-xs">{c.inicio ? formatDate(c.inicio) : '—'}</Td>
               <Td className="text-gray-500 text-xs">{c.termino ? formatDate(c.termino) : '—'}</Td>
               <Td><ContratoStatusBadge status={c.status} /></Td>
+              <Td><AssinaturaStatusBadge status={c.assinaturaStatus} /></Td>
               <Td>
-                <button
-                  onClick={() => {
-                    const texto = `Contrato ${c.id}\nEmpresa: ${c.empresa}\nPlano: ${c.plano}\nValor: R$ ${c.valor}`
-                    const blob = new Blob([texto], { type: 'text/plain' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a'); a.href = url; a.download = `contrato-${c.id}.txt`; a.click()
-                  }}
-                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
-                >
-                  <Download size={13} />
-                  Download
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setModalContrato(c)}
+                    className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium transition-colors"
+                  >
+                    <Eye size={13} />
+                    Ver
+                  </button>
+                  {(c.assinaturaStatus === 'Não gerado' || c.assinaturaStatus === 'Pendente') && (
+                    <button
+                      onClick={() => handleGerarContrato(c.clienteApiId)}
+                      disabled={gerandoContrato === c.clienteApiId}
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {gerandoContrato === c.clienteApiId ? <Loader2 size={12} className="animate-spin" /> : null}
+                      Gerar contrato
+                    </button>
+                  )}
+                  {c.assinaturaStatus === 'Aguardando assinatura' && (
+                    <button
+                      onClick={() => handleGerarContrato(c.clienteApiId)}
+                      disabled={gerandoContrato === c.clienteApiId}
+                      className="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium transition-colors disabled:opacity-50"
+                    >
+                      Reenviar
+                    </button>
+                  )}
+                  {c.assinaturaStatus !== 'Assinado' && (
+                    <button
+                      onClick={() => handleMarcarAssinado(c.clienteApiId)}
+                      className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium transition-colors"
+                    >
+                      <Check size={12} />
+                      Marcar assinado
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      const texto = gerarTextoContrato(c)
+                      const blob = new Blob([texto], { type: 'text/plain' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a'); a.href = url; a.download = `contrato-${c.id}.txt`; a.click()
+                    }}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                  >
+                    <Download size={13} />
+                    Download
+                  </button>
+                </div>
               </Td>
             </tr>
           ))}
         </tbody>
       </TableCard>
+
+      {/* Modal: Preview do contrato */}
+      {modalContrato && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <span className="text-sm font-semibold text-gray-900">Contrato — {modalContrato.empresa}</span>
+                <div className="mt-1"><AssinaturaStatusBadge status={modalContrato.assinaturaStatus} /></div>
+              </div>
+              <button onClick={() => setModalContrato(null)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed bg-gray-50 rounded-lg p-4">
+                {gerarTextoContrato(modalContrato)}
+              </pre>
+            </div>
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+              <span className="text-xs text-gray-500">Enviar para assinatura eletrônica:</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { handleGerarContrato(modalContrato.clienteApiId); setModalContrato(null) }}
+                  disabled={gerandoContrato === modalContrato.clienteApiId}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
+                >
+                  {gerandoContrato === modalContrato.clienteApiId && <Loader2 size={13} className="animate-spin" />}
+                  Enviar para assinatura
+                </button>
+                <button onClick={() => setModalContrato(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tab: Cross Global ───────────────────────────────────────────────────────
+
+interface CrossArgumento {
+  id: string
+  cliente_nome: string
+  gatilho: string
+  frase: string
+  data: string
+  aprovado?: boolean | null
+}
+
+function TabCrossGlobal() {
+  const [argumentos, setArgumentos] = useState<CrossArgumento[]>([])
+  const [loading, setLoading] = useState(true)
+  const [processando, setProcessando] = useState<string | null>(null)
+
+  async function carregarCross() {
+    setLoading(true)
+    try {
+      const res = await adminClientesApi.crossGlobal()
+      const data = (res.data as CrossArgumento[]) || []
+      setArgumentos(data)
+    } catch {
+      // fallback: lista vazia
+      setArgumentos([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { carregarCross() }, [])
+
+  async function handleAprovar(id: string, aprovado: boolean) {
+    setProcessando(id)
+    try {
+      await adminClientesApi.aprovarCross(id, aprovado)
+      setArgumentos(prev => prev.filter(a => a.id !== id))
+    } catch {
+      // silencioso — remove da lista mesmo assim para UX fluida
+      setArgumentos(prev => prev.filter(a => a.id !== id))
+    } finally {
+      setProcessando(null)
+    }
+  }
+
+  const pendentes = argumentos.filter(a => a.aprovado === null || a.aprovado === undefined)
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Brain size={20} className="text-purple-600" />
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Cross-cliente Global</h2>
+          <p className="text-sm text-gray-500">Argumentos detectados automaticamente em todas as contas — aguardando aprovação</p>
+        </div>
+        {pendentes.length > 0 && (
+          <span className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold">
+            {pendentes.length}
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-gray-500">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Carregando...</span>
+        </div>
+      ) : pendentes.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 px-6 py-12 text-center">
+          <Check size={32} className="text-green-400 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-700">Nenhum argumento pendente</p>
+          <p className="text-xs text-gray-400 mt-1">Todos os argumentos foram revisados</p>
+        </div>
+      ) : (
+        <TableCard>
+          <thead>
+            <tr>
+              <Th>Cliente</Th>
+              <Th>Gatilho</Th>
+              <Th>Argumento sugerido</Th>
+              <Th>Data</Th>
+              <Th>Ações</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {pendentes.map(a => (
+              <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                <Td>
+                  <span className="font-medium text-gray-900 text-sm">{a.cliente_nome}</span>
+                </Td>
+                <Td>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                    {a.gatilho}
+                  </span>
+                </Td>
+                <Td>
+                  <p className="text-sm text-gray-700 max-w-xs">{a.frase}</p>
+                </Td>
+                <Td className="text-xs text-gray-500">
+                  {a.data ? new Date(a.data).toLocaleDateString('pt-BR') : '—'}
+                </Td>
+                <Td>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAprovar(a.id, true)}
+                      disabled={processando === a.id}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      {processando === a.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={() => handleAprovar(a.id, false)}
+                      disabled={processando === a.id}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    >
+                      <X size={11} />
+                      Reprovar
+                    </button>
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </TableCard>
+      )}
     </div>
   )
 }
@@ -986,7 +1279,7 @@ function TabMarketing() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type TabId = 'pipeline' | 'ativos' | 'contratos' | 'campanhas' | 'marketing'
+type TabId = 'pipeline' | 'ativos' | 'contratos' | 'cross' | 'campanhas' | 'marketing'
 
 interface TabDef {
   id: TabId
@@ -998,6 +1291,7 @@ const tabs: TabDef[] = [
   { id: 'pipeline', label: 'Pipeline', icon: <TrendingUp size={15} /> },
   { id: 'ativos', label: 'Ativos', icon: <Users size={15} /> },
   { id: 'contratos', label: 'Contratos', icon: <FileText size={15} /> },
+  { id: 'cross', label: 'Inteligência', icon: <Brain size={15} /> },
   { id: 'campanhas', label: 'Campanhas', icon: <Megaphone size={15} /> },
   { id: 'marketing', label: 'Marketing', icon: <Mail size={15} /> },
 ]
@@ -1038,6 +1332,7 @@ export default function AdminClientesPage() {
       {activeTab === 'pipeline' && <TabPipeline />}
       {activeTab === 'ativos' && <TabAtivos />}
       {activeTab === 'contratos' && <TabContratos />}
+      {activeTab === 'cross' && <TabCrossGlobal />}
       {activeTab === 'campanhas' && <TabCampanhas />}
       {activeTab === 'marketing' && <TabMarketing />}
     </div>

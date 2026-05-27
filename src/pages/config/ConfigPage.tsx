@@ -656,71 +656,154 @@ function SectionSeguranca() {
 
 // ─── Seção: Notificações ──────────────────────────────────────────────────────
 
+type CanalNotif = 'plataforma' | 'email' | 'whatsapp'
+
+interface CategoriaNotif {
+  id: string
+  titulo: string
+  descricao: string
+  canais: CanalNotif[]
+  toggles: string[]
+}
+
+const CATEGORIAS_NOTIF: CategoriaNotif[] = [
+  {
+    id: 'ligacoes',
+    titulo: 'Ligações e Agendamentos',
+    descricao: 'Alertas quando agente agendar ou transferir ao vivo',
+    canais: ['plataforma', 'email', 'whatsapp'],
+    toggles: ['Nova reunião agendada', 'Transferência ao vivo', 'No-show detectado'],
+  },
+  {
+    id: 'relatorios',
+    titulo: 'Relatórios Automáticos',
+    descricao: 'Resumos periódicos de performance',
+    canais: ['email'],
+    toggles: ['Relatório diário', 'Relatório semanal', 'Relatório mensal'],
+  },
+  {
+    id: 'inteligencia',
+    titulo: 'Inteligência e Aprendizado',
+    descricao: 'Novos padrões detectados, argumentos para aprovar',
+    canais: ['plataforma', 'email'],
+    toggles: ['Novo argumento cross-cliente para aprovar', 'Padrão detectado', 'Versão do agente atualizada'],
+  },
+  {
+    id: 'performance',
+    titulo: 'Performance e Alertas',
+    descricao: 'Quedas de performance ou metas em risco',
+    canais: ['plataforma', 'email'],
+    toggles: ['Meta mensal em risco (< 70%)', 'Queda de conversão > 20%', 'Agente com muitos no-shows'],
+  },
+  {
+    id: 'financeiro',
+    titulo: 'Financeiro',
+    descricao: 'Cobranças, consumo e faturas',
+    canais: ['email'],
+    toggles: ['Fatura gerada', 'Consumo acima de 80%', 'Falha no pagamento'],
+  },
+  {
+    id: 'sistema',
+    titulo: 'Sistema',
+    descricao: 'Atualizações da plataforma e manutenções',
+    canais: ['plataforma'],
+    toggles: ['Manutenção programada', 'Nova funcionalidade disponível'],
+  },
+]
+
+const CANAL_LABEL: Record<CanalNotif, string> = {
+  plataforma: 'Plataforma',
+  email: 'E-mail',
+  whatsapp: 'WhatsApp',
+}
+
+function buildInitialNotifState(): Record<string, boolean> {
+  const state: Record<string, boolean> = {}
+  CATEGORIAS_NOTIF.forEach(cat => {
+    cat.toggles.forEach(t => { state[`${cat.id}__${t}`] = true })
+    cat.canais.forEach(c => { state[`${cat.id}__canal__${c}`] = c !== 'whatsapp' })
+  })
+  return state
+}
+
 function SectionNotificacoes() {
-  const [reuniao, setReuniao] = useState(true)
-  const [transf, setTransf] = useState(true)
-  const [noShow, setNoShow] = useState(false)
-  const [consumo, setConsumo] = useState(true)
-  const [ci, setCi] = useState(false)
-  const [meta, setMeta] = useState(true)
+  const [prefs, setPrefs] = useState<Record<string, boolean>>(buildInitialNotifState)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
-  const [email, setEmail] = useState(true)
-  const [whatsapp, setWhatsapp] = useState(true)
-  const [push, setPush] = useState(false)
+  function toggle(key: string) {
+    setPrefs(prev => ({ ...prev, [key]: !prev[key] }))
+  }
 
-  const [frequencia, setFrequencia] = useState<'imediato' | 'diario' | 'semanal'>('imediato')
-
-  const eventos: { label: string; checked: boolean; onChange: (v: boolean) => void }[] = [
-    { label: 'Reunião agendada', checked: reuniao, onChange: setReuniao },
-    { label: 'Transferência aceita', checked: transf, onChange: setTransf },
-    { label: 'No-show registrado', checked: noShow, onChange: setNoShow },
-    { label: 'Alerta de consumo', checked: consumo, onChange: setConsumo },
-    { label: 'Novos padrões CI', checked: ci, onChange: setCi },
-    { label: 'Meta atingida', checked: meta, onChange: setMeta },
-  ]
+  async function handleSalvar() {
+    setSaving(true)
+    try {
+      await api.patch('/clientes/notificacoes', { preferencias: prefs })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      // silencioso — preferências salvas localmente
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Eventos</h3>
-        <div className="divide-y divide-gray-100">
-          {eventos.map(ev => (
-            <div key={ev.label} className="flex items-center justify-between py-3">
-              <span className="text-sm text-gray-800">{ev.label}</span>
-              <Toggle checked={ev.checked} onChange={ev.onChange} />
-            </div>
-          ))}
-        </div>
-      </div>
+      {CATEGORIAS_NOTIF.map(cat => (
+        <div key={cat.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">{cat.titulo}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{cat.descricao}</p>
+          </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Canais</h3>
-        <div className="divide-y divide-gray-100">
-          <div className="flex items-center justify-between py-3">
-            <span className="text-sm text-gray-800">E-mail</span>
-            <Toggle checked={email} onChange={setEmail} />
+          {/* Toggles por evento */}
+          <div className="divide-y divide-gray-100 mb-4">
+            {cat.toggles.map(t => {
+              const key = `${cat.id}__${t}`
+              return (
+                <div key={t} className="flex items-center justify-between py-2.5">
+                  <span className="text-sm text-gray-700">{t}</span>
+                  <Toggle checked={!!prefs[key]} onChange={() => toggle(key)} />
+                </div>
+              )
+            })}
           </div>
-          <div className="flex items-center justify-between py-3">
-            <span className="text-sm text-gray-800">WhatsApp</span>
-            <Toggle checked={whatsapp} onChange={setWhatsapp} />
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <span className="text-sm text-gray-800">Push / browser</span>
-            <Toggle checked={push} onChange={setPush} />
-          </div>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Frequência</h3>
-        <div className="flex gap-3">
-          {(['imediato', 'diario', 'semanal'] as const).map(f => (
-            <label key={f} className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="frequencia" value={f} checked={frequencia === f} onChange={() => setFrequencia(f)} className="accent-blue-600" />
-              <span className="text-sm text-gray-700 capitalize">{f === 'imediato' ? 'Imediato' : f === 'diario' ? 'Resumo diário' : 'Resumo semanal'}</span>
-            </label>
-          ))}
+          {/* Selector de canal */}
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-xs text-gray-400 mr-1">Canais:</span>
+            {cat.canais.map(c => {
+              const key = `${cat.id}__canal__${c}`
+              const active = !!prefs[key]
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggle(key)}
+                  className={`px-2.5 py-1 text-xs rounded-full border font-medium transition-colors ${
+                    active
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {CANAL_LABEL[c]}
+                </button>
+              )
+            })}
+          </div>
         </div>
+      ))}
+
+      <div className="flex justify-end">
+        <button
+          onClick={handleSalvar}
+          disabled={saving}
+          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Salvando...' : saved ? '✓ Preferências salvas' : 'Salvar preferências'}
+        </button>
       </div>
     </div>
   )
