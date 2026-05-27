@@ -2630,20 +2630,53 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
 
 function TabHistorico() {
   const [periodo, setPeriodo] = useState(7)
-  const HISTORICO = [
-    { id:'h1', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', telefone:'(11) 98765-4321', agente:'Ana', campanha:'SP — Campanha Maio', duracao:'2m34s', data:'14/05 13h22', resultado:'Agendou', icp:94, sinais:['urgencia','decisor'], tentativa:1 },
-    { id:'h2', empresa:'TechLabs MG', contato:'Fernanda Costa', telefone:'(31) 98800-1122', agente:'Carlos', campanha:'MG — Campanha Abr', duracao:'0m48s', data:'13/05 09h15', resultado:'Não atendeu', icp:72, sinais:[], tentativa:2 },
-    { id:'h3', empresa:'Logística Norte', contato:'Antônio Ramos', telefone:'(11) 94321-7890', agente:'Ana', campanha:'SP — Campanha Maio', duracao:'1m55s', data:'13/05 14h40', resultado:'Recusou', icp:55, sinais:[], tentativa:1 },
-    { id:'h4', empresa:'Indústria Delta', contato:'Roberto Alves', telefone:'(31) 97654-3210', agente:'Carlos', campanha:'GO — Campanha Maio', duracao:'3m12s', data:'12/05 11h30', resultado:'Agendou', icp:78, sinais:['proposta','preco'], tentativa:1 },
-  ]
-  const agendamentos = HISTORICO.filter(h => h.resultado === 'Agendou').length
-  const taxa = ((agendamentos / HISTORICO.length) * 100).toFixed(1)
+  const [transcricaoAbertaHist, setTranscricaoAbertaHist] = useState<Record<string, boolean>>({})
+
+  const { data: ligacoesRaw = [], isLoading } = useQuery({
+    queryKey: ['ligacoes-historico', periodo],
+    queryFn: () => ligacoesApi.list({ status: 'encerrada' }).then(r => r.data as any[]),
+    refetchInterval: 30000,
+  })
+
+  // Filtra por período
+  const HISTORICO = ligacoesRaw.filter(l => {
+    if (!periodo) return true
+    const encerrada = l.encerrada_em || l.iniciada_em
+    if (!encerrada) return true
+    const diffDias = (Date.now() - new Date(encerrada).getTime()) / (1000 * 60 * 60 * 24)
+    return diffDias <= periodo
+  })
+
+  const agendamentos = HISTORICO.filter(h => h.resultado === 'agendada' || h.resultado === 'atendida').length
+  const taxa = HISTORICO.length > 0 ? ((agendamentos / HISTORICO.length) * 100).toFixed(1) : '0.0'
+  const transferencias = HISTORICO.filter(h => h.status === 'transferida').length
+  const comTranscricao = HISTORICO.filter(h => h.transcricao).length
+
+  function formatDuracao(secs: number | null) {
+    if (!secs) return '—'
+    const m = Math.floor(secs / 60)
+    const s = secs % 60
+    return `${m}m${String(s).padStart(2,'0')}s`
+  }
+  function formatData(iso: string | null) {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' ' +
+           d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+  }
+  function labelResultado(r: string) {
+    const map: Record<string, string> = {
+      atendida: 'Atendida', agendada: 'Agendou', transferida: 'Transferida',
+      nao_atendida: 'Não atendeu', ocupado: 'Ocupado', cancelada: 'Cancelada',
+      numero_invalido: 'Nº inválido', encerrada: 'Encerrada', pendente: 'Pendente'
+    }
+    return map[r] || r || '—'
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          {/* Filtro de período */}
           <div className="flex bg-gray-100 rounded-lg p-1 gap-0.5">
             {[7,15,30,0].map(d => (
               <button key={d} onClick={() => setPeriodo(d)}
@@ -2654,14 +2687,13 @@ function TabHistorico() {
               </button>
             ))}
           </div>
-          <select className="input py-1.5 text-xs" id="hist-filtro-campanha"><option>Todas as campanhas</option></select>
-          <select className="input py-1.5 text-xs" id="hist-filtro-agente"><option>Todos os agentes</option></select>
         </div>
         <button
           className="btn-secondary gap-2 text-xs py-1.5"
           onClick={() => {
-            const header = 'Empresa,Contato,Telefone,Agente,Data,Duração,Resultado,ICP,Campanha'
-            const rows = HISTORICO.map(h => `${h.empresa},${h.contato},${h.telefone},${h.agente},${h.data},${h.duracao},${h.resultado},${h.icp},${h.campanha}`)
+            const header = 'Contato,Telefone,Agente,Data,Duração,Resultado,Transcrição'
+            const rows = HISTORICO.map(h =>
+              `${h.contatos?.nome || ''},${h.numero_destino || ''},${h.agentes?.nome || ''},${formatData(h.encerrada_em)},${formatDuracao(h.duracao_segundos)},${labelResultado(h.resultado)},"${(h.transcricao || '').replace(/"/g,'""')}"`)
             const csv = [header, ...rows].join('\n')
             const blob = new Blob([csv], { type: 'text/csv' })
             const url = URL.createObjectURL(blob)
@@ -2671,14 +2703,14 @@ function TabHistorico() {
         ><Download size={12}/> Exportar CSV</button>
       </div>
 
-      {/* KPIs do período */}
+      {/* KPIs */}
       <div className="grid grid-cols-5 gap-3">
         {[
-          { id:'hist-kpi-total', label:'Total ligações', value: HISTORICO.length, color:'text-gray-900' },
-          { id:'hist-kpi-agend', label:'Agendamentos', value: agendamentos, color:'text-emerald-600' },
-          { id:'hist-kpi-transf', label:'Transferências', value: 1, color:'text-purple-600' },
-          { id:'hist-kpi-cadencia', label:'Rechamadas', value: 12, color:'text-amber-600' },
-          { id:'hist-kpi-taxa', label:'Taxa conversão', value:`${taxa}%`, color:'text-brand-600' },
+          { id:'hist-kpi-total',    label:'Total ligações',    value: HISTORICO.length,  color:'text-gray-900' },
+          { id:'hist-kpi-agend',    label:'Agendamentos',      value: agendamentos,       color:'text-emerald-600' },
+          { id:'hist-kpi-transf',   label:'Transferências',    value: transferencias,     color:'text-purple-600' },
+          { id:'hist-kpi-transc',   label:'Com transcrição',   value: comTranscricao,     color:'text-brand-600' },
+          { id:'hist-kpi-taxa',     label:'Taxa conversão',    value:`${taxa}%`,          color:'text-brand-600' },
         ].map(k => (
           <div key={k.id} className="kpi-card">
             <span className={clsx('text-2xl font-bold font-mono', k.color)}>{k.value}</span>
@@ -2690,40 +2722,70 @@ function TabHistorico() {
 
       {/* Tabela */}
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_.8fr_1.2fr_80px] px-4 py-2 bg-gray-50 border-b border-gray-100">
-          {['Empresa / Contato','Agente · Data','Sinais','ICP','Resultado','Ações'].map(h => (
+        <div className="grid grid-cols-[2fr_1fr_.8fr_1.2fr_100px] px-4 py-2 bg-gray-50 border-b border-gray-100">
+          {['Contato / Número','Agente · Data','Duração','Resultado','Ações'].map(h => (
             <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
           ))}
         </div>
         <div id="hist-tabela-corpo">
+          {isLoading && (
+            <div className="px-4 py-8 text-center text-xs text-gray-400">Carregando...</div>
+          )}
+          {!isLoading && HISTORICO.length === 0 && (
+            <div className="px-4 py-8 text-center text-xs text-gray-400">Nenhuma ligação encerrada nos últimos {periodo || 'todos'} dias.</div>
+          )}
           {HISTORICO.map((h, i) => (
-            <div key={h.id} className={clsx('grid grid-cols-[2fr_1fr_1fr_.8fr_1.2fr_80px] px-4 py-3 border-b border-gray-100 items-center', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
-              <div>
-                <div className="text-sm font-medium text-gray-900">{h.empresa}</div>
-                <div className="text-xs text-gray-500">{h.contato} · <span className="font-mono">{h.telefone}</span></div>
-                <div className="text-2xs text-gray-400">{h.campanha} · Tent. {h.tentativa}</div>
+            <div key={h.id} className={clsx('border-b border-gray-100', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
+              <div className="grid grid-cols-[2fr_1fr_.8fr_1.2fr_100px] px-4 py-3 items-center">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {h.contatos?.nome || h.numero_destino || '—'}
+                  </div>
+                  <div className="text-xs text-gray-500 font-mono">{h.numero_destino}</div>
+                  <div className="text-2xs text-gray-400">{h.agentes?.nome ? `Agente: ${h.agentes.nome}` : ''}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-700">{h.agentes?.nome || '—'}</div>
+                  <div className="text-2xs text-gray-400">{formatData(h.encerrada_em || h.iniciada_em)}</div>
+                </div>
+                <div className="text-xs font-mono text-gray-600">{formatDuracao(h.duracao_segundos)}</div>
+                <span className={clsx('badge text-2xs w-fit',
+                  h.resultado === 'agendada' || h.resultado === 'atendida' ? 'badge-success' :
+                  h.resultado === 'transferida' ? 'badge-purple' :
+                  h.resultado === 'nao_atendida' ? 'badge-amber' : 'badge-danger'
+                )}>{labelResultado(h.resultado)}</span>
+                <div className="flex gap-1.5">
+                  {h.transcricao && (
+                    <button
+                      className="text-2xs text-brand-600 hover:text-brand-700 font-medium"
+                      onClick={() => setTranscricaoAbertaHist(prev => ({ ...prev, [h.id]: !prev[h.id] }))}
+                    >{transcricaoAbertaHist[h.id] ? '▲ Fechar' : '▼ Ver'}</button>
+                  )}
+                  {h.url_gravacao && (
+                    <a href={h.url_gravacao} target="_blank" rel="noopener noreferrer"
+                      className="text-2xs text-emerald-600 hover:text-emerald-700 font-medium">🎧</a>
+                  )}
+                  {!h.transcricao && !h.url_gravacao && (
+                    <span className="text-2xs text-gray-300">—</span>
+                  )}
+                </div>
               </div>
-              <div>
-                <div className="text-xs text-gray-700">{h.agente}</div>
-                <div className="text-2xs text-gray-400">{h.data}</div>
-                <div className="text-2xs font-mono text-gray-500">{h.duracao}</div>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {h.sinais.length > 0 ? h.sinais.map(s => (
-                  <span key={s} className="text-2xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">{s}</span>
-                )) : <span className="text-2xs text-gray-300">—</span>}
-              </div>
-              <IcpBadge value={h.icp}/>
-              <span className={clsx('badge text-2xs',
-                h.resultado === 'Agendou' ? 'badge-success' :
-                h.resultado.includes('Não') ? 'badge-amber' : 'badge-danger'
-              )}>{h.resultado}</span>
-              <div className="flex gap-1.5">
-                <button
-                  className="text-2xs text-brand-600 hover:text-brand-700 font-medium"
-                  onClick={() => alert('Transcrição:\n' + ((h as any).transcricao || 'Não disponível'))}
-                >Transcrição</button>
-              </div>
+              {/* Transcrição expandida */}
+              {transcricaoAbertaHist[h.id] && h.transcricao && (
+                <div className="px-4 pb-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto">
+                    <div className="text-2xs font-semibold text-gray-500 uppercase mb-2">Transcrição da conversa</div>
+                    {h.transcricao.split('\n').map((linha: string, idx: number) => {
+                      const isAgente = linha.startsWith('[AGENTE]')
+                      return (
+                        <div key={idx} className={clsx('text-xs py-0.5', isAgente ? 'text-brand-700 font-medium' : 'text-gray-700')}>
+                          {linha}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
