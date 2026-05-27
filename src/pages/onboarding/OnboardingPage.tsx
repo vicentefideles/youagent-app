@@ -76,11 +76,30 @@ const SEGMENTOS = ['Tech/SaaS', 'Indústria', 'Serviços B2B', 'Saúde', 'Educa�
 const PORTES = ['1–10', '11–50', '51–200', '201–1000', '1000+']
 const CARGOS = ['Diretor', 'VP', 'CEO', 'Gerente', 'Coordenador', 'Outro']
 
-const VOZES_CARDS = [
-  { id: 'feminina_clara', label: 'Ana', descricao: 'Voz feminina clara e profissional', emoji: '👩‍💼', tags: ['Corporativo', 'B2B'] },
-  { id: 'masculina_confiante', label: 'Carlos', descricao: 'Voz masculina confiante e direta', emoji: '👨‍💼', tags: ['Vendas', 'Outbound'] },
-  { id: 'feminina_dinamica', label: 'Julia', descricao: 'Voz feminina dinâmica e empática', emoji: '👩‍💻', tags: ['SaaS', 'Tech'] },
-  { id: 'masculina_consultivo', label: 'Rafael', descricao: 'Voz masculina consultiva e pausada', emoji: '🧑‍🏫', tags: ['Consultoria', 'Enterprise'] },
+const VOZES_TELNYX = [
+  // ── pt-BR NaturalHD
+  { id: 'Telnyx.NaturalHD.isadora',  nome: 'Isadora',   genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
+  { id: 'Telnyx.NaturalHD.lucia',    nome: 'Lucia',     genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
+  { id: 'Telnyx.NaturalHD.sol',      nome: 'Sol',       genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
+  { id: 'Telnyx.NaturalHD.alzira',   nome: 'Alzira',    genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
+  { id: 'Telnyx.NaturalHD.baltasar', nome: 'Baltasar',  genero: 'Masculino', modelo: 'Natural HD', idioma: 'pt-BR' },
+  { id: 'Telnyx.NaturalHD.celso',    nome: 'Celso',     genero: 'Masculino', modelo: 'Natural HD', idioma: 'pt-BR' },
+  // ── pt-BR KokoroTTS
+  { id: 'Telnyx.KokoroTTS.pf_dora',  nome: 'Dora',      genero: 'Feminino',  modelo: 'KokoroTTS',  idioma: 'pt-BR' },
+  { id: 'Telnyx.KokoroTTS.pm_alex',  nome: 'Alex',      genero: 'Masculino', modelo: 'KokoroTTS',  idioma: 'pt-BR' },
+  { id: 'Telnyx.KokoroTTS.pm_santa', nome: 'Santa',     genero: 'Masculino', modelo: 'KokoroTTS',  idioma: 'pt-BR' },
+  // ── pt-PT Ultra
+  { id: 'Telnyx.Ultra.1cf751f6-8749-43ab-98bd-230dd633abdb', nome: 'Ana Paula', genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.2f4d204f-a5dc-4196-81bc-155986b76ab6', nome: 'Mirella',   genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.5063f45b-d9e0-4095-b056-8f3ee055d411', nome: 'Camilo',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.6a16c1f4-462b-44de-998d-ccdaa4125a0a', nome: 'Hidalgo',   genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.6a360542-a117-4ed5-9e09-e8bf9b05eabb', nome: 'Tiago',     genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.700d1ee3-a641-4018-ba6e-899dcadc9e2b', nome: 'Luana',     genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.a37639f0-2f0a-4de4-9942-875a187af878', nome: 'Felipe',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.b0f46533-d4bb-493f-a26f-a99e1f2e86e3', nome: 'Heitor',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.d4b44b9a-82bc-4b65-b456-763fce4c52f9', nome: 'Beatriz',   genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.f39bf583-3b3d-402f-9ffb-6179d9ec3e35', nome: 'Isabel',    genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
+  { id: 'Telnyx.Ultra.fbee0e7d-a83a-4082-bad1-13c70f86da4e', nome: 'Diogo',     genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
 ]
 
 const TONS_CARDS = [
@@ -104,21 +123,21 @@ const PROPOSITOS: Proposito[] = [
     titulo: 'Agendar para meu vendedor',
     descricao: 'O agente qualifica leads e transfere ao vivo para o vendedor fechar',
     icon: <UserCheck size={28} className="text-blue-500" />,
-    preConfig: { tom: 'profissional', voz: 'feminina_clara' },
+    preConfig: { tom: 'profissional', voz: 'Telnyx.NaturalHD.isadora' },
   },
   {
     id: 'substituir_sdr',
     titulo: 'Substituir equipe de SDRs',
     descricao: 'O agente faz toda a prospecção e agenda reuniões automaticamente',
     icon: <Users size={28} className="text-purple-500" />,
-    preConfig: { tom: 'consultivo', voz: 'masculina_confiante' },
+    preConfig: { tom: 'consultivo', voz: 'Telnyx.NaturalHD.baltasar' },
   },
   {
     id: 'prospeccao_outbound',
     titulo: 'Prospecção outbound do zero',
     descricao: 'O agente busca e qualifica leads novos de forma autônoma',
     icon: <PhoneOutgoing size={28} className="text-green-500" />,
-    preConfig: { tom: 'direto', voz: 'feminina_dinamica' },
+    preConfig: { tom: 'direto', voz: 'Telnyx.NaturalHD.lucia' },
   },
 ]
 
@@ -634,7 +653,7 @@ function Step4({
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Voz · Tom</p>
             <p className="font-medium text-gray-900">
-              {[form.voz, form.tom].filter(Boolean).join(' · ') || '—'}
+              {[VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz, form.tom].filter(Boolean).join(' · ') || '—'}
             </p>
           </div>
         </div>
@@ -921,6 +940,7 @@ export default function OnboardingPage() {
         icp_segmento: form['icp-segmento-alvo'],
         icp_porte: form['icp-porte-alvo'],
         voz: form['voz'],
+        voz_id: form['voz'],
         tom: form['tom'],
         status: 'ativo',
       })

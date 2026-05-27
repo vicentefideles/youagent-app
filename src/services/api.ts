@@ -99,6 +99,7 @@ export const inteligenciaApi = {
   get: () => api.get('/inteligencia'),
   getQualidade: () => api.get('/inteligencia/qualidade'),
   getCross: () => api.get('/inteligencia/cross'),
+  detectarPadroes: () => api.post('/inteligencia/detectar-padroes', {}),
 }
 
 // WhatsApp
