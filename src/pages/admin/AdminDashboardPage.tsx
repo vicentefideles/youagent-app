@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Users,
   TrendingUp,
@@ -10,7 +11,7 @@ import {
   CheckCircle,
   Info,
 } from 'lucide-react'
-import { adminClientesApi } from '@/services/api'
+import { adminClientesApi, adminKpisApi } from '@/services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ const MRR_MONTHS: MrrMonth[] = [
   { month: 'Mai', value: 67850 },
 ]
 
-const ALERTAS: Alerta[] = [
+const ALERTAS_FALLBACK: Alerta[] = [
   { severity: 'green', message: 'Sistema — Uptime 99,97% nos últimos 30 dias' },
 ]
 
@@ -106,6 +107,16 @@ export default function AdminDashboardPage() {
       .catch(() => setClientes([]))
   }, [])
 
+  const { data: kpisGlobais } = useQuery({
+    queryKey: ['admin-kpis-globais'],
+    queryFn: () => adminKpisApi.globais().then(r => r.data as any),
+  })
+
+  const { data: alertas = ALERTAS_FALLBACK } = useQuery({
+    queryKey: ['admin-alertas'],
+    queryFn: () => adminKpisApi.alertas().then(r => r.data as any[]).catch(() => ALERTAS_FALLBACK),
+  })
+
   // Derived KPIs from real data
   const ativos = clientes.filter(c => c.status === 'ativo')
   const aguardando = clientes.filter(c => c.status === 'aguardando_ativacao' || c.status === 'cadastrado')
@@ -114,11 +125,10 @@ export default function AdminDashboardPage() {
   const KPIS: KpiCard[] = [
     { label: 'Clientes Ativos', value: String(ativos.length), delta: `${aguardando.length} aguardando`, up: true, icon: <Users className="w-5 h-5" /> },
     { label: 'MRR Total', value: formatBRL(mrrTotal), delta: '— calculado por plano', up: true, icon: <TrendingUp className="w-5 h-5" /> },
-    // TODO: calcular MRR real com histórico de pagamentos
-    { label: 'Ligações/Dia', value: '—', delta: 'sem endpoint', up: true, icon: <Phone className="w-5 h-5" /> },
-    { label: 'Reuniões Geradas', value: '—', delta: 'sem endpoint', up: true, icon: <Calendar className="w-5 h-5" /> },
-    { label: 'Churn Rate', value: '—', delta: 'sem endpoint', up: false, icon: <TrendingDown className="w-5 h-5" /> },
-    { label: 'NPS', value: '—', delta: 'sem endpoint', up: true, icon: <Star className="w-5 h-5" /> },
+    { label: 'Ligações/Dia', value: kpisGlobais?.ligacoes_hoje ?? '—', delta: 'hoje', up: true, icon: <Phone className="w-5 h-5" /> },
+    { label: 'Reuniões Geradas', value: kpisGlobais?.reunioes_30d ?? '—', delta: 'últimos 30 dias', up: true, icon: <Calendar className="w-5 h-5" /> },
+    { label: 'Churn Rate', value: '—', delta: '—', up: false, icon: <TrendingDown className="w-5 h-5" /> },
+    { label: 'NPS', value: '—', delta: '—', up: true, icon: <Star className="w-5 h-5" /> },
   ]
 
   // Clientes recentes: last 5 ordered by criado_em (API already returns desc)
@@ -234,7 +244,7 @@ export default function AdminDashboardPage() {
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
           <h2 className="text-base font-semibold text-gray-900 mb-4">Alertas da plataforma</h2>
           <ul className="space-y-3">
-            {ALERTAS.map((a, i) => (
+            {alertas.map((a, i) => (
               <li key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
                 {alertIcon(a.severity)}
                 <span className="text-sm text-gray-700">{a.message}</span>

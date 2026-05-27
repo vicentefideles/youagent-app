@@ -528,6 +528,34 @@ function Step3({
   )
 }
 
+function calcularIcpScore(form: FormData): number {
+  let score = 0
+  // Cargo: 30 pontos
+  const cargosAltos = ['ceo', 'diretor', 'sócio', 'owner', 'presidente', 'vp', 'c-level']
+  const cargoLower = (form['icp-cargo-tipo'] ?? '').toLowerCase()
+  if (cargosAltos.some(c => cargoLower.includes(c))) score += 30
+  else if (cargoLower.includes('gerente') || cargoLower.includes('coordenador')) score += 20
+  else if (cargoLower.length > 0) score += 10
+
+  // Segmento: 25 pontos
+  if (form['empresa-segmento']) score += 20
+
+  // Porte: 20 pontos
+  const porte = form['empresa-porte'] ?? ''
+  if (porte.includes('grande') || porte.includes('enterprise')) score += 20
+  else if (porte.includes('médio') || porte.includes('medio')) score += 15
+  else if (porte.includes('pequeno') || porte.includes('startup')) score += 10
+  else if (porte.length > 0) score += 8
+
+  // Produto preenchido: 12 pontos
+  if (form['prod-nome']) score += 12
+
+  // Qualificação: 8 pontos
+  if (form['wiz-qualif-q1'] || form['wiz-qualif-q2']) score += 8
+
+  return Math.min(score, 95)
+}
+
 function Step4({
   form,
   activated,
@@ -542,6 +570,7 @@ function Step4({
   onReset: () => void
 }) {
   const navigate = useNavigate()
+  const icpScore = calcularIcpScore(form)
 
   if (activated) {
     return (
@@ -614,9 +643,9 @@ function Step4({
           <span className="text-xs text-gray-500">Score ICP estimado</span>
           <div className="flex items-center gap-2">
             <div className="w-24 bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-500 h-2 rounded-full" style={{ width: '72%' }} />
+              <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${icpScore}%` }} />
             </div>
-            <span className="text-sm font-semibold text-blue-600">72/100</span>
+            <span className="text-sm font-semibold text-blue-600">{icpScore}/100</span>
           </div>
         </div>
       </div>
@@ -700,6 +729,15 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
     setHorarios(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  async function handleSalvarHorarios() {
+    try {
+      if (agente?.id) {
+        await agentesApi.update(agente.id, { horarios })
+      }
+    } catch(e) { /* silencioso */ }
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 flex flex-col gap-5">
@@ -750,7 +788,7 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             Cancelar
           </button>
-          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+          <button onClick={handleSalvarHorarios} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
             Salvar horários
           </button>
         </div>

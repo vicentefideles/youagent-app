@@ -168,6 +168,9 @@ export const emailsApi = {
   marcarLido: (id: string) => api.patch(`/emails/${id}`, { lido: true }),
   enviar: (data: { para: string; assunto: string; corpo: string }) =>
     api.post('/emails/enviar', data),
+  modelos: () => api.get('/emails/modelos'),
+  saveModelo: (data: unknown) => api.post('/emails/modelos', data),
+  updateModelo: (id: string, data: unknown) => api.patch(`/emails/modelos/${id}`, data),
 }
 
 // Claude AI
@@ -206,6 +209,13 @@ export const adminCrossApi = {
   list: () => api.get('/admin/clientes/cross-global'),
   aprovar: (id: string, aprovado: boolean) =>
     api.patch(`/admin/clientes/cross-global/${id}`, { aprovado }),
+}
+
+// Admin KPIs globais
+export const adminKpisApi = {
+  globais:  () => api.get('/admin/clientes/kpis-globais'),
+  alertas:  () => api.get('/admin/clientes/alertas'),
+  mrrHistorico: () => api.get('/admin/clientes/mrr-historico').catch(() => ({ data: [] })),
 }
 
 // Admin — clientes
