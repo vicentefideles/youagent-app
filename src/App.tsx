@@ -9,6 +9,7 @@ import BoasVindasPage from '@/pages/auth/BoasVindasPage'
 import CheckoutPage   from '@/pages/checkout/CheckoutPage'
 import AppLayout      from '@/components/layout/AppLayout'
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
+import AdminRoute from '@/components/layout/AdminRoute'
 import RouteGuard     from '@/components/RouteGuard'
 import DashboardPage  from '@/pages/dashboard/DashboardPage'
 import CampanhasPage  from '@/pages/campanhas/CampanhasPage'
@@ -120,14 +121,14 @@ export default function App() {
             } />
 
             {/* ── Admin — plataforma (não envolve RouteGuard de status) ────── */}
-            <Route path="admin/clientes"   element={<AdminClientesPage />} />
-            <Route path="admin/suporte"    element={<AdminSuportePage />} />
-            <Route path="admin/dashboard"  element={<AdminDashboardPage />} />
-            <Route path="admin/config"     element={<AdminConfigPage />} />
-            <Route path="admin/plataforma" element={<AdminPlataformaPage />} />
-            <Route path="admin/custos"     element={<AdminCustosPage />} />
-            <Route path="admin/dev"        element={<AdminDevPage />} />
-            <Route path="admin/telnyx"     element={<AdminTelnyxPage />} />
+            <Route path="admin/clientes"   element={<AdminRoute><AdminClientesPage /></AdminRoute>} />
+            <Route path="admin/suporte"    element={<AdminRoute><AdminSuportePage /></AdminRoute>} />
+            <Route path="admin/dashboard"  element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
+            <Route path="admin/config"     element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
+            <Route path="admin/plataforma" element={<AdminRoute><AdminPlataformaPage /></AdminRoute>} />
+            <Route path="admin/custos"     element={<AdminRoute><AdminCustosPage /></AdminRoute>} />
+            <Route path="admin/dev"        element={<AdminRoute><AdminDevPage /></AdminRoute>} />
+            <Route path="admin/telnyx"     element={<AdminRoute><AdminTelnyxPage /></AdminRoute>} />
 
             <Route path="vendedor-restrito" element={<VendedorPageRestrita />} />
           </Route>
