@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Settings,
   CreditCard,
@@ -14,6 +14,7 @@ import {
   Trash2,
   Plus,
 } from 'lucide-react'
+import { api, equipeApi } from '@/services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,37 +67,77 @@ const INTEGRATIONS: Integration[] = [
 // ─── Sub-panels ───────────────────────────────────────────────────────────────
 
 function PlataformaPanel() {
+  const [nome, setNome] = useState('ETZ')
+  const [url, setUrl] = useState('app.etztech.com.br')
+  const [ambiente, setAmbiente] = useState('Produção')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleSalvar() {
+    setSaving(true)
+    try {
+      await api.patch('/admin/config', { secao: 'plataforma', dados: { nome, url, ambiente } })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch {
+      localStorage.setItem('admin_config_plataforma', JSON.stringify({ nome, url, ambiente }))
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold text-gray-900">Configurações da plataforma</h2>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Nome da plataforma</label>
-          <input defaultValue="ETZ" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input value={nome} onChange={e => setNome(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">URL base</label>
-          <input defaultValue="app.etztech.com.br" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input value={url} onChange={e => setUrl(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Logotipo</label>
-        <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center">
-          <p className="text-sm text-gray-400">Clique para enviar um arquivo de imagem</p>
-          <p className="text-xs text-gray-300 mt-1">PNG, SVG ou JPG — máx. 2MB</p>
+        <div
+          className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+          onClick={() => fileRef.current?.click()}
+        >
+          {logoUrl
+            ? <img src={logoUrl} alt="Logo" className="h-12 mx-auto object-contain" />
+            : <>
+                <p className="text-sm text-gray-400">Clique para enviar um arquivo de imagem</p>
+                <p className="text-xs text-gray-300 mt-1">PNG, SVG ou JPG — máx. 2MB</p>
+              </>
+          }
         </div>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileRef}
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) setLogoUrl(URL.createObjectURL(f)) }}
+        />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Ambiente</label>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <select value={ambiente} onChange={e => setAmbiente(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option>Produção</option>
           <option>Homologação</option>
           <option>Dev</option>
         </select>
       </div>
       <div>
-        <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-          Salvar
+        <button
+          onClick={handleSalvar}
+          disabled={saving}
+          className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60"
+        >
+          {saved ? '✓ Salvo' : saving ? 'Salvando...' : 'Salvar'}
         </button>
       </div>
     </div>
@@ -144,40 +185,67 @@ function PlanosPanel() {
 }
 
 function LimitesPanel() {
+  const [agentesStarter, setAgentesStarter] = useState(1)
+  const [agentesGrowth, setAgentesGrowth] = useState(3)
+  const [agentesEnterprise, setAgentesEnterprise] = useState(999)
+  const [ligacoesStarter, setLigacoesStarter] = useState(500)
+  const [timeoutTransf, setTimeoutTransf] = useState(30)
+  const [diasGravacao, setDiasGravacao] = useState(90)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function handleSalvar() {
+    setSaving(true)
+    const dados = { agentes: { starter: agentesStarter, growth: agentesGrowth, enterprise: agentesEnterprise }, ligacoesStarter, timeoutTransf, diasGravacao }
+    try {
+      await api.patch('/admin/config', { secao: 'limites', dados })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch {
+      localStorage.setItem('admin_config_limites', JSON.stringify(dados))
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } finally { setSaving(false) }
+  }
+
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold text-gray-900">Limites por plano</h2>
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Máx. agentes por plano</p>
         <div className="grid grid-cols-3 gap-4">
-          {['Starter', 'Growth', 'Enterprise'].map((p, i) => (
-            <div key={p}>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{p}</label>
-              <input
-                type="number"
-                defaultValue={[1, 3, 999][i]}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          ))}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Starter</label>
+            <input type="number" value={agentesStarter} onChange={e => setAgentesStarter(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Growth</label>
+            <input type="number" value={agentesGrowth} onChange={e => setAgentesGrowth(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Enterprise</label>
+            <input type="number" value={agentesEnterprise} onChange={e => setAgentesEnterprise(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Máx. ligações/mês (Starter)</label>
-          <input type="number" defaultValue={500} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="number" value={ligacoesStarter} onChange={e => setLigacoesStarter(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Timeout de transferência (seg)</label>
-          <input type="number" defaultValue={30} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="number" value={timeoutTransf} onChange={e => setTimeoutTransf(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Máx. gravações armazenadas (dias)</label>
-          <input type="number" defaultValue={90} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="number" value={diasGravacao} onChange={e => setDiasGravacao(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
       </div>
-      <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-        Salvar limites
+      <button
+        onClick={handleSalvar}
+        disabled={saving}
+        className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60"
+      >
+        {saved ? '✓ Salvo' : saving ? 'Salvando...' : 'Salvar limites'}
       </button>
     </div>
   )
@@ -220,29 +288,67 @@ function IntegracoesPanel() {
 
 function EmpresaPanel() {
   const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+  const [nomeEmpresa, setNomeEmpresa] = useState('ETZ')
+  const [cnpj, setCnpj] = useState('12.345.678/0001-99')
+  const [emailSuporte, setEmailSuporte] = useState('suporte@etztech.com')
+  const [telefone, setTelefone] = useState('(11) 3456-7890')
+  const [site, setSite] = useState('https://etztech.com.br')
+  const [endereco, setEndereco] = useState('Av. Paulista, 1000 — SP')
+  const [logo, setLogo] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleSalvar() {
+    setSaving(true)
+    const dados = { nomeEmpresa, cnpj, emailSuporte, telefone, site, endereco }
+    try {
+      await api.patch('/admin/config', { secao: 'empresa', dados })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch {
+      localStorage.setItem('admin_config_empresa', JSON.stringify(dados))
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } finally { setSaving(false) }
+  }
+
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold text-gray-900">Dados da EtzTech</h2>
       <div className="grid grid-cols-2 gap-4">
-        <div><label className="block text-xs font-medium text-gray-500 mb-1">Nome da empresa</label><input defaultValue="ETZ" className={inputCls} /></div>
-        <div><label className="block text-xs font-medium text-gray-500 mb-1">CNPJ</label><input defaultValue="12.345.678/0001-99" className={inputCls} /></div>
-        <div><label className="block text-xs font-medium text-gray-500 mb-1">E-mail de suporte</label><input defaultValue="suporte@etztech.com" className={inputCls} /></div>
-        <div><label className="block text-xs font-medium text-gray-500 mb-1">Telefone</label><input defaultValue="(11) 3456-7890" className={inputCls} /></div>
-        <div><label className="block text-xs font-medium text-gray-500 mb-1">Site</label><input defaultValue="https://etztech.com.br" className={inputCls} /></div>
-        <div><label className="block text-xs font-medium text-gray-500 mb-1">Endereço</label><input defaultValue="Av. Paulista, 1000 — SP" className={inputCls} /></div>
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">Nome da empresa</label><input value={nomeEmpresa} onChange={e => setNomeEmpresa(e.target.value)} className={inputCls} /></div>
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">CNPJ</label><input value={cnpj} onChange={e => setCnpj(e.target.value)} className={inputCls} /></div>
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">E-mail de suporte</label><input value={emailSuporte} onChange={e => setEmailSuporte(e.target.value)} className={inputCls} /></div>
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">Telefone</label><input value={telefone} onChange={e => setTelefone(e.target.value)} className={inputCls} /></div>
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">Site</label><input value={site} onChange={e => setSite(e.target.value)} className={inputCls} /></div>
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">Endereço</label><input value={endereco} onChange={e => setEndereco(e.target.value)} className={inputCls} /></div>
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Logo</label>
-        <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex items-center gap-4">
-          <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">Y</div>
+        <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex items-center gap-4 cursor-pointer hover:border-blue-400 transition-colors" onClick={() => fileRef.current?.click()}>
+          {logo
+            ? <img src={logo} alt="Logo" className="w-14 h-14 object-contain rounded-xl" />
+            : <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">Y</div>
+          }
           <div>
             <p className="text-sm text-gray-600 font-medium">Clique para enviar novo logo</p>
             <p className="text-xs text-gray-400 mt-0.5">PNG, SVG ou JPG — máx. 2MB</p>
-            <input type="file" className="mt-2 text-xs text-gray-500" accept="image/*" />
           </div>
         </div>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileRef}
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) setLogo(URL.createObjectURL(f)) }}
+        />
       </div>
-      <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">Salvar</button>
+      <button
+        onClick={handleSalvar}
+        disabled={saving}
+        className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60"
+      >
+        {saved ? '✓ Salvo' : saving ? 'Salvando...' : 'Salvar'}
+      </button>
     </div>
   )
 }
@@ -262,7 +368,22 @@ const LOGS_ACESSO: LogAcesso[] = [
 function SegurancaPanel() {
   const [twoFa, setTwoFa] = useState(true)
   const [sessao, setSessao] = useState('8h')
+  const [whitelist, setWhitelist] = useState('189.40.12.8\n177.92.44.3\n200.150.33.9')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+  async function handleSalvar() {
+    setSaving(true)
+    const dados = { twoFa, sessao, whitelist }
+    try {
+      await api.patch('/admin/config', { secao: 'seguranca', dados })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch {
+      localStorage.setItem('admin_config_seguranca', JSON.stringify(dados))
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } finally { setSaving(false) }
+  }
 
   const acoesMap: Record<LogAcesso['acao'], string> = {
     login: 'bg-green-100 text-green-700',
@@ -286,7 +407,7 @@ function SegurancaPanel() {
 
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Whitelist de IPs (um por linha)</label>
-        <textarea defaultValue={'189.40.12.8\n177.92.44.3\n200.150.33.9'} rows={4} className={inputCls + ' resize-none'} />
+        <textarea value={whitelist} onChange={e => setWhitelist(e.target.value)} rows={4} className={inputCls + ' resize-none'} />
       </div>
 
       <div>
@@ -320,7 +441,13 @@ function SegurancaPanel() {
         </table>
       </div>
 
-      <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">Salvar</button>
+      <button
+        onClick={handleSalvar}
+        disabled={saving}
+        className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60"
+      >
+        {saved ? '✓ Salvo' : saving ? 'Salvando...' : 'Salvar'}
+      </button>
     </div>
   )
 }
@@ -353,9 +480,22 @@ const NOTIF_ITEMS: NotifItem[] = [
 
 function NotifPanel() {
   const [notifs, setNotifs] = useState(NOTIF_INIT)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   function toggle(key: string, canal: keyof NotifToggle) {
     setNotifs(prev => ({ ...prev, [key]: { ...prev[key], [canal]: !prev[key][canal] } }))
+  }
+
+  async function handleSalvar() {
+    setSaving(true)
+    try {
+      await api.patch('/admin/config', { secao: 'notificacoes', dados: notifs })
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch {
+      localStorage.setItem('admin_config_notificacoes', JSON.stringify(notifs))
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } finally { setSaving(false) }
   }
 
   const canalLabel: Record<keyof NotifToggle, string> = { email: 'E-mail', sistema: 'Sistema', whatsapp: 'WhatsApp' }
@@ -383,7 +523,13 @@ function NotifPanel() {
           </div>
         ))}
       </div>
-      <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">Salvar</button>
+      <button
+        onClick={handleSalvar}
+        disabled={saving}
+        className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60"
+      >
+        {saved ? '✓ Salvo' : saving ? 'Salvando...' : 'Salvar'}
+      </button>
     </div>
   )
 }
@@ -413,16 +559,19 @@ function EquipePanel() {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [novoMembro, setNovoMembro] = useState<Omit<MembroEquipe, 'id'>>({ nome: '', cargo: '', email: '', role: 'suporte', status: 'ativo' })
 
-  function adicionarMembro() {
+  async function adicionarMembro() {
     if (!novoMembro.nome.trim()) return
-    setMembros(prev => [...prev, { ...novoMembro, id: `m${Date.now()}` }])
+    const novo = { ...novoMembro, id: `m${Date.now()}` }
+    setMembros(prev => [...prev, novo])
     setShowForm(false)
     setNovoMembro({ nome: '', cargo: '', email: '', role: 'suporte', status: 'ativo' })
+    try { await equipeApi.create(novoMembro) } catch (e) { console.error(e) }
   }
 
-  function removerMembro(id: string) {
+  async function removerMembro(id: string) {
     setMembros(prev => prev.filter(m => m.id !== id))
     setConfirmId(null)
+    try { await equipeApi.update(id, { ativo: false }) } catch (e) { console.error(e) }
   }
 
   const roleBadge: Record<MembroEquipe['role'], string> = {

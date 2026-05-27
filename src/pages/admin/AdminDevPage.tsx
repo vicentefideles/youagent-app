@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { claudeApi } from '@/services/api'
+import { claudeApi, api } from '@/services/api'
 import {
   Code2,
   CheckCircle,
@@ -121,6 +121,10 @@ function TabHealthCheck() {
       setItems([...HEALTH_ITEMS])
       setChecking(false)
     }, 2000)
+    // chamada real como fallback
+    api.get('/health').then(r => {
+      console.log('Health check real:', r.data)
+    }).catch(e => console.log('Health check real falhou:', e.message))
   }
 
   const okCount = items.filter((i) => i.status === 'ok').length
@@ -484,7 +488,13 @@ function TabConfig() {
         </div>
       </div>
 
-      <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+      <button
+        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+        onClick={() => {
+          localStorage.setItem('admin_dev_config', JSON.stringify(cfg))
+          alert('Configurações salvas localmente')
+        }}
+      >
         Salvar configurações
       </button>
     </div>
@@ -713,7 +723,18 @@ function TabSistema() {
 
       {/* Actions */}
       <div className="flex gap-3">
-        <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+        <button
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          onClick={() => {
+            const diag = {
+              timestamp: new Date().toISOString(),
+              logs: logs.slice(-50),
+            }
+            const blob = new Blob([JSON.stringify(diag, null, 2)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a'); a.href = url; a.download = 'diagnostico-etz-' + Date.now() + '.json'; a.click()
+          }}
+        >
           <Download className="w-4 h-4" /> Exportar diagnóstico
         </button>
         <button onClick={() => setShowConfirm(true)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">
@@ -731,7 +752,16 @@ function TabSistema() {
             <p className="text-sm text-gray-500 mb-5">Esta ação remove todos os dados locais e não pode ser desfeita.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowConfirm(false)} className="flex-1 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-              <button onClick={() => setShowConfirm(false)} className="flex-1 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">Limpar</button>
+              <button
+                onClick={() => {
+                  const jwt = localStorage.getItem('etz_jwt')
+                  localStorage.clear()
+                  if (jwt) localStorage.setItem('etz_jwt', jwt)
+                  setShowConfirm(false)
+                  window.location.reload()
+                }}
+                className="flex-1 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg"
+              >Limpar</button>
             </div>
           </div>
         </div>

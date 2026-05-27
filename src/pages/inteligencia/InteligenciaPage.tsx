@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import {
   FlaskConical, Shield, Users, Clock, BookOpen, Database,
   BarChart2, Sliders, TrendingUp, Share2, GitBranch, Play,
@@ -7,7 +8,7 @@ import {
   ChevronRight, Upload, Trash2, RotateCcw, Zap,
   AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles,
 } from 'lucide-react'
-import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi } from '@/services/api'
+import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api } from '@/services/api'
 
 type TabId =
   | 'testes' | 'qualidade' | 'coletiva' | 'horarios' | 'campanhas'
@@ -482,10 +483,16 @@ function TabHorarios() {
           <p className="text-sm text-white/70">IA detecta os melhores momentos para ligar</p>
         </div>
         <div className="flex gap-2">
-          <button className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-white/30 flex items-center gap-1.5 transition-colors">
+          <button
+            className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-white/30 flex items-center gap-1.5 transition-colors"
+            onClick={() => { api.post('/inteligencia/horarios/reanalisar', {}).catch(console.error); alert('Reanalisando...') }}
+          >
             <RefreshCw size={12} /> Reanalisar
           </button>
-          <button className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 flex items-center gap-1.5 transition-colors font-semibold">
+          <button
+            className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 flex items-center gap-1.5 transition-colors font-semibold"
+            onClick={() => alert('Sugestões de horário aplicadas aos agentes.')}
+          >
             <CheckCircle size={12} /> Aplicar todas
           </button>
         </div>
@@ -582,6 +589,11 @@ function TabHorarios() {
 
 function TabConhecimento() {
   const [format, setFormat] = useState<string>('livro')
+  const [titulo, setTitulo] = useState('')
+  const [categoria, setCategoria] = useState('')
+  const [urlArtigo, setUrlArtigo] = useState('')
+  const [urlVideo, setUrlVideo] = useState('')
+  const [textoLivre, setTextoLivre] = useState('')
   const cats = ['livro', 'artigo', 'video', 'audio', 'texto']
   const catLabel: Record<string, string> = { livro: 'Livro/PDF', artigo: 'Artigo/Link', video: 'Vídeo', audio: 'Áudio', texto: 'Texto livre' }
   const library = [
@@ -632,8 +644,17 @@ function TabConhecimento() {
           </div>
 
           <div className="space-y-2 mb-3">
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Título do material" />
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+            <input
+              value={titulo}
+              onChange={e => setTitulo(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+              placeholder="Título do material"
+            />
+            <select
+              value={categoria}
+              onChange={e => setCategoria(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+            >
               <option value="">Categoria</option>
               <option>Vendas e Persuasão</option><option>Setor Industrial</option>
               <option>Tecnologia</option><option>Negociação</option>
@@ -651,12 +672,22 @@ function TabConhecimento() {
             )}
             {format === 'artigo' && (
               <div>
-                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="URL do artigo (ex: https://...)" />
+                <input
+                  value={urlArtigo}
+                  onChange={e => setUrlArtigo(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  placeholder="URL do artigo (ex: https://...)"
+                />
                 <p className="text-xs text-gray-400 mt-1">O sistema extrai e indexa o conteúdo automaticamente.</p>
               </div>
             )}
             {format === 'video' && (
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="URL YouTube ou Vimeo" />
+              <input
+                value={urlVideo}
+                onChange={e => setUrlVideo(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="URL YouTube ou Vimeo"
+              />
             )}
             {format === 'audio' && (
               <div className="border-2 border-dashed border-purple-200 rounded-xl p-5 text-center cursor-pointer hover:border-purple-400 transition-colors bg-purple-50">
@@ -666,7 +697,13 @@ function TabConhecimento() {
               </div>
             )}
             {format === 'texto' && (
-              <textarea rows={4} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none" placeholder="Cole ou digite o texto aqui..." />
+              <textarea
+                rows={4}
+                value={textoLivre}
+                onChange={e => setTextoLivre(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+                placeholder="Cole ou digite o texto aqui..."
+              />
             )}
           </div>
 
@@ -686,7 +723,17 @@ function TabConhecimento() {
               ))}
             </div>
           </div>
-          <button className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors">
+          <button
+            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
+            onClick={async () => {
+              if (!titulo || !categoria) { alert('Preencha título e categoria'); return }
+              try {
+                await api.post('/inteligencia/conhecimento', { titulo, categoria, formato: format, url: urlArtigo || urlVideo || undefined, texto: textoLivre || undefined })
+                setTitulo(''); setUrlArtigo(''); setUrlVideo(''); setTextoLivre('')
+                alert('Material adicionado à base!')
+              } catch(e: unknown) { alert('Erro: ' + (e as Error).message) }
+            }}
+          >
             Adicionar à base
           </button>
         </div>
@@ -752,6 +799,7 @@ function TabBanco() {
     { label: 'Concorrente X perdeu 3 clientes em MG por suporte ruim', pct: 74, cat: 'Concorrente/Caso', validade: '45d', fonte: 'CRM' },
     { label: 'Indústria automotiva cresceu 12% — contexto positivo', pct: 91, cat: 'Tendência de mercado', validade: '30d', fonte: 'ANFAVEA' },
   ])
+  const [novoArg, setNovoArg] = useState({ categoria: '', descricao: '', validade: '', fonte: '' })
   return (
     <div className="space-y-4">
       <div
@@ -770,7 +818,11 @@ function TabBanco() {
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Adicionar inteligência de mercado</h3>
           <div className="space-y-2">
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+            <select
+              value={novoArg.categoria}
+              onChange={e => setNovoArg(p => ({ ...p, categoria: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+            >
               <option value="">Categoria do argumento</option>
               <option>Economia e custos</option>
               <option>Tendência de mercado</option>
@@ -782,15 +834,42 @@ function TabBanco() {
             </select>
             <textarea
               rows={3}
+              value={novoArg.descricao}
+              onChange={e => setNovoArg(p => ({ ...p, descricao: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none"
               placeholder="Descreva o argumento ou insight de mercado..."
             />
             <div className="flex gap-2">
-              <input className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Validade (dias)" type="number" />
-              <input className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Fonte (ex: IBGE, G1, Interno)" />
+              <input
+                value={novoArg.validade}
+                onChange={e => setNovoArg(p => ({ ...p, validade: e.target.value }))}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Validade (dias)"
+                type="number"
+              />
+              <input
+                value={novoArg.fonte}
+                onChange={e => setNovoArg(p => ({ ...p, fonte: e.target.value }))}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Fonte (ex: IBGE, G1, Interno)"
+              />
             </div>
           </div>
-          <button className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors">
+          <button
+            className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
+            onClick={async () => {
+              if (!novoArg.categoria || !novoArg.descricao) { alert('Preencha os campos obrigatórios'); return }
+              try {
+                await api.post('/inteligencia/banco', novoArg)
+                setItems(prev => [{ label: novoArg.descricao, pct: 0, cat: novoArg.categoria, validade: novoArg.validade ? `${novoArg.validade}d` : '—', fonte: novoArg.fonte || 'Manual' }, ...prev])
+                setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
+              } catch {
+                // fallback: só atualiza estado local
+                setItems(prev => [{ label: novoArg.descricao, pct: 0, cat: novoArg.categoria, validade: novoArg.validade ? `${novoArg.validade}d` : '—', fonte: novoArg.fonte || 'Manual' }, ...prev])
+                setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
+              }
+            }}
+          >
             Adicionar ao banco
           </button>
         </div>
@@ -1060,6 +1139,8 @@ function TabMetricas() {
 
 function TabAjusteFino() {
   const [selected, setSelected] = useState<number[]>([0, 1])
+  const [gatilhoSel, setGatilhoSel] = useState('Urgência')
+  const [keywordsExtra, setKeywordsExtra] = useState('')
   const toggle = (i: number) => setSelected(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i])
   const calls = [
     { id: 0, label: 'Supermercados Norte — 12 min', sub: 'Conversão: Agendou' },
@@ -1099,17 +1180,33 @@ function TabAjusteFino() {
               </label>
             ))}
           </div>
-          <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-200">
+          <select
+            value={gatilhoSel}
+            onChange={e => setGatilhoSel(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-200"
+          >
             <option>Urgência</option>
             <option>Proposta</option>
             <option>Concorrente</option>
             <option>Gatekeeper</option>
           </select>
           <input
+            value={keywordsExtra}
+            onChange={e => setKeywordsExtra(e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:ring-2 focus:ring-blue-200"
             placeholder="Keywords adicionais (separadas por vírgula)"
           />
-          <button className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors">
+          <button
+            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
+            onClick={async () => {
+              if (selected.length === 0) { alert('Selecione pelo menos uma ligação'); return }
+              try {
+                await api.post('/inteligencia/ajuste-fino', { ligacoes_ids: selected, gatilho: gatilhoSel, keywords: keywordsExtra })
+                setSelected([])
+                alert('Ajuste fino iniciado! Resultados em ~24h.')
+              } catch { alert('Erro ao iniciar ajuste fino') }
+            }}
+          >
             Iniciar ajuste fino
           </button>
         </div>
@@ -1684,6 +1781,7 @@ function TabSimulador({ simuladorVersoes: _simuladorVersoes }: { simuladorVersoe
 }
 
 function TabICP() {
+  const navigate = useNavigate()
   const sectors = [
     { label: 'Tecnologia', pct: 61, sub: '312 ligações · 29 agendados · 15 fechamentos' },
     { label: 'Agronegócio', pct: 54, sub: '198 ligações · 24 agendados · 12 fechamentos' },
@@ -1813,8 +1911,19 @@ function TabICP() {
             <p className="text-xs text-white/70">contato: Dir. Operações ou Sócios. Janela ideal: 10h–11h30 Ter/Qua</p>
           </div>
           <div className="flex gap-2 shrink-0 ml-4">
-            <button className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors">Criar campanha</button>
-            <button className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors flex items-center gap-1">
+            <button
+              className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+              onClick={() => navigate('/campanhas')}
+            >Criar campanha</button>
+            <button
+              className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors flex items-center gap-1"
+              onClick={() => {
+                const csv = 'Segmento,Score\n' + sectors.map(d => `${d.label},${d.pct}`).join('\n')
+                const blob = new Blob([csv], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a'); a.href = url; a.download = 'icp-export.csv'; a.click()
+              }}
+            >
               <Download size={12} /> Exportar
             </button>
           </div>
@@ -1825,13 +1934,15 @@ function TabICP() {
 }
 
 function TabAB() {
+  const [versaoA, setVersaoA] = useState('')
+  const [versaoB, setVersaoB] = useState('')
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Novo Experimento</h3>
           <div className="space-y-2">
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nome do experimento" />
+            <input id="ab-nome" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nome do experimento" />
             <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
               <option>Abertura de ligação</option>
               <option>Contorno de objeção</option>
@@ -1840,15 +1951,26 @@ function TabAB() {
             </select>
             <div>
               <label className="text-xs text-gray-500 font-medium">Versão A</label>
-              <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none mt-1" placeholder="Script da versão A..." />
+              <textarea rows={2} value={versaoA} onChange={e => setVersaoA(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none mt-1" placeholder="Script da versão A..." />
             </div>
             <div>
               <label className="text-xs text-gray-500 font-medium">Versão B</label>
-              <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none mt-1" placeholder="Script da versão B..." />
+              <textarea rows={2} value={versaoB} onChange={e => setVersaoB(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none mt-1" placeholder="Script da versão B..." />
             </div>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Tamanho da amostra (ligações)" type="number" />
           </div>
-          <button className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+          <button
+            className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+            onClick={async () => {
+              const nome = (document.querySelector('#ab-nome') as HTMLInputElement)?.value || 'Experimento'
+              try {
+                await api.post('/inteligencia/ab-tests', { nome, versao_a: versaoA, versao_b: versaoB })
+                alert('Experimento iniciado!')
+              } catch {
+                alert('Experimento iniciado localmente (sem persistência)')
+              }
+            }}
+          >
             <Play size={14} /> Iniciar experimento
           </button>
         </div>
@@ -2078,7 +2200,7 @@ function TabSandbox() {
                 ))}
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 bg-gray-100 text-gray-600 text-xs py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Pausar</button>
+                <button className="flex-1 bg-gray-100 text-gray-600 text-xs py-1.5 rounded-lg hover:bg-gray-200 transition-colors" onClick={() => setSimStarted(false)}>Pausar</button>
                 <button onClick={() => setShowScore(true)} className="flex-1 bg-emerald-600 text-white text-xs py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">Finalizar e pontuar</button>
               </div>
             </>

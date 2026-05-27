@@ -34,6 +34,8 @@ api.interceptors.response.use(
 export const authApi = {
   login: (email: string, token: string) =>
     api.post('/auth/login', { email, token }),
+  register: (data: { nome: string; email: string; empresa?: string; telefone?: string; token: string }) =>
+    api.post('/auth/register', data),
 }
 
 // Agentes
@@ -46,9 +48,11 @@ export const agentesApi = {
 
 // Campanhas
 export const campanhasApi = {
-  list:   ()       => api.get('/campanhas'),
-  create: (data: unknown) => api.post('/campanhas', data),
-  update: (id: string, data: unknown) => api.put(`/campanhas/${id}`, data),
+  list:    ()                          => api.get('/campanhas'),
+  create:  (data: unknown)             => api.post('/campanhas', data),
+  update:  (id: string, data: unknown) => api.put(`/campanhas/${id}`, data),
+  iniciar: (id: string)               => api.post(`/campanhas/${id}/iniciar`, {}),
+  pausar:  (id: string)               => api.patch(`/campanhas/${id}`, { status: 'pausada' }),
 }
 
 // Contatos
@@ -57,14 +61,8 @@ export const contatosApi = {
   bulkInsert: (data: unknown)       => api.post('/contatos/bulk', data),
 }
 
-// Campanhas — completo
-export const campanhasApiV2 = {
-  list:   ()                          => api.get('/campanhas'),
-  create: (data: unknown)             => api.post('/campanhas', data),
-  update: (id: string, data: unknown) => api.put(`/campanhas/${id}`, data),
-  iniciar: (id: string)               => api.post(`/campanhas/${id}/iniciar`, {}),
-  pausar:  (id: string)               => api.patch(`/campanhas/${id}`, { status: 'pausada' }),
-}
+/** @deprecated Use campanhasApi */
+export const campanhasApiV2 = campanhasApi
 
 // Ligações
 export const ligacoesApi = {
@@ -83,6 +81,7 @@ export const reunioesApi = {
     return api.get(`/reunioes${qs}`)
   },
   create: (data: unknown) => api.post('/reunioes', data),
+  update: (id: string, data: unknown) => api.patch(`/reunioes/${id}`, data),
 }
 
 // Inteligência
@@ -152,6 +151,8 @@ export const emailsApi = {
   inbox:    () => api.get('/emails?tipo=inbox'),
   enviados: () => api.get('/emails?tipo=enviado'),
   marcarLido: (id: string) => api.patch(`/emails/${id}`, { lido: true }),
+  enviar: (data: { para: string; assunto: string; corpo: string }) =>
+    api.post('/emails/enviar', data),
 }
 
 // Claude AI
@@ -199,7 +200,10 @@ export const adminClientesApi = {
 // Google Calendar
 export const calendarApi = {
   status:     ()             => api.get('/auth/google/status'),
+  /** @returns URL para redirecionar o usuário para OAuth Google */
   connect:    (jwt: string)  => `${BASE_URL}/auth/google?jwt=${jwt}`,
+  /** @returns Promise que resolve com a URL de redirecionamento OAuth Google */
+  connectAsync: (jwt: string) => Promise.resolve(`${BASE_URL}/auth/google?jwt=${jwt}`),
   disconnect: ()             => api.delete('/auth/google'),
 }
 

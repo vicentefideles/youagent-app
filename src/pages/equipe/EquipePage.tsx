@@ -59,48 +59,6 @@ function getInitials(nome: string): string {
   return (first + last).toUpperCase()
 }
 
-function makeVendedor(
-  id: string,
-  nome: string,
-  cargo: Vendedor['cargo'],
-  status: Vendedor['status'],
-  agentesAtivos: number,
-  ligacoes: number,
-  reunioes: number,
-  showRate: number,
-  conversao: number,
-  meta: number,
-  realizado: number,
-  email: string,
-  telefone: string,
-): Vendedor {
-  return {
-    id,
-    nome,
-    email,
-    cargo,
-    status,
-    telefone,
-    agentesAtivos,
-    ligacoes,
-    reunioes,
-    showRate,
-    conversao,
-    meta,
-    realizado,
-    avatar: getInitials(nome),
-  }
-}
-
-// ── Mock data ──────────────────────────────────────────────────────────────
-
-const MOCK_VENDEDORES: Vendedor[] = [
-  makeVendedor('1', 'João Alves', 'Closer', 'Ativo', 2, 347, 42, 78, 19, 50, 42, 'joao.alves@empresa.com', '(11) 99001-2345'),
-  makeVendedor('2', 'Carlos Vasconcelos', 'Closer', 'Ativo', 1, 289, 31, 71, 15, 40, 31, 'carlos.v@empresa.com', '(11) 98002-3456'),
-  makeVendedor('3', 'Mariana Santos', 'SDR', 'Ativo', 2, 512, 28, 65, 12, 35, 28, 'mariana.santos@empresa.com', '(11) 97003-4567'),
-  makeVendedor('4', 'Rafael Mendes', 'Closer', 'Inativo', 0, 0, 0, 0, 0, 40, 0, 'rafael.mendes@empresa.com', '(11) 96004-5678'),
-  makeVendedor('5', 'Ana Lima', 'Gerente', 'Ativo', 0, 0, 0, 0, 0, 0, 0, 'ana.lima@empresa.com', '(11) 95005-6789'),
-]
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -200,20 +158,23 @@ function ProgressRing({ pct }: { pct: number }) {
   )
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────
+// ── Modal Adicionar / Editar ────────────────────────────────────────────────
 
 interface ModalAdicionarProps {
+  inicial?: Partial<NovoVendedor>
   onClose: () => void
   onSave: (v: NovoVendedor) => void
 }
 
-function ModalAdicionar({ onClose, onSave }: ModalAdicionarProps) {
+function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
   const [form, setForm] = useState<NovoVendedor>({
-    nome: '',
-    email: '',
-    cargo: 'Closer',
-    telefone: '',
+    nome: inicial?.nome ?? '',
+    email: inicial?.email ?? '',
+    cargo: inicial?.cargo ?? 'Closer',
+    telefone: inicial?.telefone ?? '',
   })
+
+  const isEdicao = Boolean(inicial?.nome)
 
   function handleSave() {
     if (!form.nome.trim() || !form.email.trim()) return
@@ -225,7 +186,9 @@ function ModalAdicionar({ onClose, onSave }: ModalAdicionarProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-gray-900">Adicionar Vendedor</h2>
+          <h2 className="text-base font-semibold text-gray-900">
+            {isEdicao ? 'Editar Vendedor' : 'Adicionar Vendedor'}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={18} />
           </button>
@@ -302,9 +265,18 @@ function ModalAdicionar({ onClose, onSave }: ModalAdicionarProps) {
 interface ModalMetasProps {
   vendedores: Vendedor[]
   onClose: () => void
+  onSalvar: (metas: Record<string, number>) => void
 }
 
-function ModalMetas({ vendedores, onClose }: ModalMetasProps) {
+function ModalMetas({ vendedores, onClose, onSalvar }: ModalMetasProps) {
+  const [metas, setMetas] = useState<Record<string, number>>(
+    Object.fromEntries(vendedores.filter((v) => v.status === 'Ativo').map((v) => [v.id, v.meta]))
+  )
+
+  function handleSalvarMeta() {
+    onSalvar(metas)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
@@ -324,8 +296,9 @@ function ModalMetas({ vendedores, onClose }: ModalMetasProps) {
                 <span className="flex-1 text-sm text-gray-800">{v.nome}</span>
                 <input
                   type="number"
-                  defaultValue={v.meta}
+                  value={metas[v.id] ?? v.meta}
                   min={0}
+                  onChange={(e) => setMetas((prev) => ({ ...prev, [v.id]: Number(e.target.value) }))}
                   className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -340,7 +313,7 @@ function ModalMetas({ vendedores, onClose }: ModalMetasProps) {
             Cancelar
           </button>
           <button
-            onClick={onClose}
+            onClick={handleSalvarMeta}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
           >
             Salvar Metas
@@ -355,12 +328,14 @@ function ModalMetas({ vendedores, onClose }: ModalMetasProps) {
 
 interface TabVendedoresProps {
   vendedores: Vendedor[]
-  onToggleStatus: (id: string) => void
+  onToggleStatus: (id: string, ativo: boolean) => void
   onAddVendedor: (v: NovoVendedor) => void
+  onEditVendedor: (id: string, v: NovoVendedor) => void
 }
 
-function TabVendedores({ vendedores, onToggleStatus, onAddVendedor }: TabVendedoresProps) {
+function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVendedor }: TabVendedoresProps) {
   const [showModal, setShowModal] = useState(false)
+  const [editando, setEditando] = useState<Vendedor | null>(null)
 
   const totalAtivos = vendedores.filter((v) => v.status === 'Ativo').length
   const totalAgentes = vendedores.reduce((acc, v) => acc + v.agentesAtivos, 0)
@@ -413,6 +388,13 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor }: TabVendedo
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
+              {vendedores.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
+                    Nenhum vendedor cadastrado ainda.
+                  </td>
+                </tr>
+              )}
               {vendedores.map((v) => (
                 <tr key={v.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-5 py-3.5">
@@ -438,12 +420,15 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor }: TabVendedo
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-1.5">
-                      <button className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                      <button
+                        onClick={() => setEditando(v)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
                         <Pencil size={12} />
                         Editar
                       </button>
                       <button
-                        onClick={() => onToggleStatus(v.id)}
+                        onClick={() => onToggleStatus(v.id, v.status === 'Ativo')}
                         className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                           v.status === 'Ativo'
                             ? 'text-red-600 bg-red-50 hover:bg-red-100'
@@ -464,6 +449,17 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor }: TabVendedo
       {showModal && (
         <ModalAdicionar onClose={() => setShowModal(false)} onSave={onAddVendedor} />
       )}
+
+      {editando && (
+        <ModalAdicionar
+          inicial={{ nome: editando.nome, email: editando.email, cargo: editando.cargo, telefone: editando.telefone }}
+          onClose={() => setEditando(null)}
+          onSave={(form) => {
+            onEditVendedor(editando.id, form)
+            setEditando(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -475,6 +471,14 @@ interface TabDesempenhoProps {
 }
 
 function TabDesempenho({ vendedores }: TabDesempenhoProps) {
+  if (vendedores.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20 text-sm text-gray-400">
+        Nenhum vendedor cadastrado ainda.
+      </div>
+    )
+  }
+
   const ranked = [...vendedores].sort((a, b) => b.realizado - a.realizado)
 
   function progressColor(pct: number): string {
@@ -606,9 +610,10 @@ function TabDesempenho({ vendedores }: TabDesempenhoProps) {
 
 interface TabMetasProps {
   vendedores: Vendedor[]
+  onSalvarMetas: (metas: Record<string, number>) => void
 }
 
-function TabMetas({ vendedores }: TabMetasProps) {
+function TabMetas({ vendedores, onSalvarMetas }: TabMetasProps) {
   const [showModal, setShowModal] = useState(false)
   const ativos = vendedores.filter((v) => v.status === 'Ativo')
 
@@ -676,7 +681,14 @@ function TabMetas({ vendedores }: TabMetasProps) {
       </div>
 
       {showModal && (
-        <ModalMetas vendedores={vendedores} onClose={() => setShowModal(false)} />
+        <ModalMetas
+          vendedores={vendedores}
+          onClose={() => setShowModal(false)}
+          onSalvar={(metas) => {
+            onSalvarMetas(metas)
+            setShowModal(false)
+          }}
+        />
       )}
     </div>
   )
@@ -694,7 +706,7 @@ export default function EquipePage() {
   })
 
   const vendedores: Vendedor[] = isLoading
-    ? MOCK_VENDEDORES
+    ? []
     : rawEquipe.map((v) => ({
         id: v.id,
         nome: v.nome,
@@ -718,20 +730,40 @@ export default function EquipePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['equipe'] }),
   })
 
-  const toggleMutation = useMutation({
-    mutationFn: (id: string) => {
-      const current = vendedores.find((v) => v.id === id)
-      return equipeApi.update(id, { ativo: current?.status !== 'Ativo' })
-    },
+  const editarMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: NovoVendedor }) =>
+      equipeApi.update(id, { nome: data.nome, email: data.email, cargo: data.cargo }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['equipe'] }),
   })
 
-  function handleToggleStatus(id: string) {
-    toggleMutation.mutate(id)
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) =>
+      equipeApi.update(id, { ativo: !ativo }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['equipe'] }),
+  })
+
+  const metaMutation = useMutation({
+    mutationFn: ({ id, meta }: { id: string; meta: number }) =>
+      equipeApi.update(id, { meta_mensal: meta }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['equipe'] }),
+  })
+
+  function handleToggleStatus(id: string, ativo: boolean) {
+    toggleMutation.mutate({ id, ativo })
   }
 
   function handleAddVendedor(novo: NovoVendedor) {
     criarMutation.mutate(novo)
+  }
+
+  function handleEditVendedor(id: string, dados: NovoVendedor) {
+    editarMutation.mutate({ id, data: dados })
+  }
+
+  function handleSalvarMetas(metas: Record<string, number>) {
+    Object.entries(metas).forEach(([id, meta]) => {
+      metaMutation.mutate({ id, meta })
+    })
   }
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -777,10 +809,13 @@ export default function EquipePage() {
           vendedores={vendedores}
           onToggleStatus={handleToggleStatus}
           onAddVendedor={handleAddVendedor}
+          onEditVendedor={handleEditVendedor}
         />
       )}
       {activeTab === 'desempenho' && <TabDesempenho vendedores={vendedores} />}
-      {activeTab === 'metas' && <TabMetas vendedores={vendedores} />}
+      {activeTab === 'metas' && (
+        <TabMetas vendedores={vendedores} onSalvarMetas={handleSalvarMetas} />
+      )}
     </div>
   )
 }

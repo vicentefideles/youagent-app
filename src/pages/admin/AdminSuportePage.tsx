@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { api, emailsApi } from '@/services/api';
 import {
   Headphones,
   Phone,
@@ -502,11 +503,13 @@ function TabLigacoes() {
   const [empresa, setEmpresa] = useState('');
   const [status, setStatus] = useState('Todos');
   const [date, setDate] = useState('');
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   const filtered = MOCK_CALLS.filter((c) => {
     const matchEmpresa = c.company.toLowerCase().includes(empresa.toLowerCase());
     const matchStatus = status === 'Todos' || c.status === status;
-    return matchEmpresa && matchStatus;
+    const matchDate = !date || c.datetime?.includes(date);
+    return matchEmpresa && matchStatus && matchDate;
   });
 
   return (
@@ -565,7 +568,11 @@ function TabLigacoes() {
                 <td className="px-4 py-3 text-gray-600">{row.agent}</td>
                 <td className="px-4 py-3 text-gray-500">{row.datetime}</td>
                 <td className="px-4 py-3">
-                  <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700">
+                  <button
+                    onClick={() => setPlayingId(row.id === playingId ? null : row.id)}
+                    className={`p-1.5 hover:bg-gray-100 rounded-lg transition-colors ${row.id === playingId ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    title={row.id === playingId ? 'Pausar' : 'Reproduzir gravação'}
+                  >
                     <Play size={14} />
                   </button>
                 </td>
@@ -638,7 +645,11 @@ function TabEmail() {
                 <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
                 <td className="px-4 py-3 text-gray-500">{row.date}</td>
                 <td className="px-4 py-3">
-                  <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700">
+                  <button
+                    onClick={() => alert(`Empresa: ${row.company}\nAssunto: ${row.subject}\nStatus: ${row.status}\nData: ${row.date}`)}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
+                    title="Ver detalhes"
+                  >
                     <Eye size={14} />
                   </button>
                 </td>
@@ -802,7 +813,13 @@ function TabModelos() {
               </div>
             )}
 
-            <button className="w-fit px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(t.body).catch(() => {})
+                alert('Modelo copiado para a área de transferência!\n\nCole nas notas da ligação na aba Discagem Manual.')
+              }}
+              className="w-fit px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
               Usar Modelo
             </button>
           </div>
@@ -1068,8 +1085,27 @@ function TabSuporte() {
             <textarea value={resposta} onChange={e => setResposta(e.target.value)} rows={4} placeholder="Digite sua resposta..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div className="flex gap-2">
-            <button onClick={() => { setTicketAberto(null); setResposta(''); }} className="flex-1 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">Resolver</button>
-            <button className="flex-1 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Responder</button>
+            <button
+              onClick={() => {
+                api.patch('/admin/suporte/tickets/' + ticketAberto?.id, { status: 'resolvido' }).catch(console.error)
+                setTicketAberto(null)
+                setResposta('')
+              }}
+              className="flex-1 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Resolver
+            </button>
+            <button
+              onClick={() => {
+                if (!resposta.trim()) return
+                setTicketAberto(prev => prev ? { ...prev, status: 'Resolvido', } : null)
+                api.post('/admin/suporte/tickets/' + ticketAberto?.id + '/responder', { resposta }).catch(console.error)
+                setResposta('')
+              }}
+              className="flex-1 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Responder
+            </button>
           </div>
         </div>
       )}
@@ -1160,6 +1196,7 @@ function Tab360() {
 
 function TabInbox() {
   const [selecionado, setSelecionado] = useState<InboxEmail | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   return (
     <div className="flex gap-4" style={{ minHeight: '480px' }}>
@@ -1200,8 +1237,32 @@ function TabInbox() {
               ))}
             </div>
             <div className="p-4 border-t border-gray-100 flex gap-2">
-              <input type="text" placeholder="Responder..." className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">Enviar</button>
+              <input
+                type="text"
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Responder..."
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={async () => {
+                  if (!replyText.trim()) return
+                  try {
+                    await emailsApi.enviar({
+                      para: selecionado?.thread[0]?.de || '',
+                      assunto: 'Re: ' + (selecionado?.assunto || ''),
+                      corpo: replyText,
+                    })
+                    setReplyText('')
+                    alert('Resposta enviada!')
+                  } catch {
+                    alert('Erro ao enviar')
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Enviar
+              </button>
             </div>
           </div>
         )}

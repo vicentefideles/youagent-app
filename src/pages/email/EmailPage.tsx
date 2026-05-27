@@ -6,7 +6,7 @@ import {
   Pencil, Brain, ArrowLeft,
   Link, Minus
 } from 'lucide-react'
-import { emailsApi, claudeApi } from '@/services/api'
+import { emailsApi, claudeApi, whatsappApi } from '@/services/api'
 
 type TabId = 'acoes' | 'fila' | 'modelos' | 'campanhas' | 'equipe' | 'whatsapp' | 'inbox' | 'enviados'
 
@@ -66,7 +66,18 @@ function EmailComposer({
   const [para, setPara] = useState(email.email)
   const [assunto, setAssunto] = useState(email.assunto)
   const [corpo, setCorpo] = useState(email.corpo)
+  const [rascunhoSalvo, setRascunhoSalvo] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  async function handleEnviarEmail() {
+    try {
+      await emailsApi.enviar({ para, assunto, corpo })
+      onSend(email.id)
+    } catch (e) {
+      console.error('Erro ao enviar email:', e)
+      alert('Erro ao enviar email. Tente novamente.')
+    }
+  }
 
   const suggestions = [
     'Mencione o ROI de 60% em prospecção',
@@ -207,13 +218,20 @@ function EmailComposer({
           {/* Actions */}
           <div className="flex gap-2">
             <button
-              onClick={() => onSend(email.id)}
+              onClick={handleEnviarEmail}
               className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700"
             >
               <Send size={14} /> Enviar agora
             </button>
-            <button className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-4 py-2 text-gray-700 hover:bg-gray-50">
-              <Save size={14} /> Salvar rascunho
+            <button
+              onClick={() => {
+                localStorage.setItem('email_rascunho', JSON.stringify({ assunto, corpo, destinatario: para }))
+                setRascunhoSalvo(true)
+                setTimeout(() => setRascunhoSalvo(false), 2000)
+              }}
+              className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-4 py-2 text-gray-700 hover:bg-gray-50"
+            >
+              <Save size={14} /> {rascunhoSalvo ? '✓ Salvo' : 'Salvar rascunho'}
             </button>
             <button
               onClick={onBack}
@@ -314,10 +332,23 @@ function TabFila() {
             </p>
           </div>
           <div className="flex gap-2 shrink-0 ml-4">
-            <button className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 hover:bg-gray-50">
+            <button
+              onClick={() => setComposerEmail({ id: Date.now(), contato: '', empresa: '', campanha: '', origem: '', template: '', horario: '', assunto: '', status: 'pendente', email: '', corpo: '' })}
+              className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+            >
               <Mail size={14} /> Novo E-mail
             </button>
-            <button className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700">
+            <button
+              onClick={async () => {
+                for (const r of rows.filter(r => r.status === 'pendente')) {
+                  try {
+                    await emailsApi.enviar({ para: r.email || r.contato, assunto: r.assunto, corpo: r.corpo || '' })
+                    setRows(prev => prev.map(x => x.id === r.id ? { ...x, status: 'enviado' as const } : x))
+                  } catch (e) { console.error(e) }
+                }
+              }}
+              className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700"
+            >
               <Send size={14} /> Enviar todos pendentes
             </button>
           </div>
@@ -365,7 +396,15 @@ function TabFila() {
                           >
                             <Pencil size={11} /> Editar
                           </button>
-                          <button className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700 flex items-center gap-1">
+                          <button
+                            onClick={async () => {
+                              try {
+                                await emailsApi.enviar({ para: r.email || r.contato, assunto: r.assunto, corpo: r.corpo || '' })
+                                setRows(prev => prev.map(x => x.id === r.id ? { ...x, status: 'enviado' as const } : x))
+                              } catch (e) { console.error(e) }
+                            }}
+                            className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700 flex items-center gap-1"
+                          >
                             <Send size={11} /> Enviar
                           </button>
                         </>
@@ -800,6 +839,9 @@ function TabEquipe() {
 // ─── Aba WhatsApp ─────────────────────────────────────────────────────────────
 function TabWhatsApp() {
   const [showComposer, setShowComposer] = useState(false)
+  const [waTemplate, setWaTemplate] = useState('Tentativa não atendida')
+  const [waAudiencia, setWaAudiencia] = useState('Não atenderam (últimos 7 dias)')
+  const [waMensagem, setWaMensagem] = useState('')
 
   const historico = [
     { empresa: 'Acme Corp', contato: 'João Silva', msg: 'Olá João, tentei entrar em contato pelo telefone...', status: 'Entregue', data: 'Hoje 14:30' },
@@ -843,7 +885,11 @@ function TabWhatsApp() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 font-medium block mb-1">Template</label>
-              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              <select
+                value={waTemplate}
+                onChange={e => setWaTemplate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
                 <option>Tentativa não atendida</option>
                 <option>Follow-up pós-reunião</option>
                 <option>Convite para demo</option>
@@ -852,7 +898,11 @@ function TabWhatsApp() {
             </div>
             <div>
               <label className="text-xs text-gray-500 font-medium block mb-1">Audiência</label>
-              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              <select
+                value={waAudiencia}
+                onChange={e => setWaAudiencia(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
                 <option>Não atenderam (últimos 7 dias)</option>
                 <option>Agendados sem resposta</option>
                 <option>Fila multicanal ativa</option>
@@ -862,7 +912,13 @@ function TabWhatsApp() {
           </div>
           <div>
             <label className="text-xs text-gray-500 font-medium block mb-1">Mensagem</label>
-            <textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" rows={3} placeholder="Olá [Nome], tentei entrar em contato pelo telefone..." />
+            <textarea
+              value={waMensagem}
+              onChange={e => setWaMensagem(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              rows={3}
+              placeholder="Olá [Nome], tentei entrar em contato pelo telefone..."
+            />
           </div>
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">Estimativa: <strong className="text-gray-900">34 contatos</strong></p>
@@ -870,7 +926,16 @@ function TabWhatsApp() {
               <button onClick={() => setShowComposer(false)} className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-600 hover:bg-gray-50">
                 Cancelar
               </button>
-              <button className="flex items-center gap-1.5 text-sm bg-green-600 text-white rounded-lg px-3 py-1.5 hover:bg-green-700">
+              <button
+                onClick={async () => {
+                  try {
+                    await whatsappApi.send({ template: waTemplate, audiencia: waAudiencia, mensagem: waMensagem })
+                    alert('Campanha disparada!')
+                    setShowComposer(false)
+                  } catch (e: any) { alert('Erro: ' + (e?.message || 'desconhecido')) }
+                }}
+                className="flex items-center gap-1.5 text-sm bg-green-600 text-white rounded-lg px-3 py-1.5 hover:bg-green-700"
+              >
                 <Megaphone size={14} /> Disparar campanha
               </button>
             </div>
@@ -942,6 +1007,7 @@ type InboxFilter = 'todos' | 'nao_lidos' | 'pendente'
 function TabInbox() {
   const [filtro, setFiltro] = useState<InboxFilter>('todos')
   const [emailSelecionado, setEmailSelecionado] = useState<InboxEmail | null>(null)
+  const [composerEmail, setComposerEmail] = useState<QueueEmail | null>(null)
 
   const { data: inboxReais = [] } = useQuery({
     queryKey: ['emails-inbox'],
@@ -975,6 +1041,16 @@ function TabInbox() {
   const naoLidosCount = inboxSource.filter(e => !e.lido).length
   const pendentesCount = inboxSource.filter(e => e.respostaPendente).length
 
+  if (composerEmail) {
+    return (
+      <EmailComposer
+        email={composerEmail}
+        onBack={() => setComposerEmail(null)}
+        onSend={() => setComposerEmail(null)}
+      />
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
@@ -1004,7 +1080,10 @@ function TabInbox() {
           {filtered.map(e => (
             <button
               key={e.id}
-              onClick={() => setEmailSelecionado(e)}
+              onClick={() => {
+                setEmailSelecionado(e)
+                if (!e.lido) emailsApi.marcarLido(String(e.id)).catch(console.error)
+              }}
               className={`w-full text-left flex items-start gap-3 p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${emailSelecionado?.id === e.id ? 'bg-blue-50' : e.lido ? '' : 'bg-blue-50/40'}`}
             >
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs shrink-0">
@@ -1041,7 +1120,22 @@ function TabInbox() {
                 <p key={i} className="text-sm text-gray-700 leading-relaxed">{line || ' '}</p>
               ))}
             </div>
-            <button className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 self-start">
+            <button
+              onClick={() => setComposerEmail({
+                id: Date.now(),
+                contato: emailSelecionado.de || '',
+                empresa: emailSelecionado.empresa || '',
+                assunto: 'Re: ' + (emailSelecionado.assunto || ''),
+                status: 'pendente',
+                email: emailSelecionado.de || '',
+                corpo: '',
+                campanha: '',
+                origem: '',
+                template: '',
+                horario: '',
+              })}
+              className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 self-start"
+            >
               <Send size={14} /> Responder
             </button>
           </div>
@@ -1126,7 +1220,15 @@ function TabEnviados() {
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-900">E-mails enviados pelo sistema</h3>
-          <button className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 hover:bg-gray-50">
+          <button
+            onClick={() => {
+              const csv = ['Para,Assunto,Data,Status', ...enviadosSource.map(e => `${e.para},${e.assunto},${e.dataEnvio},${e.status}`)].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a'); a.href = url; a.download = 'emails-enviados.csv'; a.click()
+            }}
+            className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+          >
             <Send size={14} /> Exportar CSV
           </button>
         </div>

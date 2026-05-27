@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { Check } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
 
 export default function BoasVindasPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -18,7 +20,7 @@ export default function BoasVindasPage() {
             <h2 className="text-2xl font-bold text-gray-900">Conta ativada!</h2>
             <p className="text-base text-gray-500 mt-1">Bem-vindo ao ETZ! 🎉</p>
             <p className="text-xs text-gray-400 mt-2">
-              Empresa Demo · Plano Growth ativo · Trial gratuito até 23/06/2026
+              {user?.nome || 'Sua empresa'} · {user?.plano || 'Plano Trial'} · {user?.email}
             </p>
           </div>
 
@@ -63,7 +65,7 @@ export default function BoasVindasPage() {
 
           {/* Rodapé */}
           <p className="text-xs text-gray-400">
-            Credenciais de acesso admin enviadas para admin@empresa.com
+            Credenciais de acesso enviadas para {user?.email || 'seu e-mail'}
           </p>
 
           <button

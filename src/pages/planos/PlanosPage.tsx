@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Check,
   X,
@@ -154,6 +155,32 @@ interface CardModalProps {
 }
 
 function CardModal({ onClose }: CardModalProps) {
+  const [numero, setNumero] = useState('')
+  const [validade, setValidade] = useState('')
+  const [cvv, setCvv] = useState('')
+  const [nome, setNome] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  function formatNumero(v: string) {
+    return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
+  }
+
+  function formatValidade(v: string) {
+    const raw = v.replace(/\D/g, '').slice(0, 4)
+    if (raw.length >= 3) return raw.slice(0, 2) + '/' + raw.slice(2)
+    return raw
+  }
+
+  function handleSalvar() {
+    setSaved(true)
+    setTimeout(() => {
+      setSaved(false)
+      onClose()
+    }, 1500)
+  }
+
+  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
@@ -161,26 +188,55 @@ function CardModal({ onClose }: CardModalProps) {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Número do cartão</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="•••• •••• •••• ••••" />
+            <input
+              className={inputCls}
+              placeholder="•••• •••• •••• ••••"
+              value={numero}
+              onChange={(e) => setNumero(formatNumero(e.target.value))}
+              maxLength={19}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Validade</label>
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="MM/AA" />
+              <input
+                className={inputCls}
+                placeholder="MM/AA"
+                value={validade}
+                onChange={(e) => setValidade(formatValidade(e.target.value))}
+                maxLength={5}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">CVV</label>
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="•••" />
+              <input
+                className={inputCls}
+                placeholder="•••"
+                type="password"
+                value={cvv}
+                onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                maxLength={4}
+              />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Nome no cartão</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Como aparece no cartão" />
+            <input
+              className={inputCls}
+              placeholder="Como aparece no cartão"
+              value={nome}
+              onChange={(e) => setNome(e.target.value.toUpperCase())}
+            />
           </div>
         </div>
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancelar</button>
-          <button className="flex-1 bg-blue-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-700">Salvar cartão</button>
+          <button
+            onClick={handleSalvar}
+            className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${saved ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          >
+            {saved ? '✓ Salvo' : 'Salvar cartão'}
+          </button>
         </div>
       </div>
     </div>
@@ -343,6 +399,7 @@ function RoiCalculator({ planAtual }: { planAtual: string }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PlanosPage() {
+  const navigate = useNavigate()
   const [annual, setAnnual] = useState(false)
   const [showCardModal, setShowCardModal] = useState(false)
 
@@ -426,6 +483,13 @@ export default function PlanosPage() {
 
               <button
                 disabled={plan.current}
+                onClick={
+                  plan.current
+                    ? undefined
+                    : plan.id === 'enterprise'
+                    ? () => window.open('mailto:vendas@etztech.com?subject=Interesse no plano Enterprise', '_blank')
+                    : () => navigate('/checkout')
+                }
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   plan.ctaStyle === 'blue'
                     ? 'bg-blue-600 text-white opacity-60 cursor-default'
@@ -442,8 +506,12 @@ export default function PlanosPage() {
       </div>
 
       {/* Usage */}
+      {/* TODO: conectar planosApi.list() ou dashboardApi.get() para dados reais de uso */}
       <div className="bg-white border border-gray-200 rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-5">Uso este mês</h2>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold text-gray-900">Uso este mês</h2>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">Dados de demonstração</span>
+        </div>
         <div className="space-y-5">
           <ProgressBar label="Ligações" current={1284} max={2000} color="blue" />
           <ProgressBar label="Reuniões agendadas" current={87} color="green" suffix=" reuniões" />
@@ -452,8 +520,12 @@ export default function PlanosPage() {
       </div>
 
       {/* Billing history */}
+      {/* TODO: conectar planosApi.getFaturas() — dados abaixo são de demonstração */}
       <div className="bg-white border border-gray-200 rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-5">Histórico de cobrança</h2>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold text-gray-900">Histórico de cobrança</h2>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">Dados de demonstração</span>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
@@ -477,7 +549,20 @@ export default function PlanosPage() {
                   </span>
                 </td>
                 <td className="py-3">
-                  <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  <button
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title={`Baixar fatura ${inv.month}`}
+                    onClick={() => {
+                      const csv = `Fatura,Mês,Plano,Valor,Status\n${inv.month},${inv.month},${inv.plan},${inv.value},${inv.status}`
+                      const blob = new Blob([csv], { type: 'text/csv' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `fatura-${inv.month.replace(' ', '-').toLowerCase()}.csv`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                  >
                     <Download className="w-4 h-4" />
                   </button>
                 </td>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Phone,
   TrendingUp,
@@ -74,6 +75,7 @@ interface FeedItem {
 
 // ─── Mock data ─────────────────────────────────────────────────────────────────
 
+// TODO: conectar à API quando endpoint retornar bar_data (ligacoes/reunioes por dia)
 const BAR_DATA: BarDay[] = [
   { label: 'S', ligacoes: 145, reunioes: 8 },
   { label: 'T', ligacoes: 132, reunioes: 7 },
@@ -91,6 +93,7 @@ const BAR_DATA: BarDay[] = [
   { label: 'D', ligacoes: 178, reunioes: 11 },
 ]
 
+// TODO: conectar à API quando endpoint retornar donut_segments (resultado das ligacoes)
 const DONUT_SEGMENTS: DonutSegment[] = [
   { label: 'Não atendeu', pct: 42, color: '#f59e0b' },
   { label: 'Agendado',    pct: 18, color: '#10b981' },
@@ -119,14 +122,6 @@ const CONTACTS: ContactItem[] = [
   { initials: 'RP', nome: 'Rafael Porto',   empresa: 'InnovaB2B',   last: 'Demonstrou interesse em IA',      next: 'Demo agendada: ter 15h' },
 ]
 
-const FEED: FeedItem[] = [
-  { dot: 'bg-emerald-500', text: 'Reunião agendada — Acme Corp com João | 15h00', time: 'há 3 min' },
-  { dot: 'bg-blue-500',    text: 'Agente Ana transferiu para Carlos Ferreira',    time: 'há 8 min' },
-  { dot: 'bg-amber-500',   text: 'No-show registrado — BetaTech às 14h',          time: 'há 22 min' },
-  { dot: 'bg-emerald-500', text: "Novo padrão detectado: menção de 'ROI'",        time: 'há 45 min' },
-  { dot: 'bg-blue-500',    text: 'Lista importada: 234 contatos — Campanha SP',   time: 'há 1h' },
-  { dot: 'bg-gray-400',    text: 'Agente Carlos Vasconcelos ativado',              time: 'há 2h' },
-]
 
 // ─── Meritocracia types + data ────────────────────────────────────────────────
 
@@ -153,26 +148,11 @@ interface ReuniaoFila {
 
 const AVATAR_COLORS = ['bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
 
-const VENDEDORES_FILA_INIT: VendedorFila[] = [
-  { id: 1, nome: 'João Silva',       avatar: 'JS', cargo: 'Closer SP', peso: 30, reunioesHoje: 4, taxaShow: 78 },
-  { id: 2, nome: 'Maria Rodrigues',  avatar: 'MR', cargo: 'Closer SP', peso: 25, reunioesHoje: 3, taxaShow: 72 },
-  { id: 3, nome: 'Carlos Ferreira',  avatar: 'CF', cargo: 'Closer MG', peso: 20, reunioesHoje: 2, taxaShow: 71 },
-  { id: 4, nome: 'Ana Lima',         avatar: 'AL', cargo: 'Closer GO', peso: 15, reunioesHoje: 2, taxaShow: 68 },
-  { id: 5, nome: 'Pedro Costa',      avatar: 'PC', cargo: 'Closer MG', peso: 10, reunioesHoje: 1, taxaShow: 65 },
-]
-
-const REUNIOES_FILA: ReuniaoFila[] = [
-  { id: 1, empresa: 'Grupo Comercial ABC', avatarEmpresa: 'GA', contato: 'Marcos Silva',    icpScore: 94, agente: 'Ana',    vendedor: 'João Silva',      horario: 'Hoje · 14h00' },
-  { id: 2, empresa: 'Indústria Delta',     avatarEmpresa: 'ID', contato: 'Roberto Alves',   icpScore: 78, agente: 'Carlos', vendedor: 'Maria Rodrigues', horario: 'Hoje · 15h30' },
-  { id: 3, empresa: 'Tech Nova Sistemas',  avatarEmpresa: 'TN', contato: 'Carla Mendes',    icpScore: 85, agente: 'Ana',    vendedor: 'João Silva',      horario: 'Amanhã · 09h30' },
-  { id: 4, empresa: 'FarmaCenter',         avatarEmpresa: 'FC', contato: 'Luciana Pinto',   icpScore: 62, agente: 'Julia',  vendedor: 'Carlos Ferreira', horario: 'Amanhã · 11h00' },
-  { id: 5, empresa: 'TechSolutions LTDA',  avatarEmpresa: 'TS', contato: 'Bruno Almeida',   icpScore: 85, agente: 'Rafael', vendedor: 'Ana Lima',        horario: 'Amanhã · 14h00' },
-]
 
 // ─── Card Meritocracia ─────────────────────────────────────────────────────────
 
 function CardMeritocracia() {
-  const [vendedores, setVendedores] = useState<VendedorFila[]>(VENDEDORES_FILA_INIT)
+  const [vendedores, setVendedores] = useState<VendedorFila[]>([])
 
   function ajustarPeso(id: number, delta: number) {
     setVendedores(prev => {
@@ -283,14 +263,18 @@ function CardMeritocracia() {
 
 // ─── Card Próximas da Fila ─────────────────────────────────────────────────────
 
-function CardProximasFila() {
+interface CardProximasFilaProps {
+  reunioes: ReuniaoFila[]
+}
+
+function CardProximasFila({ reunioes }: CardProximasFilaProps) {
   const [distribuidos, setDistribuidos] = useState<Set<number>>(new Set())
 
   function distribuir(id: number) {
     setDistribuidos(prev => new Set([...prev, id]))
   }
   function distribuirTodas() {
-    setDistribuidos(new Set(REUNIOES_FILA.map(r => r.id)))
+    setDistribuidos(new Set(reunioes.map(r => r.id)))
   }
 
   return (
@@ -309,7 +293,7 @@ function CardProximasFila() {
       </div>
 
       <div className="flex flex-col divide-y divide-gray-100">
-        {REUNIOES_FILA.map((r, i) => (
+        {reunioes.map((r, i) => (
           <div key={r.id} className={`flex items-center gap-4 py-3 ${distribuidos.has(r.id) ? 'opacity-50' : ''}`}>
             {/* Avatar empresa */}
             <div className={`w-9 h-9 rounded-lg text-white text-xs font-bold flex items-center justify-center flex-shrink-0 ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`}>
@@ -527,6 +511,7 @@ function buildDashOffset(prevPct: number): number {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const isAtivo = useAuthStore((s) => s.isAtivo())
   const setStatus = useAuthStore((s) => s.setStatus)
@@ -573,20 +558,36 @@ export default function DashboardPage() {
         text: f.texto,
         time: formatTs(f.ts),
       }))
-    : FEED
+    : []
 
   const kpis: KpiItem[] = [
-    { label: 'Agentes ativos',  value: dash?.kpis?.agentes_ativos ?? agentes?.length ?? '—',  icon: <Bot size={18} className="text-brand" />,         bg: 'bg-brand-50',   text: 'text-brand-600',   delta: '▲ 2 vs semana passada', deltaPositive: true },
-    { label: 'Campanhas',       value: dash?.kpis?.campanhas_ativas ?? campanhas?.length ?? '—', icon: <Activity size={18} className="text-purple-600" />, bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '▲ 1 nova hoje',         deltaPositive: true },
-    { label: 'Ligações hoje',   value: dash?.kpis?.ligacoes_hoje ?? '—',                    icon: <Phone size={18} className="text-emerald-600" />,   bg: 'bg-emerald-50', text: 'text-emerald-600', delta: '▲ 12% vs ontem',        deltaPositive: true },
-    { label: 'Taxa de acerto',  value: dash?.kpis?.taxa_acerto != null ? `${dash.kpis.taxa_acerto}%` : '—', icon: <TrendingUp size={18} className="text-amber-600" />, bg: 'bg-amber-50',   text: 'text-amber-600',   delta: '▼ 3% vs ontem',         deltaPositive: false },
-    { label: 'Reuniões agend.', value: dash?.kpis?.reunioes_agendadas ?? '—',               icon: <Calendar size={18} className="text-brand" />,      bg: 'bg-brand-50',   text: 'text-brand-600',   delta: '▲ 22% vs ontem',        deltaPositive: true },
-    { label: 'Score CI',        value: '87',                                                  icon: <Brain size={18} className="text-purple-600" />,    bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '▲ 5 pts esta semana',   deltaPositive: true },
+    { label: 'Agentes ativos',  value: dash?.kpis?.agentes_ativos ?? agentes?.length ?? '—',  icon: <Bot size={18} className="text-brand" />,         bg: 'bg-brand-50',   text: 'text-brand-600',   delta: '—', deltaPositive: true },
+    { label: 'Campanhas',       value: dash?.kpis?.campanhas_ativas ?? campanhas?.length ?? '—', icon: <Activity size={18} className="text-purple-600" />, bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '—', deltaPositive: true },
+    { label: 'Ligações hoje',   value: dash?.kpis?.ligacoes_hoje ?? '—',                    icon: <Phone size={18} className="text-emerald-600" />,   bg: 'bg-emerald-50', text: 'text-emerald-600', delta: '—', deltaPositive: true },
+    { label: 'Taxa de acerto',  value: dash?.kpis?.taxa_acerto != null ? `${dash.kpis.taxa_acerto}%` : '—', icon: <TrendingUp size={18} className="text-amber-600" />, bg: 'bg-amber-50',   text: 'text-amber-600',   delta: '—', deltaPositive: false },
+    { label: 'Reuniões agend.', value: dash?.kpis?.reunioes_agendadas ?? '—',               icon: <Calendar size={18} className="text-brand" />,      bg: 'bg-brand-50',   text: 'text-brand-600',   delta: '—', deltaPositive: true },
+    { label: 'Score CI',        value: dash?.kpis?.score_ci ?? '—',                          icon: <Brain size={18} className="text-purple-600" />,    bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '—', deltaPositive: true },
   ]
 
+  const reunioesFila: ReuniaoFila[] = dash?.proximas_reunioes?.map((r: { id: number; vendedor: string; inicio: string }) => ({
+    id: r.id,
+    empresa: '—',
+    avatarEmpresa: r.vendedor.slice(0, 2).toUpperCase(),
+    contato: '—',
+    icpScore: 0,
+    agente: '—',
+    vendedor: r.vendedor,
+    horario: new Date(r.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+  })) ?? []
+
+  // Bar chart — use real data when available, otherwise fall back to mock
+  const barData: BarDay[] = (dash?.por_dia && dash.por_dia.length > 0)
+    ? dash.por_dia
+    : BAR_DATA
+
   // Bar chart scale
-  const maxLig = Math.max(...BAR_DATA.map((d) => d.ligacoes))
-  const maxReu = Math.max(...BAR_DATA.map((d) => d.reunioes))
+  const maxLig = Math.max(...barData.map((d) => d.ligacoes))
+  const maxReu = Math.max(...barData.map((d) => d.reunioes))
 
   // Donut cumulative offsets
   let cumPct = 0
@@ -656,7 +657,7 @@ export default function DashboardPage() {
               <span className="text-xs text-gray-400">0</span>
             </div>
             {/* Bars */}
-            {BAR_DATA.map((day, i) => (
+            {barData.map((day, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
                 <div className="flex items-end gap-0.5 w-full h-28">
                   <div
@@ -758,7 +759,10 @@ export default function DashboardPage() {
                 💡 <strong>Recomendação:</strong> Criar campanha focada em empresas de Tech 50–200 funcionários com decisor VP Comercial em SP
               </p>
             </div>
-            <button className="w-full text-xs text-blue-600 border border-blue-200 rounded-lg py-2 hover:bg-blue-50 transition-colors font-medium">
+            <button
+              onClick={() => navigate('/campanhas')}
+              className="w-full text-xs text-blue-600 border border-blue-200 rounded-lg py-2 hover:bg-blue-50 transition-colors font-medium"
+            >
               Criar campanha com esse perfil →
             </button>
           </div>
@@ -812,7 +816,10 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500 mt-0.5 truncate">{c.last}</p>
                   <p className="text-xs text-blue-600 mt-0.5 truncate">→ {c.next}</p>
                 </div>
-                <button className="text-xs text-gray-400 hover:text-gray-700 flex-shrink-0 font-medium">
+                <button
+                  onClick={() => navigate('/inteligencia')}
+                  className="text-xs text-gray-400 hover:text-gray-700 flex-shrink-0 font-medium"
+                >
                   Ver →
                 </button>
               </div>
@@ -899,15 +906,19 @@ export default function DashboardPage() {
             <h2 className="text-sm font-semibold text-gray-900">Atividade Recente</h2>
           </div>
           <div className="space-y-3">
-            {feedItems.map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <span className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${item.dot}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-700 leading-relaxed">{item.text}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{item.time}</p>
+            {feedItems.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Nenhuma atividade ainda.</p>
+            ) : (
+              feedItems.map((item, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${item.dot}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-700 leading-relaxed">{item.text}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.time}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -917,7 +928,7 @@ export default function DashboardPage() {
 
       {/* ── Meritocracia + Próximas da Fila ───────────────────────────────── */}
       <CardMeritocracia />
-      <CardProximasFila />
+      <CardProximasFila reunioes={reunioesFila} />
 
       {/* ── Agentes + Campanhas ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

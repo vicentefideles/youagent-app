@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { campanhasApi, reunioesApi, claudeApi } from '@/services/api'
+import { campanhasApi, reunioesApi, ligacoesApi, claudeApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -234,6 +235,37 @@ interface MonitorIA {
 }
 
 function TabFila() {
+  const { data: filaData = [] } = useQuery({
+    queryKey: ['ligacoes'],
+    queryFn: () => ligacoesApi.list().then(r => (r.data as any[]).map(l => ({
+      id: String(l.id),
+      empresa: l.empresa_nome ?? l.empresa ?? '',
+      contato: l.contato_nome ?? l.contato ?? '',
+      cargo: l.cargo ?? '',
+      telefone: l.telefone ?? '',
+      agente: l.agente_nome ?? l.agente ?? '',
+      campanha: l.campanha_nome ?? l.campanha ?? '',
+      segmento: l.segmento ?? '',
+      status: (l.status ?? 'na_fila') as StatusLigacao,
+      icp: l.icp ?? 0,
+      potencial: l.potencial ?? 0,
+      tentativa: l.tentativa ?? 1,
+      maxTentativas: l.max_tentativas ?? 3,
+      duracao: l.duracao,
+      snippet: l.snippet,
+      gatilhoDetectado: l.gatilho_detectado,
+      transferindo: l.transferindo ?? false,
+    } as EntradaFila)))
+  })
+  const [fila, setFila] = useState<EntradaFila[]>([])
+
+  // Sync API data into local state (allows local mutations like pause/resume)
+  useEffect(() => {
+    if (filaData.length > 0) setFila(filaData)
+  }, [filaData])
+  const [filtroCampanha, setFiltroCampanha] = useState('')
+  const [filtroAgente, setFiltroAgente] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('')
   const [selecionados, setSelecionados] = useState<string[]>([])
   const [expandido, setExpandido] = useState<string | null>('1')
   const [scriptInput, setScriptInput] = useState<Record<string, string>>({})
@@ -266,7 +298,7 @@ function TabFila() {
 
   // Simula progresso de monitorIA para ligações ativas
   useEffect(() => {
-    const ativas = FILA.filter(l => l.status === 'em_ligacao')
+    const ativas = fila.filter(l => l.status === 'em_ligacao')
     setMonitorIA(prev => {
       const next = { ...prev }
       ativas.forEach(l => {
@@ -305,13 +337,19 @@ function TabFila() {
     return ms < 150 ? 'text-emerald-400' : ms < 300 ? 'text-amber-400' : 'text-red-400'
   }
 
-  const ativas = FILA.filter(l => l.status === 'em_ligacao').length
+  const filaFiltrada = fila.filter(f => {
+    if (filtroCampanha && !f.campanha.includes(filtroCampanha)) return false
+    if (filtroAgente && f.agente !== filtroAgente) return false
+    if (filtroStatus && f.status !== filtroStatus) return false
+    return true
+  })
+  const ativas = fila.filter(l => l.status === 'em_ligacao').length
 
   function toggleSel(id: string) {
     setSelecionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
   function toggleAll(checked: boolean) {
-    setSelecionados(checked ? FILA.map(f => f.id) : [])
+    setSelecionados(checked ? filaFiltrada.map(f => f.id) : [])
   }
   function injetarScript(id: string) {
     setScriptFeedback(prev => ({ ...prev, [id]: '✓ Frase enviada ao agente' }))
@@ -382,10 +420,16 @@ function TabFila() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <select className="input py-1.5 text-xs"><option>Todas as campanhas</option></select>
-            <select className="input py-1.5 text-xs"><option>Todos os agentes</option></select>
-            <select className="input py-1.5 text-xs">
-              <option>Todos os status</option><option>Em ligação</option><option>Na fila</option><option>Retornar</option><option>Agendado</option>
+            <select className="input py-1.5 text-xs" value={filtroCampanha} onChange={e => setFiltroCampanha(e.target.value)}>
+              <option value="">Todas as campanhas</option>
+              <option value="SP">SP</option><option value="MG">MG</option><option value="GO">GO</option><option value="RJ">RJ</option><option value="RS">RS</option><option value="PR">PR</option>
+            </select>
+            <select className="input py-1.5 text-xs" value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)}>
+              <option value="">Todos os agentes</option>
+              <option>Ana</option><option>Carlos</option><option>Julia</option><option>Rafael</option><option>Marcos</option>
+            </select>
+            <select className="input py-1.5 text-xs" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
+              <option value="">Todos os status</option><option value="em_ligacao">Em ligação</option><option value="na_fila">Na fila</option><option value="retornar">Retornar</option><option value="agendado">Agendado</option>
             </select>
             <button className="btn-primary text-xs py-1.5 gap-1.5"><Megaphone size={12}/> + Nova campanha</button>
           </div>
@@ -396,13 +440,31 @@ function TabFila() {
           <div className="flex items-center gap-3 px-4 py-2.5 bg-brand-50 border-b border-brand-200">
             <span className="text-xs font-bold text-brand-600">{selecionados.length} selecionado(s)</span>
             <div className="w-px h-4 bg-brand-300" />
-            {[
-              { label:'⏸ Pausar todos', cls:'border-brand-300 text-brand-700' },
-              { label:'▶ Retomar todos', cls:'border-emerald-300 text-emerald-700' },
-              { label:'⬆ Priorizar', cls:'border-amber-300 text-amber-700' },
-            ].map(b => (
-              <button key={b.label} className={clsx('text-xs font-semibold px-3 py-1.5 rounded-lg border bg-white transition-colors hover:opacity-80', b.cls)}>{b.label}</button>
-            ))}
+            <button
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border bg-white transition-colors hover:opacity-80 border-brand-300 text-brand-700"
+              onClick={() => {
+                setFila(prev => prev.map(f => selecionados.includes(f.id) ? { ...f, status: 'na_fila' as StatusLigacao } : f))
+                setSelecionados([])
+              }}
+            >⏸ Pausar todos</button>
+            <button
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border bg-white transition-colors hover:opacity-80 border-emerald-300 text-emerald-700"
+              onClick={() => {
+                setFila(prev => prev.map(f => selecionados.includes(f.id) ? { ...f, status: 'em_ligacao' as StatusLigacao } : f))
+                setSelecionados([])
+              }}
+            >▶ Retomar todos</button>
+            <button
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border bg-white transition-colors hover:opacity-80 border-amber-300 text-amber-700"
+              onClick={() => {
+                setFila(prev => {
+                  const sel = prev.filter(f => selecionados.includes(f.id))
+                  const rest = prev.filter(f => !selecionados.includes(f.id))
+                  return [...sel, ...rest]
+                })
+                setSelecionados([])
+              }}
+            >⬆ Priorizar</button>
             <button className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 bg-white">📋 Mover campanha</button>
             <button onClick={() => setSelecionados([])} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-200 text-red-600 bg-white hover:bg-red-50 transition-colors">Cancelar</button>
             <button onClick={() => setSelecionados([])} className="ml-auto text-xs text-gray-400 hover:text-gray-600"><X size={14}/></button>
@@ -411,14 +473,21 @@ function TabFila() {
 
         {/* Colunas */}
         <div className="grid grid-cols-[28px_2fr_1fr_1fr_1.4fr_90px] px-4 py-2 bg-gray-50 border-b border-gray-100">
-          <input type="checkbox" className="w-3.5 h-3.5 accent-indigo-500" onChange={e => toggleAll(e.target.checked)} checked={selecionados.length === FILA.length} />
+          <input type="checkbox" className="w-3.5 h-3.5 accent-indigo-500" onChange={e => toggleAll(e.target.checked)} checked={selecionados.length === filaFiltrada.length && filaFiltrada.length > 0} />
           {['Empresa / Contato','Agente · Campanha','Status','Inteligência em tempo real','Ações'].map(h => (
             <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
           ))}
         </div>
 
         {/* Linhas */}
-        {FILA.map(item => (
+        {filaFiltrada.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <PhoneCall size={32} className="mb-3 opacity-30" />
+            <p className="text-sm font-medium">Nenhuma ligação na fila</p>
+            <p className="text-xs mt-1">As chamadas aparecerão aqui quando os agentes estiverem ativos.</p>
+          </div>
+        )}
+        {filaFiltrada.map(item => (
           <div key={item.id}>
             <div
               className={clsx(
@@ -983,7 +1052,17 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModal; onClose: () =
         {/* Footer */}
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
           <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
-          <button onClick={onClose} className="btn-primary flex-1 justify-center">Salvar configurações</button>
+          <button
+            onClick={async () => {
+              try {
+                if (modal.campanhaId) {
+                  await campanhasApi.update(modal.campanhaId, { configuracoes_ia: cfg })
+                }
+              } catch (e) { console.error(e) }
+              onClose()
+            }}
+            className="btn-primary flex-1 justify-center"
+          >Salvar configurações</button>
         </div>
       </div>
     </div>
@@ -1152,10 +1231,25 @@ function ModalNovaCampanha({ open, onClose }: { open: boolean; onClose: () => vo
 // ─── ABA CAMPANHAS ───────────────────────────────────────────────────────────
 
 function TabCampanhas() {
-  const { data: campanhasReais = [] } = useQuery({
+  const { data: campanhasReaisRaw = [] } = useQuery({
     queryKey: ['campanhas'],
     queryFn: () => campanhasApi.list().then((r: any) => r.data),
   })
+  const campanhasReais = (campanhasReaisRaw as any[]).map(c => ({
+    id: String(c.id ?? c._id ?? ''),
+    nome: c.nome ?? c.name ?? '',
+    cor: c.cor ?? 'brand',
+    total: c.total ?? c.total_leads ?? 0,
+    feitas: c.feitas ?? c.ligacoes_feitas ?? 0,
+    faltam: c.faltam ?? c.ligacoes_restantes ?? 0,
+    conv: c.conv ?? c.taxa_conversao ?? '0%',
+    agendados: c.agendados ?? c.total_agendados ?? 0,
+    fila: c.fila ?? c.na_fila ?? 0,
+    consumo: c.consumo ?? c.percentual_consumido ?? 0,
+    alerta: c.alerta ?? null,
+    status: c.status ?? 'ativa',
+    agr: c.agr ?? c.agressividade ?? 'Média',
+  }))
 
   const [campStatus, setCampStatus] = useState<Record<string, string>>({ sp:'ativa', mg:'ativa', go:'pausada' })
   const [configModal, setConfigModal] = useState<ConfigIAModal>({ open: false, campanhaId: null, campanhaName: '' })
@@ -1449,6 +1543,35 @@ function TabAgendados() {
 
   const [resultados, setResultados] = useState<Record<string, string>>({})
   const [modalJornada, setModalJornada] = useState<Agendamento | null>(null)
+  const [etapaSelecionada, setEtapaSelecionada] = useState('Agendado')
+  const [valorOpor, setValorOpor] = useState('')
+  const [nota, setNota] = useState('')
+
+  const agendamentos: Agendamento[] = agendamentosReais.length > 0
+    ? agendamentosReais.map((r: any): Agendamento => ({
+        id: String(r.id ?? r._id ?? Math.random()),
+        empresa: r.empresa ?? r.empresa_nome ?? 'Reunião',
+        contato: r.contato ?? r.contato_nome ?? r.vendedor_nome ?? '—',
+        cargo: r.cargo ?? '',
+        telefone: r.telefone ?? '',
+        email: r.email ?? '',
+        modalidade: (r.modalidade ?? 'online') as Agendamento['modalidade'],
+        cidade: r.cidade,
+        cnpj: r.cnpj,
+        segmento: r.segmento,
+        resumoLigacao: r.resumo_ligacao ?? r.resumo ?? '',
+        agente: r.agente_nome ?? r.agente_id ?? r.agente ?? '—',
+        duracaoLigacao: r.duracao_ligacao ?? r.duracao ?? '',
+        dataHora: r.data_hora ?? (r.inicio ? new Date(r.inicio).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : ''),
+        meetLink: r.meet_link ?? r.meetLink,
+        vendedor: r.vendedor_nome ?? r.vendedor ?? '—',
+        vendedorIniciais: ((r.vendedor_nome ?? r.vendedor ?? 'VD') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2),
+        status: r.status ?? 'pendente',
+        noShowRisk: r.no_show_risk ?? r.noShowRisk ?? 0,
+        campanha: r.campanha_nome ?? r.campanha ?? '',
+        resultado: r.resultado,
+      }))
+    : AGENDAMENTOS
 
   return (
     <div className="flex flex-col gap-4">
@@ -1458,7 +1581,18 @@ function TabAgendados() {
         <div className="flex items-center gap-2">
           <select className="input py-1.5 text-xs"><option>Todas as campanhas</option></select>
           <select className="input py-1.5 text-xs"><option>Todos os vendedores</option></select>
-          <button className="btn-secondary gap-2 text-xs py-1.5"><Download size={12}/> Exportar CSV</button>
+          <button
+            className="btn-secondary gap-2 text-xs py-1.5"
+            onClick={() => {
+              const header = 'Empresa,Contato,Cargo,Data/Hora,Vendedor,Status,Campanha'
+              const rows = agendamentos.map((a: any) => `${a.empresa},${a.contato},${a.cargo ?? ''},${a.dataHora},${a.vendedor},${a.status},${a.campanha}`)
+              const csv = [header, ...rows].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob)
+              const el = document.createElement('a'); el.href = url; el.download = 'agendamentos.csv'; el.click()
+              URL.revokeObjectURL(url)
+            }}
+          ><Download size={12}/> Exportar CSV</button>
         </div>
       </div>
 
@@ -1481,7 +1615,14 @@ function TabAgendados() {
 
       {/* Cards */}
       <div className="flex flex-col gap-3">
-        {(agendamentosReais.length > 0 ? agendamentosReais.map((r: any) => ({ empresa: 'Reunião', contato: r.vendedor_nome ?? '—', horario: new Date(r.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), agente: r.agente_id ?? '—', status: 'confirmado' as const })) : AGENDAMENTOS).map((ag: any) => (
+        {agendamentos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <Calendar size={32} className="mb-3 opacity-30" />
+            <p className="text-sm font-medium">Nenhum agendamento encontrado</p>
+            <p className="text-xs mt-1">As reuniões agendadas pelos agentes aparecerão aqui.</p>
+          </div>
+        )}
+        {agendamentos.map((ag: any) => (
           <div key={ag.id} className={clsx('card border-l-4', ag.status === 'confirmado' ? 'border-l-brand-500' : ag.status === 'pendente' ? 'border-l-amber-500' : 'border-l-emerald-500')}>
             <div className="p-4">
               <div className="grid grid-cols-[2fr_1.2fr_1.2fr_1fr] gap-4 items-start">
@@ -1544,8 +1685,23 @@ function TabAgendados() {
                   {/* Botões extras para pendente */}
                   {ag.status === 'pendente' && (
                     <div className="flex flex-col gap-1">
-                      <button className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 bg-white transition-colors">✓ Aprovar</button>
-                      <button className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-brand-300 text-brand-700 hover:bg-brand-50 bg-white transition-colors">↔ Transferir vendedor</button>
+                      <button
+                        className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 bg-white transition-colors"
+                        onClick={() => {
+                          setResultados(r => ({ ...r, [ag.id]: 'aprovado' }))
+                          reunioesApi.update(ag.id, { status: 'confirmada' }).catch(console.error)
+                        }}
+                      >✓ Aprovar</button>
+                      <button
+                        className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-brand-300 text-brand-700 hover:bg-brand-50 bg-white transition-colors"
+                        onClick={() => {
+                          const v = prompt('Nome do vendedor:')
+                          if (v) {
+                            setResultados(r => ({ ...r, [ag.id]: 'transferido_' + v }))
+                            reunioesApi.update(ag.id, { vendedor: v }).catch(console.error)
+                          }
+                        }}
+                      >↔ Transferir vendedor</button>
                     </div>
                   )}
 
@@ -1615,22 +1771,33 @@ function TabAgendados() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1.5">Atualizar etapa</label>
-                  <select className="input">
+                  <select className="input" value={etapaSelecionada} onChange={e => setEtapaSelecionada(e.target.value)}>
                     <option>Agendado</option><option>Realizado</option><option>Negociação</option><option>Proposta</option><option>Fechado</option><option>Perdido</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1.5">Valor da oportunidade</label>
-                  <input className="input" placeholder="R$ 0,00" />
+                  <input className="input" placeholder="R$ 0,00" value={valorOpor} onChange={e => setValorOpor(e.target.value)} />
                 </div>
               </div>
               <div className="mb-4">
                 <label className="text-xs font-medium text-gray-500 block mb-1.5">Nota</label>
-                <textarea className="input min-h-[80px] resize-none" placeholder="Adicione uma nota sobre esta oportunidade..." />
+                <textarea className="input min-h-[80px] resize-none" placeholder="Adicione uma nota sobre esta oportunidade..." value={nota} onChange={e => setNota(e.target.value)} />
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setModalJornada(null)} className="btn-secondary flex-1">Cancelar</button>
-                <button className="btn-primary flex-1">Salvar etapa</button>
+                <button
+                  className="btn-primary flex-1"
+                  onClick={() => {
+                    if (modalJornada) {
+                      reunioesApi.update(modalJornada.id, { etapa: etapaSelecionada, valor_oportunidade: valorOpor, nota }).catch(console.error)
+                    }
+                    setModalJornada(null)
+                    setEtapaSelecionada('Agendado')
+                    setValorOpor('')
+                    setNota('')
+                  }}
+                >Salvar etapa</button>
               </div>
             </div>
           </div>
@@ -1644,8 +1811,17 @@ function TabAgendados() {
 
 function TabGravacoes() {
   const [playing, setPlaying] = useState<string | null>(null)
+  const [progresso, setProgresso] = useState(0)
   const [treinadas, setTreinadas] = useState<Set<string>>(new Set())
   const [treinadaFeedback, setTreinadaFeedback] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!playing) { setProgresso(0); return }
+    const timer = setInterval(() => {
+      setProgresso(p => p >= 100 ? 100 : p + 1)
+    }, 300)
+    return () => clearInterval(timer)
+  }, [playing])
   const resultadoLabel = { agendou:'Agendou', retornar:'Retornar', nao_atendeu:'Não atendeu' } as const
   const resultadoCls = { agendou:'badge-success', retornar:'badge-amber', nao_atendeu:'badge-neutral' } as const
 
@@ -1721,7 +1897,7 @@ function TabGravacoes() {
           <div className="flex-1 flex items-center gap-3">
             <span className="text-2xs text-gray-400 font-mono w-10">0:00</span>
             <div className="flex-1 h-1.5 bg-gray-700 rounded-full cursor-pointer">
-              <div className="h-full w-[35%] bg-brand-500 rounded-full" />
+              <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${progresso}%` }} />
             </div>
             <span className="text-2xs text-gray-400 font-mono w-10">{GRAVACOES.find(g => g.id === playing)?.duracao}</span>
           </div>
@@ -1950,6 +2126,7 @@ function TabManual() {
 // ─── ABA AGENDA ──────────────────────────────────────────────────────────────
 
 function TabAgenda() {
+  const navigate = useNavigate()
   const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string } | null>(null)
   const horas = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00']
   const dias = ['Seg 05','Ter 06','Qua 07','Qui 08','Sex 09']
@@ -1988,7 +2165,10 @@ function TabAgenda() {
               </div>
             ))}
           </div>
-          <button className="btn-secondary text-xs py-1.5 gap-1.5"><Calendar size={12}/> Sync Google Agenda</button>
+          <button
+            className="btn-secondary text-xs py-1.5 gap-1.5"
+            onClick={() => navigate('/config', { state: { tab: 'integracoes' } })}
+          ><Calendar size={12}/> Sync Google Agenda</button>
         </div>
       </div>
 
@@ -2090,7 +2270,8 @@ function TabAgenda() {
 
 // ─── ABA AO VIVO ─────────────────────────────────────────────────────────────
 
-function TabAoVivo() {
+function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
+  const [transferidos, setTransferidos] = useState<Record<string, string>>({})
   const ativas = FILA.filter(l => l.status === 'em_ligacao')
 
   return (
@@ -2150,8 +2331,17 @@ function TabAoVivo() {
                 </div>
               )}
               <div className="px-4 pb-4 flex gap-2">
-                <button className="flex-1 text-xs font-semibold py-2 rounded-lg bg-purple-900/50 border border-purple-700 text-purple-300 hover:bg-purple-800/50 transition-colors">⚡ Transferir agora</button>
-                <button className="flex-1 text-xs font-semibold py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors">🎧 Escutar</button>
+                <button
+                  className="flex-1 text-xs font-semibold py-2 rounded-lg bg-purple-900/50 border border-purple-700 text-purple-300 hover:bg-purple-800/50 transition-colors"
+                  onClick={() => {
+                    const v = (item as EntradaFila & { vendedor?: string }).vendedor ?? TRANSFER_CANDIDATES.find(tc => tc.status === 'disponivel')?.nome ?? 'Vendedor'
+                    setTransferidos(prev => ({ ...prev, [item.id]: v }))
+                  }}
+                >{transferidos[item.id] ? `✓ Transferindo → ${transferidos[item.id]}` : '⚡ Transferir agora'}</button>
+                <button
+                  className="flex-1 text-xs font-semibold py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
+                  onClick={() => onGoFila?.(item.id)}
+                >🎧 Escutar</button>
               </div>
             </div>
           ))}
@@ -2192,7 +2382,18 @@ function TabHistorico() {
           <select className="input py-1.5 text-xs" id="hist-filtro-campanha"><option>Todas as campanhas</option></select>
           <select className="input py-1.5 text-xs" id="hist-filtro-agente"><option>Todos os agentes</option></select>
         </div>
-        <button className="btn-secondary gap-2 text-xs py-1.5"><Download size={12}/> Exportar CSV</button>
+        <button
+          className="btn-secondary gap-2 text-xs py-1.5"
+          onClick={() => {
+            const header = 'Empresa,Contato,Telefone,Agente,Data,Duração,Resultado,ICP,Campanha'
+            const rows = HISTORICO.map(h => `${h.empresa},${h.contato},${h.telefone},${h.agente},${h.data},${h.duracao},${h.resultado},${h.icp},${h.campanha}`)
+            const csv = [header, ...rows].join('\n')
+            const blob = new Blob([csv], { type: 'text/csv' })
+            const url = URL.createObjectURL(blob)
+            const el = document.createElement('a'); el.href = url; el.download = 'historico.csv'; el.click()
+            URL.revokeObjectURL(url)
+          }}
+        ><Download size={12}/> Exportar CSV</button>
       </div>
 
       {/* KPIs do período */}
@@ -2243,7 +2444,10 @@ function TabHistorico() {
                 h.resultado.includes('Não') ? 'badge-amber' : 'badge-danger'
               )}>{h.resultado}</span>
               <div className="flex gap-1.5">
-                <button className="text-2xs text-brand-600 hover:text-brand-700 font-medium">Transcrição</button>
+                <button
+                  className="text-2xs text-brand-600 hover:text-brand-700 font-medium"
+                  onClick={() => alert('Transcrição:\n' + ((h as any).transcricao || 'Não disponível'))}
+                >Transcrição</button>
               </div>
             </div>
           ))}
@@ -2767,7 +2971,7 @@ export default function DiscadoraPage() {
       {activeTab === 'gravacoes' && <TabGravacoes />}
       {activeTab === 'manual'    && <TabManual />}
       {activeTab === 'agenda'    && <TabAgenda />}
-      {activeTab === 'aovivo'    && <TabAoVivo />}
+      {activeTab === 'aovivo'    && <TabAoVivo onGoFila={() => setActiveTab('fila')} />}
       {activeTab === 'historico' && <TabHistorico />}
       {activeTab === 'ramal'      && <TabRamal />}
       {activeTab === 'reativacao' && <TabReativacao />}

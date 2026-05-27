@@ -102,13 +102,6 @@ const ICP_SEMANAS = [
   { sem:'Atual', val:84, alt:84, cor:'bg-emerald-100', borda:'border-t-emerald-500 border-t-[3px]', destaque:true },
 ]
 
-const FUNIL_ETAPAS = [
-  { label:'Discadas',      valor:1284, altura:160, cor:'bg-brand-500',  txtCor:'text-gray-900' },
-  { label:'Atendidas',     valor:821,  altura:102, cor:'bg-brand-400',  txtCor:'text-gray-900' },
-  { label:'Qualificadas',  valor:312,  altura:39,  cor:'bg-amber-500',  txtCor:'text-gray-900' },
-  { label:'Gatilho IA',    valor:89,   altura:11,  cor:'bg-purple-500', txtCor:'text-gray-900' },
-  { label:'Agendados',     valor:47,   altura:6,   cor:'bg-emerald-500',txtCor:'text-emerald-600' },
-]
 
 const PIPELINE_POS = [
   { label:'Agendadas',  valor:87, altura:120, cor:'bg-brand-500' },
@@ -118,6 +111,19 @@ const PIPELINE_POS = [
   { label:'Fechado',    valor:9,  altura:13,  cor:'bg-emerald-600' },
   { label:'Perdido',    valor:14, altura:19,  cor:'bg-red-400' },
 ]
+
+// ─── CSV HELPER ──────────────────────────────────────────────────────────────
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ─── HELPERS DE UI ───────────────────────────────────────────────────────────
 
@@ -355,7 +361,16 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
             <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2"><Phone size={14}/>Status de rechamada — tentativas por contato</h3>
             <p className="text-xs text-gray-500 mt-0.5">Distribuição de quantas tentativas foram feitas para os contatos da campanha ativa</p>
           </div>
-          <button className="btn-secondary text-xs py-1.5"><Download size={11}/> Exportar</button>
+          <button
+            className="btn-secondary text-xs py-1.5"
+            onClick={() => downloadCsv('rechamadas.csv', [
+              ['Tentativa','Contatos','Observação'],
+              ['1ª tentativa','312','aguardando resposta'],
+              ['2ª tentativa','187','sem resposta na 1ª'],
+              ['3ª tentativa (última)','94','última chance antes do descarte'],
+              ['Descartados','95','aguardando reprocessamento'],
+            ])}
+          ><Download size={11}/> Exportar</button>
         </div>
         <div className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -427,7 +442,16 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
               <h3 className="text-sm font-semibold text-gray-900">🎯 Score de Propensão vs Conversão Real</h3>
               <p className="text-xs text-gray-500 mt-0.5">O sistema acertou? Previsão x resultado das últimas 4 semanas</p>
             </div>
-            <button className="btn-secondary text-xs py-1.5"><Download size={11}/></button>
+            <button
+              className="btn-secondary text-xs py-1.5"
+              onClick={() => downloadCsv('score-vs-conversao.csv', [
+                ['Semana','Score Previsto (%)','Conversão Real (%)'],
+                ['Sem. 1','65','58'],
+                ['Sem. 2','78','71'],
+                ['Sem. 3','87','83'],
+                ['Sem. 4','93','89'],
+              ])}
+            ><Download size={11}/></button>
           </div>
           <div className="p-4">
             <div className="flex items-end gap-3 h-28 mb-3 px-1">
@@ -463,7 +487,13 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
               <h3 className="text-sm font-semibold text-gray-900">⏰ Timing Previsto vs Horário Real</h3>
               <p className="text-xs text-gray-500 mt-0.5">Validação da inteligência de horários por ramo</p>
             </div>
-            <button className="btn-secondary text-xs py-1.5"><Download size={11}/></button>
+            <button
+              className="btn-secondary text-xs py-1.5"
+              onClick={() => downloadCsv('timing-ramos.csv', [
+                ['Ramo','Janela prevista','Acerto (%)'],
+                ...TIMING_RAMOS.map(r => [r.ramo, r.janela, String(r.acerto)]),
+              ])}
+            ><Download size={11}/></button>
           </div>
           <div className="px-4">
             {TIMING_RAMOS.map((r, i) => (
@@ -489,7 +519,13 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
               <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><Link2 size={13}/> Impacto do Aprendizado Cross-Cliente</h3>
               <p className="text-xs text-gray-500 mt-0.5">O que veio de outros clientes e gerou resultado aqui</p>
             </div>
-            <button className="btn-secondary text-xs py-1.5"><Download size={11}/></button>
+            <button
+              className="btn-secondary text-xs py-1.5"
+              onClick={() => downloadCsv('cross-cliente.csv', [
+                ['Insight','Meta','Delta'],
+                ...CROSS_CLIENTE.map(c => [c.titulo, c.meta, c.delta]),
+              ])}
+            ><Download size={11}/></button>
           </div>
           <div className="px-4">
             {CROSS_CLIENTE.map((c, i) => (
@@ -514,7 +550,13 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
               <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><FlaskConical size={13}/> Relatório do Simulador</h3>
               <p className="text-xs text-gray-500 mt-0.5">Versões testadas antes de chegar ao cliente real</p>
             </div>
-            <button className="btn-secondary text-xs py-1.5"><Download size={11}/></button>
+            <button
+              className="btn-secondary text-xs py-1.5"
+              onClick={() => downloadCsv('simulador.csv', [
+                ['Versão','Data','Score','Objeções','Status'],
+                ...SIMULADOR.map(s => [s.ver, s.data, s.score, s.objecoes, s.status]),
+              ])}
+            ><Download size={11}/></button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -548,7 +590,13 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
             <h3 className="text-sm font-semibold text-gray-900">💰 Seu ROI com o ETZ — o que a plataforma te economizou este mês</h3>
             <p className="text-xs text-gray-500 mt-0.5">Cada melhoria no Centro de Inteligência reflete diretamente no custo por reunião e na sua economia total</p>
           </div>
-          <button className="btn-secondary text-xs py-1.5"><Download size={11}/> Exportar relatório ROI</button>
+          <button
+            className="btn-secondary text-xs py-1.5"
+            onClick={() => downloadCsv('roi-detalhado.csv', [
+              ['Mês','Custo por reunião','Valor'],
+              ...ROI_TIMELINE.map(t => [t.mes, String(t.valor), String(t.altura)]),
+            ])}
+          ><Download size={11}/> Exportar relatório ROI</button>
         </div>
 
         <div className="p-4">
@@ -1064,7 +1112,7 @@ export default function RelatoriosPage() {
     queryFn: () => relatoriosApi.get().then(r => r.data),
   })
 
-  const agentesTabela = (relData?.agentes_tabela?.length > 0) ? relData.agentes_tabela : AGENTES_TABELA
+  const agentesTabela = relData?.agentes_tabela ?? []
 
   // heatmap from API is [7][24]; convert to the HEATMAP_ROWS shape used by the renderer
   const HORAS_LABEL = ['08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h']
@@ -1077,11 +1125,11 @@ export default function RelatoriosPage() {
       }))
     : HEATMAP_ROWS
 
-  const funilEtapas = (relData?.funil?.length > 0)
+  const funilEtapas = relData?.funil
     ? relData.funil.map((f: { etapa: string; valor: number; perc: number }) => ({ label: f.etapa, valor: f.valor, altura: f.valor, cor: 'bg-brand-500', txtCor: 'text-gray-900' }))
-    : FUNIL_ETAPAS
+    : []
 
-  const campanhasComp = (relData?.campanhas_comp?.length > 0) ? relData.campanhas_comp : CAMPANHAS_COMP
+  const campanhasComp = relData?.campanhas_comp ?? []
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id:'performance', label:'Performance',         icon:<BarChart3 size={14}/> },
@@ -1116,7 +1164,13 @@ export default function RelatoriosPage() {
             <option>Carlos</option>
             <option>Julia</option>
           </select>
-          <button className="btn-secondary text-xs py-1.5"><Download size={12}/> Exportar CSV</button>
+          <button
+            className="btn-secondary text-xs py-1.5"
+            onClick={() => downloadCsv('relatorio-agentes.csv', [
+              ['Agente','Ligações','Atendidas','Atend%','Agendadas','Conversão','Rechamadas','Descartados'],
+              ...agentesTabela.map((ag: Record<string, unknown>) => [String(ag.nome), String(ag.ligacoes), String(ag.atendidas), String(ag.atendPerc), String(ag.agendadas), String(ag.conv), `${ag.rechFeitas}/${ag.rechTotal}`, String(ag.descartados)]),
+            ])}
+          ><Download size={12}/> Exportar CSV</button>
           <button className="btn-primary text-xs py-1.5"><FileText size={12}/> Exportar PDF</button>
         </div>
       </div>

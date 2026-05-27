@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DollarSign, Save, Calculator, TrendingUp, CheckCircle } from 'lucide-react'
+import { api } from '@/services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ function CustosTab() {
   const [cambio, setCambio] = useState(5.75)
   const [desconto, setDesconto] = useState(0)
   const [salvo, setSalvo] = useState(false)
+  const [salvando, setSalvando] = useState(false)
 
   function updateCusto(id: string, value: number) {
     setCustos(prev => prev.map(c => c.id === id ? { ...c, custo: value } : c))
@@ -85,9 +87,20 @@ function CustosTab() {
   const custosFixos = (supabase ? custoEmBrl(supabase) : 0) + (servidor ? custoEmBrl(servidor) : 0)
   const custoEstimadoMes = custoMinutoBase * 50000 + custosFixos // 50k minutos/mês estimado
 
-  function salvarCustos() {
-    setSalvo(true)
-    setTimeout(() => setSalvo(false), 2000)
+  async function salvarCustos() {
+    setSalvando(true)
+    try {
+      await api.post('/admin/custos', { custos, cambio, desconto })
+      setSalvo(true)
+      setTimeout(() => setSalvo(false), 2000)
+    } catch {
+      // fallback: salva localmente
+      localStorage.setItem('admin_custos', JSON.stringify({ custos, cambio, desconto }))
+      setSalvo(true)
+      setTimeout(() => setSalvo(false), 2000)
+    } finally {
+      setSalvando(false)
+    }
   }
 
   return (
@@ -141,10 +154,11 @@ function CustosTab() {
           <span className="text-xs text-gray-400">Atualizado manualmente</span>
           <button
             onClick={salvarCustos}
-            className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-colors ${salvo ? 'bg-emerald-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            disabled={salvando}
+            className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-colors disabled:opacity-60 ${salvo ? 'bg-emerald-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
             {salvo ? <CheckCircle className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-            {salvo ? 'Salvo!' : 'Salvar custos'}
+            {salvando ? 'Salvando...' : salvo ? '✓ Salvo' : 'Salvar custos'}
           </button>
         </div>
       </div>

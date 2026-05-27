@@ -1,12 +1,15 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { ExternalLink, Calendar, CheckCircle, ChevronDown } from 'lucide-react'
+import { reunioesApi } from '@/services/api'
 
 type TabId = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens'
 type ResultadoKey = 'fechou' | 'reagendou' | 'perdeu' | 'noshow'
 type MsgSubTab = 'recebidas' | 'enviadas'
 
 interface Reuniao {
-  id: number
+  id: string
   empresa: string
   contato: string
   cargo: string
@@ -21,60 +24,6 @@ interface Reuniao {
   sinais: string[]
   sugestao: string
 }
-
-const mockReunioes: Reuniao[] = [
-  {
-    id: 0,
-    empresa: 'Acme Corp',
-    contato: 'João Alves',
-    cargo: 'CEO',
-    campanha: 'campanha_a',
-    data: '23/05 - 14h00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 82,
-    status: 'Confirmada',
-    link: 'meet.google.com/abc-defg-hij',
-    agente: 'Ana',
-    sinais: ['urgência', 'proposta', 'decisor'],
-    sugestao:
-      'Aborde o ROI desde o início — empresa tem orçamento disponível e decisor validado. Reforce resultado com cliente similar no mesmo segmento.',
-  },
-  {
-    id: 1,
-    empresa: 'Delta Ind.',
-    contato: 'Maria Santos',
-    cargo: 'Gerente Comercial',
-    campanha: 'campanha_b',
-    data: '24/05 - 10h30',
-    modalidade: 'Presencial',
-    vendedor: 'Carlos Mendes',
-    icp: 71,
-    status: 'Pendente',
-    link: '—',
-    agente: 'Carlos',
-    sinais: ['preço', 'humano'],
-    sugestao:
-      'Contato mencionou orçamento restrito. Apresente caso de empresa similar no mesmo porte e priorize o argumento de ROI em 90 dias.',
-  },
-  {
-    id: 2,
-    empresa: 'Tech Sul',
-    contato: 'Roberto Lima',
-    cargo: 'Sócio',
-    campanha: 'campanha_a',
-    data: '22/05 - 15h00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 88,
-    status: 'Realizada',
-    link: 'meet.google.com/xyz-uvwx-rst',
-    agente: 'Ana',
-    sinais: ['proposta', 'decisor', 'demo'],
-    sugestao:
-      'Alto ICP. Contato solicitou proposta comercial detalhada com projeção de volume. Enviar proposta em até 24h.',
-  },
-]
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,17 +95,20 @@ function StatusBadge({ status }: { status: Reuniao['status'] }) {
 // ─── TabAgenda ────────────────────────────────────────────────────────────────
 
 function TabAgenda({
+  reunioes,
   vendedorFiltro,
   onVerFicha,
   onVerResultado,
 }: {
+  reunioes: Reuniao[]
   vendedorFiltro: string
   onVerFicha: (r: Reuniao) => void
   onVerResultado: (r: Reuniao) => void
 }) {
   const [filtroStatus, setFiltroStatus] = useState('')
+  const navigate = useNavigate()
 
-  const reunioesFiltradas = mockReunioes.filter((r) => {
+  const reunioesFiltradas = reunioes.filter((r) => {
     const matchVendedor = vendedorFiltro === 'todos' || r.vendedor.toLowerCase().includes(vendedorFiltro)
     const matchStatus =
       filtroStatus === '' ||
@@ -239,7 +191,10 @@ function TabAgenda({
                   >
                     Resultado
                   </button>
-                  <button className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
+                  <button
+                    onClick={() => navigate('/email', { state: { contato: r.contato } })}
+                    className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
                     E-mail
                   </button>
                 </div>
@@ -358,8 +313,23 @@ function TabFicha({ fichaData }: { fichaData: Reuniao | null }) {
 
 // ─── TabResultados ────────────────────────────────────────────────────────────
 
-function TabResultados({ highlightId }: { highlightId: number | null }) {
-  const [resultados, setResultados] = useState<Record<number, ResultadoKey>>({})
+function TabResultados({
+  reunioes,
+  highlightId,
+}: {
+  reunioes: Reuniao[]
+  highlightId: string | null
+}) {
+  const [resultados, setResultados] = useState<Record<string, ResultadoKey>>({})
+
+  async function handleRegistrarResultado(reuniaoId: string, resultado: ResultadoKey) {
+    setResultados((prev) => ({ ...prev, [reuniaoId]: resultado }))
+    try {
+      await reunioesApi.update(reuniaoId, { resultado })
+    } catch (e) {
+      console.error('Erro ao salvar resultado:', e)
+    }
+  }
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -374,44 +344,51 @@ function TabResultados({ highlightId }: { highlightId: number | null }) {
       </div>
 
       <div className="divide-y divide-gray-100">
-        {mockReunioes.map((r) => (
-          <div
-            key={r.id}
-            className={`px-5 py-4 flex items-center gap-4 transition-colors ${highlightId === r.id ? 'bg-blue-50 ring-1 ring-blue-200 ring-inset' : ''}`}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-gray-900 text-sm">
-                {r.empresa}
-                {highlightId === r.id && (
-                  <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded">
-                    Selecionada
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {r.contato} · {r.data}
-              </div>
-            </div>
-
-            {resultados[r.id] ? (
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${resultadoColor[resultados[r.id]]}`}>
-                {resultadoLabel[resultados[r.id]]}
-              </span>
-            ) : (
-              <div className="flex gap-2 flex-wrap justify-end">
-                {(['fechou', 'reagendou', 'perdeu', 'noshow'] as ResultadoKey[]).map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => setResultados((prev) => ({ ...prev, [r.id]: k }))}
-                    className={`px-3 py-1.5 text-xs font-medium border rounded-md transition-all hover:opacity-80 ${resultadoColor[k]}`}
-                  >
-                    {resultadoLabel[k]}
-                  </button>
-                ))}
-              </div>
-            )}
+        {reunioes.length === 0 ? (
+          <div className="py-16 text-center text-gray-400">
+            <div className="text-4xl mb-3">✅</div>
+            <div className="text-sm font-medium">Nenhuma reunião para registrar</div>
           </div>
-        ))}
+        ) : (
+          reunioes.map((r) => (
+            <div
+              key={r.id}
+              className={`px-5 py-4 flex items-center gap-4 transition-colors ${highlightId === r.id ? 'bg-blue-50 ring-1 ring-blue-200 ring-inset' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-gray-900 text-sm">
+                  {r.empresa}
+                  {highlightId === r.id && (
+                    <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded">
+                      Selecionada
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {r.contato} · {r.data}
+                </div>
+              </div>
+
+              {resultados[r.id] ? (
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${resultadoColor[resultados[r.id]]}`}>
+                  {resultadoLabel[resultados[r.id]]}
+                </span>
+              ) : (
+                <div className="flex gap-2 flex-wrap justify-end">
+                  {(['fechou', 'reagendou', 'perdeu', 'noshow'] as ResultadoKey[]).map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => handleRegistrarResultado(r.id, k)}
+                      className={`px-3 py-1.5 text-xs font-medium border rounded-md transition-all hover:opacity-80 ${resultadoColor[k]}`}
+                    >
+                      {resultadoLabel[k]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -800,7 +777,29 @@ export default function VendedorPage() {
   const [activeTab, setActiveTab] = useState<TabId>('agenda')
   const [vendedor, setVendedor] = useState('todos')
   const [fichaData, setFichaData] = useState<Reuniao | null>(null)
-  const [highlightResultadoId, setHighlightResultadoId] = useState<number | null>(null)
+  const [highlightResultadoId, setHighlightResultadoId] = useState<string | null>(null)
+
+  const { data: rawReunioes = [] } = useQuery({
+    queryKey: ['reunioes'],
+    queryFn: () => reunioesApi.list().then(r => r.data as any[]),
+  })
+
+  const reunioesData: Reuniao[] = rawReunioes.map(r => ({
+    id: String(r.id ?? ''),
+    empresa: r.empresa_nome ?? r.empresa ?? '',
+    contato: r.contato_nome ?? r.contato ?? '',
+    cargo: r.cargo ?? '',
+    campanha: r.campanha_nome ?? r.campanha ?? '',
+    data: r.inicio ? new Date(r.inicio).toLocaleDateString('pt-BR') : '',
+    modalidade: r.modalidade ?? 'online',
+    vendedor: r.vendedor_nome ?? r.vendedor ?? '',
+    icp: r.icp ?? 0,
+    status: r.status ?? 'Pendente',
+    link: r.meet_link ?? r.link ?? '',
+    agente: r.agente_nome ?? r.agente ?? '',
+    sinais: r.sinais ?? [],
+    sugestao: r.sugestao ?? '',
+  }))
 
   function handleVerFicha(r: Reuniao) {
     setFichaData(r)
@@ -874,10 +873,17 @@ export default function VendedorPage() {
       {/* Tab content */}
       <div>
         {activeTab === 'agenda' && (
-          <TabAgenda vendedorFiltro={vendedor} onVerFicha={handleVerFicha} onVerResultado={handleVerResultado} />
+          <TabAgenda
+            reunioes={reunioesData}
+            vendedorFiltro={vendedor}
+            onVerFicha={handleVerFicha}
+            onVerResultado={handleVerResultado}
+          />
         )}
         {activeTab === 'ficha' && <TabFicha fichaData={fichaData} />}
-        {activeTab === 'resultados' && <TabResultados highlightId={highlightResultadoId} />}
+        {activeTab === 'resultados' && (
+          <TabResultados reunioes={reunioesData} highlightId={highlightResultadoId} />
+        )}
         {activeTab === 'email' && <TabEmail />}
         {activeTab === 'gcal' && <TabGcal />}
         {activeTab === 'mensagens' && <TabMensagens />}

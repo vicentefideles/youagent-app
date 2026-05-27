@@ -186,14 +186,20 @@ export default function CheckoutPage() {
     return raw
   }
 
-  function handleConfirmar() {
+  async function handleConfirmar() {
     setProcessando(true)
     setStatusMsg('Validando dados...')
+
+    // TODO: integrar Stripe/gateway de pagamento real
+    // Quando disponível: await planosApi.assinar({ plano, numAgentes, frequencia, forma, cartao })
+
     setTimeout(() => setStatusMsg('Aprovando...'), 1000)
     setTimeout(() => setStatusMsg('Ativando conta...'), 2000)
     setTimeout(() => {
       setProcessando(false)
       setConfirmado(true)
+      // Navega automaticamente após exibir confirmação por 2 segundos
+      setTimeout(() => navigate('/documentos'), 2000)
     }, 3000)
   }
 

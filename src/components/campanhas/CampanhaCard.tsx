@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Upload, Brain, MoreHorizontal, Zap, Target,
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
-import { claudeApi } from '@/services/api'
+import { claudeApi, campanhasApi } from '@/services/api'
 
 interface Props {
   campanha: Campanha
@@ -14,6 +15,7 @@ interface Props {
   onIniciar: (id: string) => void
   onImportar: (campanha: Campanha) => void
   onVerFila: (campanha: Campanha) => void
+  onEditar?: (campanha: Campanha) => void
 }
 
 const TIPO_LABELS: Record<string, string> = {
@@ -50,7 +52,8 @@ interface HorarioSugestao {
   melhores_horarios?: string[]
 }
 
-export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar, onVerFila }: Props) {
+export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar, onVerFila, onEditar }: Props) {
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [iaAberta, setIaAberta] = useState(false)
   const [analisando, setAnalisando] = useState(false)
@@ -183,7 +186,27 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                                 rounded-xl shadow-popup py-1 w-44 animate-fade-in">
                   {['Editar', 'Duplicar', 'Arquivar', 'Excluir'].map((op) => (
                     <button key={op}
-                            onClick={() => setMenuOpen(false)}
+                            onClick={() => {
+                              setMenuOpen(false)
+                              if (op === 'Editar') {
+                                if (onEditar) onEditar(campanha)
+                                else navigate('/campanhas?edit=' + campanha.id)
+                              } else if (op === 'Duplicar') {
+                                campanhasApi.create({ ...campanha, nome: campanha.nome + ' (cópia)', status: 'pausada' })
+                                  .then(() => window.location.reload())
+                                  .catch(console.error)
+                              } else if (op === 'Arquivar') {
+                                campanhasApi.update(campanha.id, { status: 'arquivada' })
+                                  .then(() => window.location.reload())
+                                  .catch(console.error)
+                              } else if (op === 'Excluir') {
+                                if (confirm('Excluir campanha ' + campanha.nome + '?')) {
+                                  campanhasApi.update(campanha.id, { status: 'excluida' })
+                                    .then(() => window.location.reload())
+                                    .catch(console.error)
+                                }
+                              }
+                            }}
                             className={clsx(
                               'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors',
                               op === 'Excluir' ? 'text-red-600' : 'text-gray-700'
@@ -259,7 +282,10 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
         >
           <Brain size={13} /> IA
         </button>
-        <button className="btn-secondary flex-1 text-xs py-2 gap-1.5">
+        <button
+          className="btn-secondary flex-1 text-xs py-2 gap-1.5"
+          onClick={() => navigate('/discadora?campanha=' + campanha.id)}
+        >
           <CheckCircle2 size={13} /> Leads
         </button>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Building2,
   TrendingUp,
@@ -454,6 +455,7 @@ function TabPipeline() {
 // ─── Tab: Ativos ──────────────────────────────────────────────────────────────
 
 function TabAtivos() {
+  const navigate = useNavigate()
   const total = mockAtivos.length
   const mrrTotal = mockAtivos.reduce((acc, c) => acc + c.mrr, 0)
   const saudaveis = mockAtivos.filter((c) => c.status === 'Saudável').length
@@ -498,11 +500,17 @@ function TabAtivos() {
               <Td className="text-gray-500 text-xs">{formatDate(c.proximaRenovacao)}</Td>
               <Td>
                 <div className="flex items-center gap-2">
-                  <button className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium transition-colors">
+                  <button
+                    onClick={() => navigate('/admin/clientes?id=' + c.id)}
+                    className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium transition-colors"
+                  >
                     <Eye size={13} />
                     Detalhes
                   </button>
-                  <button className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors">
+                  <button
+                    onClick={() => navigate('/admin/suporte')}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                  >
                     <HeadphonesIcon size={13} />
                     Suporte
                   </button>
@@ -560,7 +568,15 @@ function TabContratos() {
               <Td className="text-gray-500 text-xs">{formatDate(c.termino)}</Td>
               <Td><ContratoStatusBadge status={c.status} /></Td>
               <Td>
-                <button className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors">
+                <button
+                  onClick={() => {
+                    const texto = `Contrato ${c.id}\nEmpresa: ${c.empresa}\nPlano: ${c.plano}\nValor: R$ ${c.valor}`
+                    const blob = new Blob([texto], { type: 'text/plain' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a'); a.href = url; a.download = `contrato-${c.id}.txt`; a.click()
+                  }}
+                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                >
                   <Download size={13} />
                   Download
                 </button>
@@ -668,7 +684,10 @@ function TabCampanhas() {
                 />
               </Td>
               <Td>
-                <button className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium transition-colors">
+                <button
+                  onClick={() => window.alert('Campanha: ' + c.nome + '\nStatus: ' + c.status + '\nEnviados: ' + c.enviados + '\nAbertos: ' + c.abertos + '\nTaxa: ' + c.taxa + '%')}
+                  className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium transition-colors"
+                >
                   <Eye size={13} />
                   Ver
                 </button>
@@ -738,12 +757,13 @@ function MktTipoBadge({ tipo }: { tipo: MktCampanha['tipo'] }) {
 function TabMarketing() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<MktCampanhaForm>({ nome: '', tipo: 'Email', segmento: '', template: '', agendamento: '' })
+  const [mktCampanhas, setMktCampanhas] = useState<MktCampanha[]>(mockMktCampanhas)
 
-  const campanhasAtivas = mockMktCampanhas.filter(c => c.status === 'Ativa').length
-  const totalEnviados = mockMktCampanhas.reduce((a, c) => a + c.enviados, 0)
-  const totalAbertos = mockMktCampanhas.reduce((a, c) => a + c.abertos, 0)
+  const campanhasAtivas = mktCampanhas.filter(c => c.status === 'Ativa').length
+  const totalEnviados = mktCampanhas.reduce((a, c) => a + c.enviados, 0)
+  const totalAbertos = mktCampanhas.reduce((a, c) => a + c.abertos, 0)
   const taxaAbertura = totalEnviados > 0 ? Math.round((totalAbertos / totalEnviados) * 100) : 0
-  const totalConvertidos = mockMktCampanhas.reduce((a, c) => a + c.convertidos, 0)
+  const totalConvertidos = mktCampanhas.reduce((a, c) => a + c.convertidos, 0)
 
   return (
     <div className="space-y-6">
@@ -778,7 +798,7 @@ function TabMarketing() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {mockMktCampanhas.map(c => (
+              {mktCampanhas.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <Td><p className="font-medium text-gray-900">{c.nome}</p></Td>
                   <Td><MktTipoBadge tipo={c.tipo} /></Td>
@@ -836,7 +856,15 @@ function TabMarketing() {
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Criar campanha</button>
+              <button
+                onClick={() => {
+                  const nova: MktCampanha = { id: Date.now(), nome: form.nome || 'Nova campanha', tipo: form.tipo, segmento: form.segmento || '—', enviados: 0, abertos: 0, convertidos: 0, status: 'Rascunho' }
+                  setMktCampanhas(prev => [nova, ...prev])
+                  setShowModal(false)
+                  setForm({ nome: '', tipo: 'Email', segmento: '', template: '', agendamento: '' })
+                }}
+                className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >Criar campanha</button>
             </div>
           </div>
         </div>

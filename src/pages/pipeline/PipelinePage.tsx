@@ -72,26 +72,6 @@ function calcProb(etapa: string): number {
   )
 }
 
-// ─── Mock data (fallback / demo) ──────────────────────────────────────────────
-
-const INITIAL_DEALS: Deal[] = [
-  { id: '1',  empresa: 'Nexus Soluções',     contato: 'Rafael Lima',     valor: 1200,  etapa: 'Lead',        probabilidade: 15,  responsavel: 'Ana',   data: '2026-05-20', tags: ['Inbound'],               agente: 'Clara'   },
-  { id: '2',  empresa: 'DataBridge Ltda',    contato: 'Mariana Costa',   valor: 2400,  etapa: 'Lead',        probabilidade: 20,  responsavel: 'Pedro', data: '2026-05-21', tags: ['SaaS'],                  agente: 'Roberto' },
-  { id: '3',  empresa: 'Alpha Comércio',     contato: 'Bruno Alves',     valor: 1800,  etapa: 'Lead',        probabilidade: 18,  responsavel: 'Ana',   data: '2026-05-22', tags: ['Outbound'],              agente: 'Clara'   },
-  { id: '4',  empresa: 'Prime Tech',         contato: 'Camila Rocha',    valor: 3000,  etapa: 'Lead',        probabilidade: 25,  responsavel: 'Lucas', data: '2026-05-23', tags: ['Demo agendada'],         agente: 'Helena'  },
-  { id: '5',  empresa: 'Órbita Digital',     contato: 'Thiago Mendes',   valor: 4500,  etapa: 'Qualificado', probabilidade: 40,  responsavel: 'Ana',   data: '2026-05-18', tags: ['ICP alto'],              agente: 'Clara'   },
-  { id: '6',  empresa: 'Sigma Industria',    contato: 'Fernanda Souza',  valor: 5200,  etapa: 'Qualificado', probabilidade: 45,  responsavel: 'Pedro', data: '2026-05-17', tags: ['Urgente'],               agente: 'Marcos'  },
-  { id: '7',  empresa: 'Bluewave RH',        contato: 'Rodrigo Neves',   valor: 3800,  etapa: 'Qualificado', probabilidade: 38,  responsavel: 'Lucas', data: '2026-05-16', tags: ['SaaS'],                  agente: 'Helena'  },
-  { id: '8',  empresa: 'Consulta Fácil',     contato: 'Patrícia Gomes',  valor: 4200,  etapa: 'Qualificado', probabilidade: 42,  responsavel: 'Ana',   data: '2026-05-15', tags: ['Saúde'],                 agente: 'Clara'   },
-  { id: '9',  empresa: 'VentureLabs',        contato: 'César Martins',   valor: 6800,  etapa: 'Proposta',    probabilidade: 55,  responsavel: 'Pedro', data: '2026-05-14', tags: ['Enterprise'],            agente: 'Roberto' },
-  { id: '10', empresa: 'Construtech',        contato: 'Juliana Barros',  valor: 7500,  etapa: 'Proposta',    probabilidade: 60,  responsavel: 'Lucas', data: '2026-05-13', tags: ['Proposta enviada'],      agente: 'Marcos'  },
-  { id: '11', empresa: 'Fintek Soluções',    contato: 'André Pereira',   valor: 5900,  etapa: 'Proposta',    probabilidade: 52,  responsavel: 'Ana',   data: '2026-05-12', tags: ['Financeiro'],            agente: 'Clara'   },
-  { id: '12', empresa: 'GlobalPay Brasil',   contato: 'Isabela Torres',  valor: 12000, etapa: 'Negociação',  probabilidade: 75,  responsavel: 'Pedro', data: '2026-05-10', tags: ['High value', 'ICP alto'], agente: 'Helena' },
-  { id: '13', empresa: 'Metatrader Corp',    contato: 'Fábio Cunha',     valor: 15000, etapa: 'Negociação',  probabilidade: 80,  responsavel: 'Lucas', data: '2026-05-09', tags: ['Enterprise', 'Urgente'], agente: 'Marcos' },
-  { id: '14', empresa: 'InovaLog',           contato: 'Denise Vieira',   valor: 4200,  etapa: 'Fechado',     probabilidade: 100, responsavel: 'Ana',   data: '2026-05-05', tags: ['Won'],                   agente: 'Clara'   },
-  { id: '15', empresa: 'SaúdeNet',           contato: 'Gustavo Lima',    valor: 8800,  etapa: 'Fechado',     probabilidade: 100, responsavel: 'Pedro', data: '2026-05-03', tags: ['Won', 'Saúde'],          agente: 'Roberto' },
-]
-
 const ETAPAS: Etapa[] = ['Lead', 'Qualificado', 'Proposta', 'Negociação', 'Fechado']
 
 const ETAPA_COLORS: Record<Etapa, string> = {
@@ -369,8 +349,9 @@ export default function PipelinePage() {
     queryFn: () => dealsApi.list().then(r => r.data as ApiDeal[]),
   })
 
-  const deals: Deal[] = rawDeals.length > 0
-    ? rawDeals.map(d => ({
+  const deals: Deal[] = isLoading
+    ? []
+    : rawDeals.map(d => ({
         id: d.id,
         empresa: d.nome,
         contato: d.responsavel ?? '—',
@@ -382,7 +363,6 @@ export default function PipelinePage() {
         tags: [],
         agente: '—',
       }))
-    : isLoading ? [] : INITIAL_DEALS
 
   const moverMutation = useMutation({
     mutationFn: ({ id, etapa }: { id: string; etapa: string }) =>

@@ -200,7 +200,12 @@ export default function AguardandoPage() {
             <p className="text-xs text-gray-500 mb-3">
               suporte@etztech.com · Atendimento em até 1 hora útil
             </p>
-            <button className="btn-secondary py-2 text-sm">Abrir chat de suporte</button>
+            <button
+              onClick={() => window.open('mailto:suporte@etztech.com?subject=Suporte - Conta aguardando aprovação', '_blank')}
+              className="btn-secondary py-2 text-sm"
+            >
+              Abrir chat de suporte
+            </button>
           </div>
 
         </div>

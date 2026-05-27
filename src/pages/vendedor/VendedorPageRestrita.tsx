@@ -7,9 +7,10 @@
  * - currentProfile.nome é usado como filtro automático
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { reunioesApi } from '@/services/api'
+import { useNavigate } from 'react-router-dom'
+import { reunioesApi, emailsApi, calendarApi } from '@/services/api'
 import {
   Calendar,
   CalendarDays,
@@ -57,6 +58,9 @@ interface Reuniao {
   agente: string
   sinais: string[]
   sugestao: string
+  telefone?: string
+  email?: string
+  nome?: string
 }
 
 interface EmailVendedor {
@@ -86,171 +90,6 @@ interface MensagemChat {
 
 const HOJE = new Date().toLocaleDateString('pt-BR')
 
-const mockReunioes: Reuniao[] = [
-  {
-    id: 1,
-    empresa: 'Acme Corp',
-    contato: 'Pedro Alves',
-    cargo: 'Diretor Comercial',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: HOJE,
-    hora: '10:00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 85,
-    status: 'Confirmada',
-    link: 'meet.google.com/abc-def',
-    agente: 'Ana IA',
-    sinais: ['urgência', 'proposta'],
-    sugestao: 'Mencionar ROI de 60% em prospecção. Pedro demonstrou urgência — fechar hoje.',
-  },
-  {
-    id: 2,
-    empresa: 'TechVision',
-    contato: 'Carla Lima',
-    cargo: 'VP Comercial',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: HOJE,
-    hora: '14:00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 78,
-    status: 'Pendente',
-    link: 'meet.google.com/ghi-jkl',
-    agente: 'Ana IA',
-    sinais: ['preço'],
-    sugestao: 'Abordar comparativo de custo vs ROI. Carla mencionou orçamento limitado.',
-  },
-  {
-    id: 3,
-    empresa: 'DataSoft',
-    contato: 'Rafael Porto',
-    cargo: 'CEO',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: '23/05/2026',
-    hora: '16:00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 92,
-    status: 'Realizada',
-    link: '',
-    agente: 'Carlos IA',
-    sinais: ['proposta', 'decisor'],
-    sugestao: '',
-  },
-  {
-    id: 4,
-    empresa: 'InnovaB2B',
-    contato: 'Mariana Costa',
-    cargo: 'Gerente TI',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: '25/05/2026',
-    hora: '09:30',
-    modalidade: 'Presencial',
-    vendedor: 'João Silva',
-    icp: 71,
-    status: 'Confirmada',
-    link: '',
-    agente: 'Ana IA',
-    sinais: ['demo'],
-    sugestao: 'Mariana quer ver o sistema funcionando ao vivo. Prepare demo interativa.',
-  },
-  {
-    id: 5,
-    empresa: 'FinanceGroup',
-    contato: 'Alexandre Nunes',
-    cargo: 'CFO',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: '26/05/2026',
-    hora: '11:00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 88,
-    status: 'Confirmada',
-    link: 'meet.google.com/mno-pqr',
-    agente: 'Ana IA',
-    sinais: ['proposta', 'decisor', 'urgência'],
-    sugestao: 'Alexandre é decisor final. Traga proposta comercial já estruturada.',
-  },
-  {
-    id: 6,
-    empresa: 'VarseGroup',
-    contato: 'Beatriz Souza',
-    cargo: 'Diretora Geral',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: '22/05/2026',
-    hora: '15:00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 65,
-    status: 'Não compareceu',
-    link: '',
-    agente: 'Carlos IA',
-    sinais: ['humano'],
-    sugestao: '',
-  },
-  {
-    id: 7,
-    empresa: 'LogiTech BR',
-    contato: 'Fernando Maia',
-    cargo: 'Sócio Fundador',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: '27/05/2026',
-    hora: '14:30',
-    modalidade: 'Presencial',
-    vendedor: 'João Silva',
-    icp: 80,
-    status: 'Pendente',
-    link: '',
-    agente: 'Ana IA',
-    sinais: ['preço', 'proposta'],
-    sugestao: 'Empresa crescendo 40% ao ano. Foco em escalabilidade da solução.',
-  },
-  {
-    id: 8,
-    empresa: 'MedSales',
-    contato: 'Dra. Cristina Ramos',
-    cargo: 'Gerente Comercial',
-    campanha: 'Campanha SP',
-    campanha_id: 'campanha_sp',
-    data: '21/05/2026',
-    hora: '09:00',
-    modalidade: 'Google Meet',
-    vendedor: 'João Silva',
-    icp: 74,
-    status: 'Realizada',
-    link: '',
-    agente: 'Carlos IA',
-    sinais: ['técnico', 'demo'],
-    sugestao: '',
-  },
-  // Carlos Ferreira
-  {
-    id: 9,
-    empresa: 'Delta Ind.',
-    contato: 'Maria Santos',
-    cargo: 'Gerente Comercial',
-    campanha: 'Campanha MG',
-    campanha_id: 'campanha_mg',
-    data: HOJE,
-    hora: '10:30',
-    modalidade: 'Presencial',
-    vendedor: 'Carlos Ferreira',
-    icp: 71,
-    status: 'Pendente',
-    link: '',
-    agente: 'Carlos IA',
-    sinais: ['preço', 'humano'],
-    sugestao: 'Contato mencionou orçamento restrito. Apresente ROI em 90 dias.',
-  },
-]
 
 const mockEmails: EmailVendedor[] = [
   {
@@ -474,14 +313,19 @@ function TabAgenda({
     setReunioes((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'Confirmada' as const } : r))
     )
+    reunioesApi.update(String(id), { status: 'confirmada' }).catch(console.error)
   }
 
   function salvarReagendamento(id: number) {
+    const r = reunioes.find((r) => r.id === id)
+    const dataFinal = novaData || (r?.data ?? '')
+    const horaFinal = novaHora || (r?.hora ?? '')
     setReunioes((prev) =>
       prev.map((r) =>
-        r.id === id ? { ...r, data: novaData || r.data, hora: novaHora || r.hora } : r
+        r.id === id ? { ...r, data: dataFinal, hora: horaFinal } : r
       )
     )
+    reunioesApi.update(String(id), { data: dataFinal, hora: horaFinal, status: 'remarcada' }).catch(console.error)
     setReagendandoId(null)
     setNovaData('')
     setNovaHora('')
@@ -699,6 +543,7 @@ function TabFicha({
   emails: EmailVendedor[]
 }) {
   const [copied, setCopied] = useState(false)
+  const navigate = useNavigate()
 
   if (!fichaData) {
     return (
@@ -763,15 +608,24 @@ function TabFicha({
           <hr className="border-gray-100" />
 
           <div className="flex gap-3">
-            <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors">
+            <button
+              onClick={() => window.open('tel:' + (fichaData?.telefone || ''), '_blank')}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+            >
               <Phone size={13} />
               Ligar
             </button>
-            <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors">
+            <button
+              onClick={() => navigate('/email', { state: { contato: fichaData?.email || fichaData?.nome } })}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+            >
               <Mail size={13} />
               E-mail
             </button>
-            <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors">
+            <button
+              onClick={() => { const nome = fichaData?.nome || fichaData?.contato || ''; window.open('https://www.linkedin.com/search/results/people/?keywords=' + encodeURIComponent(nome), '_blank') }}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+            >
               <ExternalLink size={13} />
               LinkedIn
             </button>
@@ -851,7 +705,15 @@ function TabFicha({
                 <Mail size={13} />
                 <span>E-mail pendente: {emailPendente.template}</span>
               </div>
-              <button className="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors">
+              <button
+                onClick={async () => {
+                  try {
+                    await emailsApi.enviar({ para: fichaData?.email || '', assunto: 'Follow-up: ' + (fichaData?.empresa || ''), corpo: 'Olá, tudo bem?' })
+                    alert('E-mail enviado!')
+                  } catch(e: unknown) { alert('Erro ao enviar: ' + (e as Error).message) }
+                }}
+                className="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors"
+              >
                 <Send size={11} />
                 Enviar agora
               </button>
@@ -918,6 +780,12 @@ function TabResultados({
         tipo: tipoResultado,
       },
     ])
+    reunioesApi.update(String(resultadoReuniao.id), {
+      resultado: tipoResultado,
+      proximo_passo: proximoPasso,
+      observacoes: obs,
+      motivo_perda: motivoPerda || undefined,
+    }).catch(console.error)
     setResultadoReuniao(null)
     setTipoResultado(null)
     setObs('')
@@ -1194,6 +1062,7 @@ function TabEmail({ emails, setEmails }: { emails: EmailVendedor[]; setEmails: R
   const [previewId, setPreviewId] = useState<number | null>(null)
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [editCorpo, setEditCorpo] = useState('')
+  const [novoAssunto, setNovoAssunto] = useState('')
 
   const pendentes = emails.filter((e) => e.status === 'Pendente').length
   const enviados = emails.filter((e) => e.status === 'Enviado').length
@@ -1204,9 +1073,14 @@ function TabEmail({ emails, setEmails }: { emails: EmailVendedor[]; setEmails: R
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status: 'Enviado' as const } : e))
     )
+    const email = emails.find(e => e.id === id)
+    if (email) emailsApi.enviar({ para: email.email || email.contato, assunto: email.template, corpo: '' }).catch(console.error)
   }
 
   function enviarTodos() {
+    emails.filter(e => e.status === 'Pendente').forEach(email => {
+      emailsApi.enviar({ para: email.email || email.contato, assunto: email.template, corpo: '' }).catch(console.error)
+    })
     setEmails((prev) =>
       prev.map((e) => (e.status === 'Pendente' ? { ...e, status: 'Enviado' as const } : e))
     )
@@ -1343,6 +1217,7 @@ function TabEmail({ emails, setEmails }: { emails: EmailVendedor[]; setEmails: R
                           onClick={() => {
                             setEditandoId(editandoId === row.id ? null : row.id)
                             setEditCorpo('')
+                            setNovoAssunto(row.template)
                           }}
                           className="flex items-center gap-1 px-2 py-1 border border-gray-200 rounded text-[10px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
                         >
@@ -1358,7 +1233,8 @@ function TabEmail({ emails, setEmails }: { emails: EmailVendedor[]; setEmails: R
                         <div className="space-y-2">
                           <input
                             type="text"
-                            defaultValue={row.template}
+                            value={novoAssunto || row.template}
+                            onChange={(e) => setNovoAssunto(e.target.value)}
                             placeholder="Assunto"
                             className="w-full border border-gray-200 rounded px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
@@ -1370,11 +1246,19 @@ function TabEmail({ emails, setEmails }: { emails: EmailVendedor[]; setEmails: R
                             className="w-full border border-gray-200 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                           />
                           <div className="flex gap-2">
-                            <button className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                            <button
+                              onClick={() => {
+                                setEmails(prev => prev.map(e => e.id === editandoId ? {...e, template: novoAssunto || e.template} : e))
+                                setEditandoId(null)
+                                setNovoAssunto('')
+                                setEditCorpo('')
+                              }}
+                              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
                               Salvar
                             </button>
                             <button
-                              onClick={() => setEditandoId(null)}
+                              onClick={() => { setEditandoId(null); setNovoAssunto(''); setEditCorpo('') }}
                               className="px-3 py-1.5 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
                             >
                               Cancelar
@@ -1407,6 +1291,8 @@ function TabGcal({ reunioes }: { reunioes: Reuniao[] }) {
   const [gcalConectado, setGcalConectado] = useState(false)
   const [emailGcal, setEmailGcal] = useState('')
   const [diasSelecionados, setDiasSelecionados] = useState([true, true, true, true, true, false])
+  const [duracaoPadrao, setDuracaoPadrao] = useState('30 min')
+  const [modalidadePreferida, setModalidadePreferida] = useState('Google Meet')
 
   const dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -1432,7 +1318,12 @@ function TabGcal({ reunioes }: { reunioes: Reuniao[] }) {
             </div>
           </div>
           <button
-            onClick={() => setGcalConectado(false)}
+            onClick={async () => {
+              try {
+                await calendarApi.disconnect()
+              } catch(e) { console.error(e) }
+              finally { setGcalConectado(false) }
+            }}
             className="text-xs text-red-600 border border-red-200 rounded-md px-3 py-1.5 hover:bg-red-50 transition-colors"
           >
             Desconectar
@@ -1517,7 +1408,11 @@ function TabGcal({ reunioes }: { reunioes: Reuniao[] }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Duração padrão</label>
-            <select className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <select
+              value={duracaoPadrao}
+              onChange={(e) => setDuracaoPadrao(e.target.value)}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
               <option>30 min</option>
               <option>45 min</option>
               <option>60 min</option>
@@ -1526,7 +1421,11 @@ function TabGcal({ reunioes }: { reunioes: Reuniao[] }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Modalidade preferida</label>
-            <select className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <select
+              value={modalidadePreferida}
+              onChange={(e) => setModalidadePreferida(e.target.value)}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
               <option>Google Meet</option>
               <option>Presencial</option>
               <option>Ambos</option>
@@ -1573,7 +1472,16 @@ function TabGcal({ reunioes }: { reunioes: Reuniao[] }) {
         </div>
 
         <button
-          onClick={() => setGcalConectado(true)}
+          onClick={async () => {
+            try {
+              const jwt = localStorage.getItem('etz_jwt') || ''
+              const url = calendarApi.connect(jwt)
+              window.location.href = url
+            } catch(e) {
+              // fallback: simula conexão
+              setGcalConectado(true)
+            }
+          }}
           className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white text-sm font-semibold rounded-md py-2.5 hover:bg-blue-700 transition-colors"
         >
           <ExternalLink size={14} />
@@ -1624,6 +1532,7 @@ function TabMensagens({
       tipo: 'enviada',
     }
     setMensagens((prev) => [...prev, nova])
+    emailsApi.enviar({ para: aberta.de, assunto: 'Resposta interna', corpo: resposta }).catch(console.error)
     setResposta('')
   }
 
@@ -1823,36 +1732,37 @@ export default function VendedorPageRestrita() {
 
   const { data: rawReunioes = [] } = useQuery({
     queryKey: ['reunioes'],
-    queryFn: () => reunioesApi.list().then(r => r.data as Array<{id: string; inicio: string; vendedor_nome?: string; agente_id?: string}>),
+    queryFn: () => reunioesApi.list().then(r => r.data as any[]),
   })
 
-  const reunioesReais: Reuniao[] = rawReunioes
-    .filter(r => !nomeVendedor || r.vendedor_nome === nomeVendedor)
-    .map((r, idx) => ({
-      id: idx + 10000,
-      empresa: 'Contato agendado',
-      contato: r.vendedor_nome ?? 'Vendedor',
-      cargo: '—',
-      campanha: '—',
-      campanha_id: '',
-      data: new Date(r.inicio).toLocaleDateString('pt-BR'),
-      hora: new Date(r.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      modalidade: '—',
-      vendedor: r.vendedor_nome ?? nomeVendedor,
-      icp: 0,
-      status: 'Confirmada' as const,
-      link: '',
-      agente: r.agente_id ?? '—',
-      sinais: [],
-      sugestao: '',
-    }))
+  const reunioesReais: Reuniao[] = rawReunioes.map(r => ({
+    id: r.id ?? 0,
+    empresa: r.empresa_nome ?? r.empresa ?? '',
+    contato: r.contato_nome ?? r.contato ?? '',
+    cargo: r.cargo ?? '',
+    campanha: r.campanha_nome ?? r.campanha ?? '',
+    campanha_id: r.campanha_id ?? '',
+    data: r.inicio ? new Date(r.inicio).toLocaleDateString('pt-BR') : '',
+    hora: r.inicio ? new Date(r.inicio).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '',
+    modalidade: r.modalidade ?? 'online',
+    vendedor: r.vendedor_nome ?? r.vendedor ?? '',
+    icp: r.icp ?? 0,
+    status: r.status ?? 'Pendente',
+    link: r.meet_link ?? r.link ?? '',
+    agente: r.agente_nome ?? r.agente ?? '',
+    sinais: r.sinais ?? [],
+    sugestao: r.sugestao ?? '',
+  }))
 
   const [tab, setTab] = useState<VTab>('agenda')
   const [fichaData, setFichaData] = useState<Reuniao | null>(null)
   const [resultadoReuniao, setResultadoReuniao] = useState<Reuniao | null>(null)
-  const [reunioes, setReunioes] = useState<Reuniao[]>(
-    reunioesReais.length > 0 ? reunioesReais : mockReunioes.filter((r) => r.vendedor === nomeVendedor)
-  )
+  const [reunioes, setReunioes] = useState<Reuniao[]>([])
+
+  useEffect(() => {
+    setReunioes(reunioesReais)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawReunioes])
   const [emails, setEmails] = useState<EmailVendedor[]>(
     mockEmails.filter((e) => e.vendedor === nomeVendedor)
   )

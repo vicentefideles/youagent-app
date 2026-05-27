@@ -44,15 +44,6 @@ interface WaConversation {
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const INITIAL_LEADS: InboundLead[] = [
-  { id: 1, nome: 'Rafael Teixeira',  empresa: 'Nexus Soluções',   canal: 'WhatsApp', mensagem: 'Olá, vi vocês em um anúncio e gostaria de saber mais sobre a plataforma de agentes.', tempo: 'há 2 min',  status: 'Aguardando',     prioridade: 'Alta'   },
-  { id: 2, nome: 'Camila Santos',    empresa: 'DataLake Corp',    canal: 'Email',    mensagem: 'Boa tarde! Tenho interesse em automatizar nosso processo de outbound e adoraria uma demo.',  tempo: 'há 8 min',  status: 'Aguardando',     prioridade: 'Alta'   },
-  { id: 3, nome: 'Diego Fonseca',    empresa: 'VertexSoft',       canal: 'Site',     mensagem: 'Preencheu formulário de contato — interesse em plano Enterprise com 10 agentes.',           tempo: 'há 15 min', status: 'Em atendimento', prioridade: 'Normal' },
-  { id: 4, nome: 'Ana Beatriz Lima', empresa: 'Pharma Brasil',    canal: 'Telefone', mensagem: 'Ligação receptiva — perguntou sobre integrações com CRM Salesforce.',                        tempo: 'há 22 min', status: 'Resolvido',      prioridade: 'Normal' },
-  { id: 5, nome: 'Marcos Vinicius',  empresa: 'Constru Tech',     canal: 'WhatsApp', mensagem: 'Oi, quero entender como funciona o agente de voz. Vocês têm trial gratuito?',               tempo: 'há 35 min', status: 'Aguardando',     prioridade: 'Baixa'  },
-  { id: 6, nome: 'Juliana Corrêa',   empresa: 'EduMais Plataforma',canal: 'Email',   mensagem: 'Somos uma edtech em crescimento e precisamos escalar prospecção B2B. Quero conversar.',     tempo: 'há 1h',     status: 'Em atendimento', prioridade: 'Alta'   },
-]
-
 const WA_CONVERSATIONS: WaConversation[] = [
   {
     id: 1, nome: 'Rafael Teixeira', empresa: 'Nexus Soluções', lastMsg: 'Olá, vi vocês em um anúncio...', tempo: '2 min', unread: 1,
@@ -128,11 +119,21 @@ function ToggleSwitch({ on, onChange }: { on: boolean; onChange: (v: boolean) =>
 function ChatPanel({
   lead,
   onClose,
+  onTransferir,
+  onEnviarMensagem,
 }: {
   lead: InboundLead
   onClose: () => void
+  onTransferir: (id: number) => void
+  onEnviarMensagem: (id: number) => void
 }) {
   const [msg, setMsg] = useState('')
+
+  function handleEnviar() {
+    if (!msg.trim()) return
+    onEnviarMensagem(lead.id)
+    setMsg('')
+  }
 
   return (
     <div className="flex flex-col bg-white border-l border-gray-200 w-80 shrink-0">
@@ -169,12 +170,19 @@ function ChatPanel({
             placeholder="Digite uma mensagem..."
             value={msg}
             onChange={e => setMsg(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleEnviar()}
           />
-          <button className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={handleEnviar}
+            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
             <Send size={14} />
           </button>
         </div>
-        <button className="w-full text-xs text-gray-500 border border-gray-200 rounded-lg py-1.5 hover:bg-gray-50 flex items-center justify-center gap-1">
+        <button
+          onClick={() => onTransferir(lead.id)}
+          className="w-full text-xs text-gray-500 border border-gray-200 rounded-lg py-1.5 hover:bg-gray-50 flex items-center justify-center gap-1"
+        >
           <User size={12} /> Transferir para vendedor
         </button>
       </div>
@@ -216,9 +224,7 @@ function FilaTab() {
     queryFn: () => receptivoApi.list().then(r => r.data),
   })
 
-  const [leads, setLeads] = useState<InboundLead[]>(
-    rawLeads.length > 0 ? rawLeads.map(mapToInboundLead) : INITIAL_LEADS
-  )
+  const [leads, setLeads] = useState<InboundLead[]>([])
   const [activeChat, setActiveChat] = useState<InboundLead | null>(null)
 
   useEffect(() => {
@@ -231,6 +237,17 @@ function FilaTab() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status: 'Em atendimento' as Status } : l))
     const lead = leads.find(l => l.id === id)
     if (lead) setActiveChat({ ...lead, status: 'Em atendimento' })
+  }
+
+  function handleTransferir(id: number) {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, status: 'Resolvido' as Status } : l))
+    receptivoApi.update(String(id), { status: 'transferido' }).catch(console.error)
+    setActiveChat(null)
+  }
+
+  function handleEnviarMensagem(id: number) {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, status: 'Em atendimento' as Status } : l))
+    receptivoApi.update(String(id), { status: 'em_atendimento' }).catch(console.error)
   }
 
   const kpis = [
@@ -270,6 +287,13 @@ function FilaTab() {
                 </tr>
               </thead>
               <tbody>
+                {leads.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
+                      Nenhum lead inbound ainda.
+                    </td>
+                  </tr>
+                )}
                 {leads.map(lead => (
                   <tr key={lead.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
@@ -310,7 +334,12 @@ function FilaTab() {
       </div>
 
       {activeChat && (
-        <ChatPanel lead={activeChat} onClose={() => setActiveChat(null)} />
+        <ChatPanel
+          lead={activeChat}
+          onClose={() => setActiveChat(null)}
+          onTransferir={handleTransferir}
+          onEnviarMensagem={handleEnviarMensagem}
+        />
       )}
     </div>
   )

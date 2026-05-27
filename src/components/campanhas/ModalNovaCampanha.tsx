@@ -23,6 +23,8 @@ const ESTADOS   = ['SP','MG','GO','RJ','PR','RS','SC','BA','CE','PE','DF','ES','
 const DIAS = [{ key:'seg',l:'Seg'},{key:'ter',l:'Ter'},{key:'qua',l:'Qua'},{key:'qui',l:'Qui'},{key:'sex',l:'Sex'},{key:'sab',l:'Sáb'},{key:'dom',l:'Dom'}]
 
 interface FormState extends NovaCampanhaForm {
+  // Vendedores selecionados
+  vendedoresSelecionados: string[]
   // Rechamada
   max_tentativas: string
   intervalo_tentativas: string
@@ -74,6 +76,7 @@ interface FormState extends NovaCampanhaForm {
 }
 
 const defaultForm: FormState = {
+  vendedoresSelecionados: [],
   nome: '', tipo: 'outbound', estado: 'SP', cidade: '', segmento: '', modalidade: 'online',
   agente_id: '', agressividade: 'media', meta_agendamentos: '',
   hora_inicio: '09:00', hora_fim: '18:00', limite_diario: '200',
@@ -443,7 +446,15 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
               <div className="flex flex-col gap-2 mb-3">
                 {vendedores.map(v => (
                   <label key={v.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl cursor-pointer hover:border-brand/30 transition-colors">
-                    <input type="checkbox" defaultChecked className="accent-brand" />
+                    <input
+                      type="checkbox"
+                      className="accent-brand"
+                      checked={form.vendedoresSelecionados?.includes(v.id)}
+                      onChange={e => {
+                        const sel = form.vendedoresSelecionados || []
+                        s('vendedoresSelecionados', e.target.checked ? [...sel, v.id] : sel.filter(x => x !== v.id))
+                      }}
+                    />
                     <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{v.iniciais}</div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{v.nome}</p>

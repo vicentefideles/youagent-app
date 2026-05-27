@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { claudeApi } from '@/services/api'
+import { claudeApi, api, calendarApi } from '@/services/api'
 import TelnyxNumeroSection from '@/components/TelnyxNumeroSection'
 import {
   Building2,
@@ -58,13 +58,32 @@ function SectionEmpresa() {
   const [objecoes, setObjecoes] = useState(
     '"Já temos fornecedor" → Entendo! Muitos clientes nossos também tinham...\n"Não tenho orçamento" → Por isso o retorno é imediato — 1 reunião fechada já paga vários meses...'
   )
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function handleSalvarEmpresa() {
+    setSaving(true)
+    try {
+      await api.patch('/clientes/perfil', { nome, website, telefone, segmento, descricao })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-base font-semibold text-gray-900">Perfil da empresa</h2>
-        <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
-          Salvar alterações
+        <button
+          onClick={handleSalvarEmpresa}
+          disabled={saving}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Salvando...' : saved ? '✓ Salvo' : 'Salvar alterações'}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -136,9 +155,52 @@ function SectionIntegracoes() {
   const [elevenEnabled, setElevenEnabled] = useState(true)
   const [gcalEnabled, setGcalEnabled] = useState(false)
   const [waEnabled, setWaEnabled] = useState(true)
+  const [integToast, setIntegToast] = useState<string | null>(null)
+
+  function showIntegToast(msg: string) {
+    setIntegToast(msg)
+    setTimeout(() => setIntegToast(null), 2500)
+  }
+
+  function handleToggleTelnyx(v: boolean) {
+    setTelnyxEnabled(v)
+    api.patch('/clientes/integracoes', { telnyx: v }).catch(console.error)
+    showIntegToast(v ? 'Telnyx ativado' : 'Telnyx desativado')
+  }
+
+  function handleToggleEleven(v: boolean) {
+    setElevenEnabled(v)
+    api.patch('/clientes/integracoes', { elevenlabs: v }).catch(console.error)
+    showIntegToast(v ? 'ElevenLabs ativado' : 'ElevenLabs desativado')
+  }
+
+  function handleToggleGcal(v: boolean) {
+    setGcalEnabled(v)
+    api.patch('/clientes/integracoes', { google_calendar: v }).catch(console.error)
+    showIntegToast(v ? 'Google Calendar ativado' : 'Google Calendar desativado')
+  }
+
+  function handleToggleWa(v: boolean) {
+    setWaEnabled(v)
+    api.patch('/clientes/integracoes', { whatsapp: v }).catch(console.error)
+    showIntegToast(v ? 'WhatsApp ativado' : 'WhatsApp desativado')
+  }
+
+  function handleConectarGoogle() {
+    const jwt = localStorage.getItem('etz_jwt') || ''
+    const url = calendarApi.connect(jwt)
+    window.location.href = url
+  }
 
   return (
     <div className="space-y-6">
+      {/* Toast de confirmação */}
+      {integToast && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg transition-opacity">
+          {integToast}
+        </div>
+      )}
+
       {/* Número de Telefone Telnyx */}
       <div>
         <h3 className="text-base font-semibold text-gray-900 mb-1">Número de Telefone</h3>
@@ -156,7 +218,7 @@ function SectionIntegracoes() {
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Voz + WhatsApp</p>
           </div>
-          <Toggle checked={telnyxEnabled} onChange={setTelnyxEnabled} />
+          <Toggle checked={telnyxEnabled} onChange={handleToggleTelnyx} />
         </div>
         <div className="space-y-3">
           <div>
@@ -188,7 +250,7 @@ function SectionIntegracoes() {
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Síntese de voz</p>
           </div>
-          <Toggle checked={elevenEnabled} onChange={setElevenEnabled} />
+          <Toggle checked={elevenEnabled} onChange={handleToggleEleven} />
         </div>
         <div className="space-y-3">
           <div>
@@ -220,10 +282,13 @@ function SectionIntegracoes() {
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Agendamento automático</p>
           </div>
-          <Toggle checked={gcalEnabled} onChange={setGcalEnabled} />
+          <Toggle checked={gcalEnabled} onChange={handleToggleGcal} />
         </div>
         <p className="text-xs text-gray-500 mb-3">Necessário para agendamento automático de reuniões entre agente e vendedor.</p>
-        <button className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors">
+        <button
+          onClick={handleConectarGoogle}
+          className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+        >
           Conectar com Google
         </button>
       </div>
@@ -237,7 +302,7 @@ function SectionIntegracoes() {
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Via Telnyx</p>
           </div>
-          <Toggle checked={waEnabled} onChange={setWaEnabled} />
+          <Toggle checked={waEnabled} onChange={handleToggleWa} />
         </div>
         <div className="space-y-3">
           <div>
@@ -357,7 +422,7 @@ function SectionIntegracoesAvancadas() {
           <label className="block text-xs font-medium text-gray-600 mb-1">Endpoint base</label>
           <input readOnly value="https://api.etztech.com/v1" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono bg-gray-50 focus:outline-none" />
         </div>
-        <a href="#" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
+        <a href="https://docs.etztech.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
           <ExternalLink className="w-3 h-3" /> Ver documentação completa
         </a>
       </div>
@@ -1059,7 +1124,7 @@ function SectionApi() {
       </div>
 
       {/* Documentação */}
-      <a href="#" className="block bg-blue-50 border border-blue-100 rounded-xl p-5 hover:bg-blue-100 transition-colors group">
+      <a href="https://docs.etztech.com" target="_blank" rel="noopener noreferrer" className="block bg-blue-50 border border-blue-100 rounded-xl p-5 hover:bg-blue-100 transition-colors group">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-blue-900">Documentação da API</p>

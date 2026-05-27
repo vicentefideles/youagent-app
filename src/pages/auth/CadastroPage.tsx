@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bot, AlertCircle } from 'lucide-react'
+import { Bot, AlertCircle, Loader2 } from 'lucide-react'
+import { authApi } from '@/services/api'
+import { useAuthStore } from '@/store/authStore'
 
 interface CadForm {
   nome: string
@@ -64,6 +66,9 @@ export default function CadastroPage() {
   })
   const [errors, setErrors] = useState<Partial<Record<keyof CadForm, string>>>({})
   const [globalError, setGlobalError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const storeLogin = useAuthStore((s) => s.login)
 
   const forca = calcularForca(form.senha)
 
@@ -85,20 +90,45 @@ export default function CadastroPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) {
       setGlobalError('Corrija os erros abaixo para continuar')
       return
     }
-    // Salva dados do formulário no localStorage para uso nas etapas seguintes
-    // O cliente_id real será salvo pela API após o cadastro; aqui garantimos
-    // que as páginas seguintes possam acessar o ID via 'youagent_cliente_id'.
-    // Quando a integração com a API for feita, substituir por:
-    //   const res = await api.post('/clientes', { ... })
-    //   const cliente = res.data as { id: string }
-    //   localStorage.setItem('youagent_cliente_id', cliente.id)
-    navigate('/checkout')
+
+    setLoading(true)
+    setGlobalError('')
+
+    try {
+      // 1. Register
+      await authApi.register({
+        nome: form.nome,
+        email: form.email,
+        empresa: form.empresa || undefined,
+        telefone: form.telefone || undefined,
+        token: form.senha,
+      })
+
+      // 2. Auto-login
+      const loginRes = await authApi.login(form.email, form.senha)
+      const data = loginRes.data as { token: string; cliente: { id: string; nome: string; email: string; plano?: string; status?: string } }
+
+      // 3. Store JWT + user
+      storeLogin(data.token, data.cliente)
+
+      // 4. Navigate
+      navigate('/boas-vindas')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
+      const msg =
+        axiosErr?.response?.data?.error ||
+        axiosErr?.response?.data?.message ||
+        'Erro ao criar conta. Tente novamente.'
+      setGlobalError(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -277,9 +307,11 @@ export default function CadastroPage() {
               </button>
               <button
                 type="submit"
-                className="btn-primary flex-1 py-2.5"
+                disabled={loading}
+                className="btn-primary flex-1 py-2.5 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Continuar para o plano →
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {loading ? 'Criando conta...' : 'Continuar para o plano →'}
               </button>
             </div>
 
