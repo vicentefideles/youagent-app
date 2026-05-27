@@ -256,7 +256,3 @@ export const telnyxApi = {
     api.post(`/telnyx/numeros/provisionar/${id}`, {}),
 }
 
-// Transcrição em tempo real
-export const transcricaoApi = {
-  get: (callControlId: string) => api.get(`/ligacoes/${callControlId}/transcript`),
-}
