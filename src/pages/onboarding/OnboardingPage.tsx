@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { claudeApi, agentesApi } from '@/services/api'
 import {
   Check,
@@ -16,9 +17,10 @@ import {
   UserCheck,
   Users,
   PhoneOutgoing,
-  PhoneIncoming,
   Settings,
   Loader2,
+  Copy,
+  Pencil,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -73,8 +75,52 @@ const INITIAL_FORM: FormData = {
 const SEGMENTOS = ['Tech/SaaS', 'Indústria', 'Serviços B2B', 'Saúde', 'Educação', 'Financeiro', 'Outro']
 const PORTES = ['1–10', '11–50', '51–200', '201–1000', '1000+']
 const CARGOS = ['Diretor', 'VP', 'CEO', 'Gerente', 'Coordenador', 'Outro']
-const VOZES = ['Clara', 'Helena', 'Roberto', 'Marcos', 'Ana', 'Carlos']
-const TONS = ['Formal', 'Consultivo', 'Descontraído']
+
+const VOZES_CARDS = [
+  { id: 'feminina_clara', label: 'Ana', descricao: 'Voz feminina clara e profissional', emoji: '👩‍💼', tags: ['Corporativo', 'B2B'] },
+  { id: 'masculina_confiante', label: 'Carlos', descricao: 'Voz masculina confiante e direta', emoji: '👨‍💼', tags: ['Vendas', 'Outbound'] },
+  { id: 'feminina_dinamica', label: 'Julia', descricao: 'Voz feminina dinâmica e empática', emoji: '👩‍💻', tags: ['SaaS', 'Tech'] },
+  { id: 'masculina_consultivo', label: 'Rafael', descricao: 'Voz masculina consultiva e pausada', emoji: '🧑‍🏫', tags: ['Consultoria', 'Enterprise'] },
+]
+
+const TONS_CARDS = [
+  { id: 'profissional', label: 'Profissional', descricao: 'Formal, direto ao ponto' },
+  { id: 'consultivo', label: 'Consultivo', descricao: 'Pergunta mais, propõe soluções' },
+  { id: 'direto', label: 'Direto', descricao: 'Objetivo, sem rodeios' },
+  { id: 'amigavel', label: 'Amigável', descricao: 'Próximo, cria rapport rapidamente' },
+]
+
+interface Proposito {
+  id: string
+  titulo: string
+  descricao: string
+  icon: React.ReactNode
+  preConfig: { tom: string; voz: string }
+}
+
+const PROPOSITOS: Proposito[] = [
+  {
+    id: 'agendar_vendedor',
+    titulo: 'Agendar para meu vendedor',
+    descricao: 'O agente qualifica leads e transfere ao vivo para o vendedor fechar',
+    icon: <UserCheck size={28} className="text-blue-500" />,
+    preConfig: { tom: 'profissional', voz: 'feminina_clara' },
+  },
+  {
+    id: 'substituir_sdr',
+    titulo: 'Substituir equipe de SDRs',
+    descricao: 'O agente faz toda a prospecção e agenda reuniões automaticamente',
+    icon: <Users size={28} className="text-purple-500" />,
+    preConfig: { tom: 'consultivo', voz: 'masculina_confiante' },
+  },
+  {
+    id: 'prospeccao_outbound',
+    titulo: 'Prospecção outbound do zero',
+    descricao: 'O agente busca e qualifica leads novos de forma autônoma',
+    icon: <PhoneOutgoing size={28} className="text-green-500" />,
+    preConfig: { tom: 'direto', voz: 'feminina_dinamica' },
+  },
+]
 
 const STEPS = [
   { label: 'Empresa', icon: Building2 },
@@ -428,20 +474,31 @@ function Step3({
 
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">Voz do agente</p>
-        <div className="grid grid-cols-3 gap-2">
-          {VOZES.map(v => (
+        <div className="grid grid-cols-2 gap-3">
+          {VOZES_CARDS.map(v => (
             <button
-              key={v}
+              key={v.id}
               type="button"
-              onClick={() => onChange('voz', v)}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                form.voz === v
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              onClick={() => onChange('voz', v.id)}
+              className={`text-left p-4 rounded-xl border-2 transition-all flex flex-col gap-2 ${
+                form.voz === v.id
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
-              {v}
-              <Play size={13} className="shrink-0 ml-1 opacity-60" />
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">{v.emoji}</span>
+                <Play size={13} className="opacity-40" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">{v.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{v.descricao}</p>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {v.tags.map(tag => (
+                  <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{tag}</span>
+                ))}
+              </div>
             </button>
           ))}
         </div>
@@ -449,19 +506,20 @@ function Step3({
 
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">Tom de comunicação</p>
-        <div className="grid grid-cols-3 gap-2">
-          {TONS.map(t => (
+        <div className="grid grid-cols-2 gap-2">
+          {TONS_CARDS.map(t => (
             <button
-              key={t}
+              key={t.id}
               type="button"
-              onClick={() => onChange('tom', t)}
-              className={`px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                form.tom === t
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              onClick={() => onChange('tom', t.id)}
+              className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
+                form.tom === t.id
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
-              {t}
+              <p className="font-semibold text-gray-900 text-sm">{t.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{t.descricao}</p>
             </button>
           ))}
         </div>
@@ -584,7 +642,7 @@ function Step4({
   )
 }
 
-// ─── Mock Agents ─────────────────────────────────────────────────────────────
+// ─── Agente type ─────────────────────────────────────────────────────────────
 
 interface AgenteMock {
   id: string
@@ -593,12 +651,38 @@ interface AgenteMock {
   campanhasAtivas: number
   avatar: string
   cor: string
+  // real API fields (optional)
+  empresa?: string
+  segmento?: string
+  produto?: string
+  icp_cargo?: string
+  icp_segmento?: string
+  icp_porte?: string
+  tom?: string
+  status?: string
 }
 
-const AGENTES_MOCK: AgenteMock[] = [
-  { id: '1', nome: 'Ana', voz: 'Clara', campanhasAtivas: 2, avatar: 'A', cor: 'bg-blue-500' },
-  { id: '2', nome: 'Carlos', voz: 'Roberto', campanhasAtivas: 1, avatar: 'C', cor: 'bg-purple-500' },
-]
+const COR_LIST = ['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500']
+
+function normalizeAgente(raw: Record<string, unknown>, idx: number): AgenteMock {
+  const nome = (raw.nome as string) || 'Agente'
+  return {
+    id: (raw.id as string) || String(idx),
+    nome,
+    voz: (raw.voz as string) || '',
+    campanhasAtivas: (raw.campanhas_ativas as number) ?? 0,
+    avatar: nome.charAt(0).toUpperCase(),
+    cor: COR_LIST[idx % COR_LIST.length],
+    empresa: raw.empresa as string,
+    segmento: raw.segmento as string,
+    produto: raw.produto as string,
+    icp_cargo: raw.icp_cargo as string,
+    icp_segmento: raw.icp_segmento as string,
+    icp_porte: raw.icp_porte as string,
+    tom: raw.tom as string,
+    status: raw.status as string,
+  }
+}
 
 const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
 const HORAS = ['8h', '9h', '10h', '11h', '12h', '13h', '14h', '15h', '16h', '17h', '18h']
@@ -675,59 +759,74 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
   )
 }
 
-function AgenteCard({ agente, onHorarios }: { agente: AgenteMock; onHorarios: () => void }) {
+function AgenteCard({
+  agente,
+  onHorarios,
+  onEditar,
+  onDuplicar,
+  duplicating,
+}: {
+  agente: AgenteMock
+  onHorarios: () => void
+  onEditar: () => void
+  onDuplicar: () => void
+  duplicating?: boolean
+}) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-full ${agente.cor} flex items-center justify-center text-white font-bold text-base`}>
           {agente.avatar}
         </div>
-        <div>
-          <p className="font-semibold text-gray-900">{agente.nome}</p>
-          <p className="text-xs text-gray-400">Voz: {agente.voz}</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 truncate">{agente.nome}</p>
+          <p className="text-xs text-gray-400">
+            {agente.voz ? `Voz: ${agente.voz}` : agente.empresa || ''}
+          </p>
         </div>
+        {agente.status === 'ativo' && (
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Ativo</span>
+        )}
       </div>
       <div className="flex items-center gap-1.5">
         <span className="w-2 h-2 rounded-full bg-green-500" />
         <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
       </div>
-      <div className="flex gap-2">
-        <button className="flex-1 text-xs font-medium py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
-          Ver detalhes
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={onEditar}
+          className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+        >
+          <Pencil size={12} />
+          Editar
+        </button>
+        <button
+          onClick={onDuplicar}
+          disabled={duplicating}
+          className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50"
+        >
+          {duplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+          Duplicar
         </button>
         <button
           onClick={onHorarios}
-          className="flex-1 flex items-center justify-center gap-1 text-xs font-medium py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+          className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
         >
           <Clock size={12} />
-          Configurar horários
+          Horários
         </button>
       </div>
     </div>
   )
 }
 
-// ─── Perfis de uso ───────────────────────────────────────────────────────────
-
-interface PerfilUso {
-  id: string
-  titulo: string
-  descricao: string
-  icon: React.ReactNode
-}
-
-const PERFIS: PerfilUso[] = [
-  { id: 'vendedor', titulo: 'Vendedor faz tudo', descricao: 'Agente qualifica e transfere para o próprio vendedor', icon: <UserCheck size={24} className="text-blue-500" /> },
-  { id: 'sdr', titulo: 'SDR + Closer', descricao: 'SDR qualifica leads, Closer fecha o negócio', icon: <Users size={24} className="text-purple-500" /> },
-  { id: 'outbound', titulo: 'Outbound puro', descricao: 'Apenas agendamento, sem transferência ao vivo', icon: <PhoneOutgoing size={24} className="text-green-500" /> },
-  { id: 'inbound', titulo: 'Botão de contato', descricao: 'Responde inbound e agenda automaticamente', icon: <PhoneIncoming size={24} className="text-amber-500" /> },
-]
+// PERFIS removed — replaced by PROPOSITOS above
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
   const [tela, setTela] = useState<'grid' | 'wiz0' | 'wizard'>('grid')
-  const [perfilSelecionado, setPerfilSelecionado] = useState<string | null>(null)
+  const [propositoSelecionado, setPropositoSelecionado] = useState<string | null>(null)
   const [agenteHorarios, setAgenteHorarios] = useState<AgenteMock | null>(null)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormData>(INITIAL_FORM)
@@ -735,6 +834,14 @@ export default function OnboardingPage() {
   const [activated, setActivated] = useState(false)
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState('')
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+
+  const { data: agentesRaw = [], refetch: refetchAgentes } = useQuery({
+    queryKey: ['agentes'],
+    queryFn: () => agentesApi.list().then(r => r.data as Record<string, unknown>[]),
+  })
+
+  const agentes: AgenteMock[] = agentesRaw.map((a, i) => normalizeAgente(a, i))
 
   function onChange(k: keyof FormData, v: string) {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -780,10 +887,39 @@ export default function OnboardingPage() {
         status: 'ativo',
       })
       setActivated(true)
+      refetchAgentes()
     } catch {
       setActivateError('Erro ao ativar agente. Tente novamente.')
     } finally {
       setActivating(false)
+    }
+  }
+
+  function handleEditar(agente: AgenteMock) {
+    setForm({
+      ...INITIAL_FORM,
+      'empresa-nome': agente.empresa || agente.nome,
+      'empresa-segmento': agente.segmento || '',
+      'prod-nome': agente.produto || '',
+      'icp-cargo-tipo': agente.icp_cargo || '',
+      'icp-segmento-alvo': agente.icp_segmento || '',
+      'icp-porte-alvo': agente.icp_porte || '',
+      voz: agente.voz || '',
+      tom: agente.tom || '',
+    })
+    setStep(0)
+    setActivated(false)
+    setTela('wizard')
+  }
+
+  async function handleDuplicar(agente: AgenteMock) {
+    setDuplicatingId(agente.id)
+    try {
+      const { id: _id, avatar: _avatar, cor: _cor, campanhasAtivas: _camp, ...rest } = agente
+      await agentesApi.create({ ...rest, nome: agente.nome + ' (Cópia)' })
+      refetchAgentes()
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -795,7 +931,7 @@ export default function OnboardingPage() {
     setActivateError('')
     setErrors({})
     setTela('grid')
-    setPerfilSelecionado(null)
+    setPropositoSelecionado(null)
   }
 
   const stepTitles = [
@@ -827,22 +963,32 @@ export default function OnboardingPage() {
             </button>
           </div>
 
-          {AGENTES_MOCK.length > 0 && (
+          {agentes.length > 0 && (
             <div className="grid grid-cols-2 gap-4 mb-6">
-              {AGENTES_MOCK.map(agente => (
+              {agentes.map(agente => (
                 <AgenteCard
                   key={agente.id}
                   agente={agente}
                   onHorarios={() => setAgenteHorarios(agente)}
+                  onEditar={() => handleEditar(agente)}
+                  onDuplicar={() => handleDuplicar(agente)}
+                  duplicating={duplicatingId === agente.id}
                 />
               ))}
             </div>
           )}
 
-          {AGENTES_MOCK.length === 0 && (
+          {agentes.length === 0 && (
             <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
               <Bot size={40} className="text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Nenhum agente criado ainda.</p>
+              <p className="text-gray-500 text-sm mb-4">Nenhum agente criado ainda.</p>
+              <button
+                onClick={() => setTela('wiz0')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                <Bot size={16} />
+                Criar primeiro agente
+              </button>
             </div>
           )}
         </div>
@@ -854,7 +1000,7 @@ export default function OnboardingPage() {
     )
   }
 
-  // ── Tela: seleção de perfil ────────────────────────────────────────────────
+  // ── Tela: seleção de propósito ────────────────────────────────────────────
   if (tela === 'wiz0') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-start justify-center py-12 px-4">
@@ -862,33 +1008,31 @@ export default function OnboardingPage() {
           <div className="mb-8 text-center">
             <div className="inline-flex items-center gap-2 mb-3">
               <Settings size={22} className="text-blue-600" />
-              <span className="text-lg font-bold text-gray-900">Qual é o perfil de uso?</span>
+              <span className="text-lg font-bold text-gray-900">Qual é o objetivo do agente?</span>
             </div>
-            <p className="text-sm text-gray-500">Escolha como o agente vai trabalhar na sua operação</p>
+            <p className="text-sm text-gray-500">Escolha o propósito principal — configuramos voz e tom automaticamente</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {PERFIS.map(p => (
+          <div className="flex flex-col gap-4 mb-6">
+            {PROPOSITOS.map(p => (
               <button
                 key={p.id}
-                onClick={() => setPerfilSelecionado(p.id)}
-                className={`text-left p-5 rounded-2xl border-2 transition-all flex flex-col gap-3 ${
-                  perfilSelecionado === p.id
+                onClick={() => setPropositoSelecionado(p.id)}
+                className={`text-left p-5 rounded-2xl border-2 transition-all flex items-center gap-5 ${
+                  propositoSelecionado === p.id
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  {p.icon}
-                  <div className={`w-4 h-4 rounded-full border-2 transition-colors flex items-center justify-center ${
-                    perfilSelecionado === p.id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
-                  }`}>
-                    {perfilSelecionado === p.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                  </div>
+                <div className="shrink-0">{p.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900">{p.titulo}</p>
+                  <p className="text-sm text-gray-500 mt-0.5">{p.descricao}</p>
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{p.titulo}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{p.descricao}</p>
+                <div className={`shrink-0 w-5 h-5 rounded-full border-2 transition-colors flex items-center justify-center ${
+                  propositoSelecionado === p.id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                }`}>
+                  {propositoSelecionado === p.id && <div className="w-2 h-2 rounded-full bg-white" />}
                 </div>
               </button>
             ))}
@@ -902,8 +1046,14 @@ export default function OnboardingPage() {
               <ChevronLeft size={16} /> Voltar
             </button>
             <button
-              disabled={!perfilSelecionado}
-              onClick={() => setTela('wizard')}
+              disabled={!propositoSelecionado}
+              onClick={() => {
+                const p = PROPOSITOS.find(x => x.id === propositoSelecionado)
+                if (p) {
+                  setForm(prev => ({ ...prev, voz: p.preConfig.voz, tom: p.preConfig.tom }))
+                }
+                setTela('wizard')
+              }}
               className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Continuar <ChevronRight size={16} />
