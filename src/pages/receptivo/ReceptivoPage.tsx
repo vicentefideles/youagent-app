@@ -613,18 +613,33 @@ interface ChamadaHistorico {
   operador: string
 }
 
-const HISTORICO_MOCK: ChamadaHistorico[] = [
-  { id: 1, dataHora: '24/05 14:32', numero: '+55 11 98765-4321', empresa: 'Nexus Soluções', duracao: '4m 12s', resultado: 'agendou', operador: 'Ana Lima' },
-  { id: 2, dataHora: '24/05 13:18', numero: '+55 21 99876-5432', empresa: 'DataLake Corp', duracao: '2m 45s', resultado: 'transferido', operador: 'Carlos Ramos' },
-  { id: 3, dataHora: '24/05 12:05', numero: '+55 11 91234-5678', empresa: 'VertexSoft', duracao: '0m 28s', resultado: 'abandonado', operador: '—' },
-  { id: 4, dataHora: '24/05 11:47', numero: '+55 31 98877-6543', empresa: 'Pharma Brasil', duracao: '6m 03s', resultado: 'atendido', operador: 'Pedro Souza' },
-  { id: 5, dataHora: '24/05 10:22', numero: '+55 62 99988-7766', empresa: 'Constru Tech', duracao: '3m 50s', resultado: 'agendou', operador: 'Ana Lima' },
-  { id: 6, dataHora: '24/05 09:58', numero: '+55 11 97765-4455', empresa: 'EduMais Plataforma', duracao: '1m 10s', resultado: 'atendido', operador: 'Carlos Ramos' },
-  { id: 7, dataHora: '23/05 17:33', numero: '+55 47 98654-3322', empresa: 'HR Solutions', duracao: '0m 15s', resultado: 'abandonado', operador: '—' },
-  { id: 8, dataHora: '23/05 16:12', numero: '+55 11 99001-2233', empresa: 'Info Sys', duracao: '5m 28s', resultado: 'transferido', operador: 'Fernanda Rocha' },
-  { id: 9, dataHora: '23/05 14:55', numero: '+55 51 97890-1122', empresa: 'Varejo Max', duracao: '7m 01s', resultado: 'agendou', operador: 'Ana Lima' },
-  { id: 10, dataHora: '23/05 13:40', numero: '+55 11 98123-4567', empresa: 'Retail Max', duracao: '2m 22s', resultado: 'atendido', operador: 'Pedro Souza' },
-]
+const RESULTADO_STATUS_MAP: Record<string, ResultadoChamada> = {
+  atendido:      'atendido',
+  resolvido:     'atendido',
+  em_atendimento:'atendido',
+  abandonado:    'abandonado',
+  transferido:   'transferido',
+  agendou:       'agendou',
+  agendado:      'agendou',
+}
+
+function mapToHistorico(
+  r: { id: string | number; nome?: string; telefone?: string; origem?: string; status?: string; criado_em: string },
+  idx: number
+): ChamadaHistorico {
+  const dt = new Date(r.criado_em)
+  const dataHora = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+  const resultado: ResultadoChamada = RESULTADO_STATUS_MAP[r.status?.toLowerCase() ?? ''] ?? 'atendido'
+  return {
+    id: typeof r.id === 'number' ? r.id : idx + 1,
+    dataHora,
+    numero: r.telefone ?? '—',
+    empresa: r.nome ?? '—',
+    duracao: '—',
+    resultado,
+    operador: '—',
+  }
+}
 
 const RESULTADO_STYLE: Record<ResultadoChamada, string> = {
   atendido:    'bg-blue-50 text-blue-700',
@@ -644,9 +659,26 @@ function HistTab() {
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('hoje')
   const [resultadoFiltro, setResultadoFiltro] = useState<ResultadoChamada | 'todos'>('todos')
 
-  const filtered = HISTORICO_MOCK.filter(c => {
+  const { data: rawLeads = [] } = useQuery({
+    queryKey: ['receptivo'],
+    queryFn: () => receptivoApi.list().then(r => r.data),
+  })
+
+  const historico: ChamadaHistorico[] = rawLeads.map(mapToHistorico)
+
+  const hoje = new Date()
+  const hojePrefix = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`
+
+  const filtered = historico.filter(c => {
     if (resultadoFiltro !== 'todos' && c.resultado !== resultadoFiltro) return false
-    if (periodo === 'hoje') return c.dataHora.startsWith('24/05')
+    if (periodo === 'hoje') return c.dataHora.startsWith(hojePrefix)
+    if (periodo === '7d') {
+      const [dayMonth] = c.dataHora.split(' ')
+      const [dd, mm] = dayMonth.split('/')
+      const date = new Date(hoje.getFullYear(), parseInt(mm)-1, parseInt(dd))
+      const diff = (hoje.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+      return diff <= 7
+    }
     return true
   })
 

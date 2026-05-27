@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 
 type CheckoutStep = 'plano' | 'pagamento' | 'confirmacao'
@@ -153,8 +153,11 @@ function Resumo({
 
 export default function CheckoutPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const locationState = location.state as { client_secret?: string; plano?: Plano } | null
+  const _clientSecret = locationState?.client_secret  // available for Stripe Elements when integrated
   const [step, setStep] = useState<CheckoutStep>('plano')
-  const [plano, setPlano] = useState<Plano>('growth')
+  const [plano, setPlano] = useState<Plano>(locationState?.plano ?? 'growth')
   const [frequencia, setFrequencia] = useState<Frequencia>('mensal')
   const [numAgentes, setNumAgentes] = useState(4)
   const [forma, setForma] = useState<FormaPagamento>('cartao_mensal')

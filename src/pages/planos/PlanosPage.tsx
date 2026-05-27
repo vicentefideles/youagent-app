@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { planosApi } from '@/services/api'
 import {
   Check,
   X,
@@ -398,10 +400,47 @@ function RoiCalculator({ planAtual }: { planAtual: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+interface BackendPlano {
+  id: string
+  nome: string
+  preco_exibicao: string
+  preco_centavos: number
+  recursos: string[]
+}
+
 export default function PlanosPage() {
   const navigate = useNavigate()
   const [annual, setAnnual] = useState(false)
   const [showCardModal, setShowCardModal] = useState(false)
+  const [assinando, setAssinando] = useState<string | null>(null)
+  const [erroAssinar, setErroAssinar] = useState('')
+
+  const { data: backendPlanos = [] } = useQuery<BackendPlano[]>({
+    queryKey: ['planos'],
+    queryFn: () => planosApi.list().then(r => r.data?.planos ?? r.data ?? []),
+  })
+
+  // Merge backend prices into PLANS (fallback to hardcoded if not loaded)
+  const planosComPreco: Plan[] = PLANS.map(p => {
+    const bp = backendPlanos.find(b => b.id === p.id)
+    if (!bp) return p
+    const monthly = Math.round(bp.preco_centavos / 100)
+    return { ...p, monthlyPrice: monthly, annualPrice: Math.round(monthly * 0.8) }
+  })
+
+  async function handleAssinar(planoId: string) {
+    setAssinando(planoId)
+    setErroAssinar('')
+    try {
+      const { data } = await planosApi.assinar(planoId)
+      navigate('/checkout', { state: { client_secret: data.client_secret, plano: planoId } })
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      setErroAssinar(axiosErr?.response?.data?.error ?? 'Erro ao iniciar assinatura.')
+    } finally {
+      setAssinando(null)
+    }
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8">
@@ -431,9 +470,16 @@ export default function PlanosPage() {
         </span>
       </div>
 
+      {/* Error message */}
+      {erroAssinar && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+          {erroAssinar}
+        </div>
+      )}
+
       {/* Plan cards */}
       <div className="grid grid-cols-3 gap-4">
-        {PLANS.map(plan => {
+        {planosComPreco.map(plan => {
           const price = annual ? plan.annualPrice : plan.monthlyPrice
           const crossed = annual ? plan.monthlyPrice : null
 
@@ -482,13 +528,13 @@ export default function PlanosPage() {
               </ul>
 
               <button
-                disabled={plan.current}
+                disabled={plan.current || assinando === plan.id}
                 onClick={
                   plan.current
                     ? undefined
                     : plan.id === 'enterprise'
                     ? () => window.open('mailto:vendas@etztech.com?subject=Interesse no plano Enterprise', '_blank')
-                    : () => navigate('/checkout')
+                    : () => handleAssinar(plan.id)
                 }
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   plan.ctaStyle === 'blue'
@@ -498,7 +544,7 @@ export default function PlanosPage() {
                     : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                {plan.cta}
+                {assinando === plan.id ? 'Aguarde...' : plan.cta}
               </button>
             </div>
           )
