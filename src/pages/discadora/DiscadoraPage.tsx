@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { campanhasApi, reunioesApi, ligacoesApi, claudeApi, equipeApi } from '@/services/api'
+import { campanhasApi, reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -111,6 +111,30 @@ const TRANSCRICOES: Record<string, TranscriptLine[]> = {
     { quem: 'Agente', cor: 'text-blue-400', texto: 'Nossa IA faz prospecção automática B2B. Você gostaria de ver uma demo do sistema funcionando?' },
     { quem: 'Cliente', cor: 'text-emerald-400', texto: 'Quero ver uma demo do sistema, sim. Quando pode?' },
   ],
+}
+
+// ─── TRANSCRIÇÃO AO VIVO (polling) ─────────────────────────────────────────
+
+function TranscriptAoVivo({ callControlId, enabled }: { callControlId: string; enabled: boolean }) {
+  const { data } = useQuery({
+    queryKey: ['transcript', callControlId],
+    queryFn: () => transcricaoApi.get(callControlId).then(r => r.data),
+    refetchInterval: 2000,
+    enabled,
+  })
+  const linhas: Array<{ ts?: number; texto: string; final?: boolean }> = (data as any)?.transcricao ?? []
+  if (linhas.length === 0) return null
+  return (
+    <div className="mt-2 bg-gray-50 rounded p-2 text-xs space-y-1 border border-gray-100">
+      <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+        TRANSCRIÇÃO AO VIVO
+      </div>
+      {linhas.slice(-3).map((linha, i) => (
+        <p key={i} className="text-gray-700 leading-relaxed">{linha.texto}</p>
+      ))}
+    </div>
+  )
 }
 
 const TRANSFER_CANDIDATES: Vendedor[] = [
@@ -528,6 +552,7 @@ function TabFila() {
                   {item.potencial > 0 && <span className="text-2xs font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">📞 {item.potencial}%</span>}
                 </div>
                 {item.snippet && <div className="mt-1.5 text-2xs text-gray-400 italic bg-white border border-gray-200 rounded px-2 py-1 max-w-[200px]">{item.snippet}</div>}
+                <TranscriptAoVivo callControlId={(item as any)._callControlId ?? item.id} enabled={item.status === 'em_ligacao'} />
               </div>
 
               {/* Agente */}

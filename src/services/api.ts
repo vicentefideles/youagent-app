@@ -221,6 +221,11 @@ export const adminClientesApi = {
   aprovarCross: (id: string, aprovado: boolean) => api.patch(`/admin/cross-global/${id}`, { aprovado }),
 }
 
+// Transcrição ao vivo
+export const transcricaoApi = {
+  get: (callControlId: string) => api.get(`/ligacoes/${callControlId}/transcript`),
+}
+
 // Google Calendar
 export const calendarApi = {
   status:     ()             => api.get('/auth/google/status'),
@@ -249,4 +254,9 @@ export const telnyxApi = {
     api.patch(`/telnyx/numeros/admin/${id}`, data),
   adminProvisionar: (id: string) =>
     api.post(`/telnyx/numeros/provisionar/${id}`, {}),
+}
+
+// Transcrição em tempo real
+export const transcricaoApi = {
+  get: (callControlId: string) => api.get(`/ligacoes/${callControlId}/transcript`),
 }
