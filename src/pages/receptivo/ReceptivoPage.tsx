@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { receptivoApi } from '@/services/api'
+import { receptivoApi, whatsappApi } from '@/services/api'
 import {
   Clock,
   ThumbsUp,
@@ -250,9 +250,16 @@ function FilaTab() {
     receptivoApi.update(String(id), { status: 'em_atendimento' }).catch(console.error)
   }
 
+  const hoje = new Date().toDateString()
+  const atendidosHoje = (rawLeads as any[]).filter((l: any) => {
+    const status = l.status?.toLowerCase() ?? ''
+    return (status === 'atendido' || status === 'resolvido' || status === 'transferido') &&
+      new Date(l.criado_em).toDateString() === hoje
+  }).length
+
   const kpis = [
     { label: 'Aguardando',              value: leads.filter(l => l.status === 'Aguardando').length.toString(),     icon: Clock,        color: 'text-yellow-600 bg-yellow-50' },
-    { label: 'Atendidos hoje',          value: '23',                                                                icon: CheckCircle2, color: 'text-green-600 bg-green-50'   },
+    { label: 'Atendidos hoje',          value: atendidosHoje > 0 ? String(atendidosHoje) : '0',                    icon: CheckCircle2, color: 'text-green-600 bg-green-50'   },
     { label: 'Tempo médio de resposta', value: '4m32s',                                                             icon: Clock,        color: 'text-blue-600 bg-blue-50'     },
     { label: 'Satisfação',              value: '4.7★',                                                              icon: ThumbsUp,     color: 'text-purple-600 bg-purple-50' },
   ]
@@ -351,6 +358,29 @@ function WhatsAppTab() {
   const [autoReply, setAutoReply] = useState(true)
   const [selected, setSelected] = useState<WaConversation>(WA_CONVERSATIONS[0])
   const [msgInput, setMsgInput] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [conversations, setConversations] = useState<WaConversation[]>(WA_CONVERSATIONS)
+
+  async function handleEnviarMensagem() {
+    if (!msgInput.trim() || enviando) return
+    const texto = msgInput.trim()
+    setEnviando(true)
+    try {
+      await whatsappApi.send({ para: selected.nome, mensagem: texto })
+      const newMsg = { from: 'ai' as const, text: texto, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }
+      setConversations(prev => prev.map(c =>
+        c.id === selected.id
+          ? { ...c, messages: [...c.messages, newMsg], lastMsg: texto }
+          : c
+      ))
+      setSelected(prev => ({ ...prev, messages: [...prev.messages, newMsg], lastMsg: texto }))
+      setMsgInput('')
+    } catch (err) {
+      console.error('Erro ao enviar:', err)
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   return (
     <div className="flex flex-1 min-h-0 p-5 gap-4">
@@ -364,7 +394,7 @@ function WhatsAppTab() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {WA_CONVERSATIONS.map(c => (
+          {conversations.map(c => (
             <button
               key={c.id}
               onClick={() => setSelected(c)}
@@ -415,10 +445,12 @@ function WhatsAppTab() {
             placeholder="Digite uma mensagem..."
             value={msgInput}
             onChange={e => setMsgInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleEnviarMensagem()}
           />
           <button
-            onClick={() => setMsgInput('')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={handleEnviarMensagem}
+            disabled={enviando || !msgInput.trim()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             <Send size={16} />
           </button>
@@ -436,6 +468,7 @@ function ConfigTab() {
   const [canalSite, setCanalSite] = useState(false)
   const [autoFora, setAutoFora] = useState(true)
   const [saved, setSaved] = useState(false)
+  const [salvando, setSalvando] = useState(false)
   const [horarioInicio, setHorarioInicio] = useState('09')
   const [horarioFim, setHorarioFim] = useState('18')
   const [boas, setBoas] = useState('Olá! Recebemos seu contato e nossa equipe retornará em breve. 😊')
@@ -443,9 +476,28 @@ function ConfigTab() {
   const [sla, setSla] = useState('1h')
   const [emailAddr, setEmailAddr] = useState('contato@etztech.com')
 
-  function save() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  async function save() {
+    setSalvando(true)
+    try {
+      await receptivoApi.saveConfig({
+        horario_inicio: horarioInicio,
+        horario_fim: horarioFim,
+        mensagem_boas_vindas: boas,
+        mensagem_fora_horario: msgFora,
+        sla,
+        email: emailAddr,
+        canal_email: canalEmail,
+        canal_whatsapp: canalWa,
+        canal_site: canalSite,
+        auto_resposta_fora: autoFora,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      console.error('Erro ao salvar config:', err)
+    } finally {
+      setSalvando(false)
+    }
   }
 
   const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -551,11 +603,12 @@ function ConfigTab() {
 
         <button
           onClick={save}
-          className={`self-start px-6 py-2.5 font-semibold text-sm rounded-lg transition-colors ${
+          disabled={salvando}
+          className={`self-start px-6 py-2.5 font-semibold text-sm rounded-lg transition-colors disabled:opacity-60 ${
             saved ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {saved ? 'Salvo!' : 'Salvar configurações'}
+          {salvando ? 'Salvando...' : saved ? 'Salvo ✓' : 'Salvar configurações'}
         </button>
       </div>
     </div>

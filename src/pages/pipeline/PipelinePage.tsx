@@ -375,6 +375,30 @@ export default function PipelinePage() {
   const [filterResp, setFilterResp] = useState('Todos')
   const [filterEtapa, setFilterEtapa] = useState<Etapa | 'Todas'>('Todas')
 
+  const [showNewDeal, setShowNewDeal] = useState(false)
+  const [newDealForm, setNewDealForm] = useState({ nome: '', valor: '', etapa: 'prospeccao' })
+  const [savingDeal, setSavingDeal] = useState(false)
+
+  async function handleCreateDeal(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newDealForm.nome) return
+    setSavingDeal(true)
+    try {
+      await dealsApi.create({
+        nome: newDealForm.nome,
+        valor: Number(newDealForm.valor) || 0,
+        etapa: newDealForm.etapa,
+      })
+      setShowNewDeal(false)
+      setNewDealForm({ nome: '', valor: '', etapa: 'prospeccao' })
+      qc.invalidateQueries({ queryKey: ['deals'] })
+    } catch (err) {
+      console.error('Erro ao criar deal:', err)
+    } finally {
+      setSavingDeal(false)
+    }
+  }
+
   const filtered = deals.filter(d => {
     const matchSearch =
       d.empresa.toLowerCase().includes(search.toLowerCase()) ||
@@ -410,7 +434,10 @@ export default function PipelinePage() {
             <h1 className="text-xl font-semibold text-gray-900">Pipeline de Vendas</h1>
             <p className="text-sm text-gray-500">Gerencie oportunidades em cada etapa do funil</p>
           </div>
-          <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={() => setShowNewDeal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
             <Plus size={16} /> Novo deal
           </button>
         </div>
@@ -486,6 +513,78 @@ export default function PipelinePage() {
             onClose={() => setSelectedDeal(null)}
             onMoveStage={etapa => moveStage(selectedDeal.id, etapa)}
           />
+        </>
+      )}
+
+      {/* New deal modal */}
+      {showNewDeal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-50"
+            onClick={() => setShowNewDeal(false)}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-sm pointer-events-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-gray-900">Novo deal</h2>
+                <button onClick={() => setShowNewDeal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={18} />
+                </button>
+              </div>
+              <form onSubmit={handleCreateDeal} className="flex flex-col gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Nome <span className="text-red-500">*</span></label>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nome do deal ou empresa"
+                    value={newDealForm.nome}
+                    onChange={e => setNewDealForm(prev => ({ ...prev, nome: e.target.value }))}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Valor (R$)</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="number"
+                    placeholder="0"
+                    value={newDealForm.valor}
+                    onChange={e => setNewDealForm(prev => ({ ...prev, valor: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1">Etapa</label>
+                  <select
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    value={newDealForm.etapa}
+                    onChange={e => setNewDealForm(prev => ({ ...prev, etapa: e.target.value }))}
+                  >
+                    <option value="prospeccao">Prospecção</option>
+                    <option value="qualificado">Qualificado</option>
+                    <option value="proposta">Proposta</option>
+                    <option value="negociacao">Negociação</option>
+                    <option value="fechado">Fechado</option>
+                  </select>
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewDeal(false)}
+                    className="flex-1 text-sm border border-gray-200 rounded-lg py-2 text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingDeal || !newDealForm.nome}
+                    className="flex-1 text-sm bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+                  >
+                    {savingDeal ? 'Salvando...' : 'Criar deal'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </>
       )}
     </div>

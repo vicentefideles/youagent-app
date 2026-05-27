@@ -602,16 +602,31 @@ export default function DashboardPage() {
 
   // Bar chart — use real data when available, otherwise fall back to mock
   const barData: BarDay[] = (dash?.por_dia && dash.por_dia.length > 0)
-    ? dash.por_dia
+    ? (dash.por_dia as any[]).map((d: any) => ({
+        label: new Date(d.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        ligacoes: d.ligacoes ?? 0,
+        reunioes: d.reunioes ?? 0,
+      }))
     : BAR_DATA
 
   // Bar chart scale
   const maxLig = Math.max(...barData.map((d) => d.ligacoes))
   const maxReu = Math.max(...barData.map((d) => d.reunioes))
 
+  // Donut — derive from real KPIs when available
+  const totalLig = dash?.kpis?.ligacoes_hoje ?? 0
+  const reunioesAg = dash?.kpis?.reunioes_agendadas ?? 0
+  const naoAtendidas = Math.max(0, totalLig - reunioesAg)
+  const donutSegments: DonutSegment[] = totalLig > 0
+    ? [
+        { label: 'Agendamentos', pct: Math.round((reunioesAg / totalLig) * 100), color: '#6366f1' },
+        { label: 'Não atendidas', pct: Math.round((naoAtendidas / totalLig) * 100), color: '#e2e8f0' },
+      ]
+    : DONUT_SEGMENTS
+
   // Donut cumulative offsets
   let cumPct = 0
-  const segmentsWithOffset = DONUT_SEGMENTS.map((seg) => {
+  const segmentsWithOffset = donutSegments.map((seg) => {
     const offset = buildDashOffset(cumPct)
     cumPct += seg.pct
     return { ...seg, dashArray: buildDashArray(seg.pct), dashOffset: offset }
@@ -719,13 +734,13 @@ export default function DashboardPage() {
                   />
                 ))}
                 {/* Center text */}
-                <text x={CX} y={CY - 8} textAnchor="middle" fontSize="22" fontWeight="700" fill="#111827">87</text>
+                <text x={CX} y={CY - 8} textAnchor="middle" fontSize="22" fontWeight="700" fill="#111827">{totalLig > 0 ? reunioesAg : 87}</text>
                 <text x={CX} y={CY + 10} textAnchor="middle" fontSize="10" fill="#6b7280">reuniões</text>
                 <text x={CX} y={CY + 22} textAnchor="middle" fontSize="10" fill="#6b7280">agendadas</text>
               </svg>
             </div>
             <div className="flex flex-col gap-2.5 flex-1">
-              {DONUT_SEGMENTS.map((seg) => (
+              {donutSegments.map((seg) => (
                 <div key={seg.label} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />

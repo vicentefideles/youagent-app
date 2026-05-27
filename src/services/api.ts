@@ -134,9 +134,11 @@ export const dealsApi = {
 
 // Receptivo
 export const receptivoApi = {
-  list:   ()                          => api.get('/receptivo'),
-  create: (data: unknown)             => api.post('/receptivo', data),
-  update: (id: string, data: unknown) => api.patch(`/receptivo/${id}`, data),
+  list:       ()                          => api.get('/receptivo'),
+  create:     (data: unknown)             => api.post('/receptivo', data),
+  update:     (id: string, data: unknown) => api.patch(`/receptivo/${id}`, data),
+  getConfig:  ()                          => api.get('/receptivo/config'),
+  saveConfig: (data: unknown)             => api.patch('/receptivo/config', data),
 }
 
 // Relatórios
