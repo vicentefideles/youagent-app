@@ -1065,9 +1065,6 @@ function CalculadoraRoi() {
   const reunioesYA = Math.round(numSDRs * reunioesPorSDR * 1.4)
   const custoPorReuniaoYA = Math.round(custoMensalYA / reunioesYA)
 
-  const economiaTotal = Math.round(custoMensalSDR - custoMensalYA)
-  const economiaPerc = Math.round((economiaTotal / custoMensalSDR) * 100)
-
   // Cálculos Vendedor (modo alternativo)
   const numVendedores = numSDRs
   const salarioVend = salarioSDR * 2

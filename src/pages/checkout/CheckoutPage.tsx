@@ -155,7 +155,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const locationState = location.state as { client_secret?: string; plano?: Plano } | null
-  const _clientSecret = locationState?.client_secret  // available for Stripe Elements when integrated
+  // client_secret available for Stripe Elements when integrated: locationState?.client_secret
   const [step, setStep] = useState<CheckoutStep>('plano')
   const [plano, setPlano] = useState<Plano>(locationState?.plano ?? 'growth')
   const [frequencia, setFrequencia] = useState<Frequencia>('mensal')

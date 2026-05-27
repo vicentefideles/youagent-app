@@ -69,14 +69,7 @@ interface LeadUploadPreview {
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 
-const FILA: EntradaFila[] = [
-  { id:'1', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', cargo:'Dir. Comercial', telefone:'(11) 98765-4321', agente:'Ana', campanha:'SP — Campanha Maio', segmento:'Indústria e Tech', status:'em_ligacao', icp:94, potencial:87, tentativa:1, maxTentativas:3, duracao:'1m38s', snippet:'"...preciso de uma solução pra mês que vem..."', gatilhoDetectado:'Urgência + pedido de preço', transferindo:true },
-  { id:'2', empresa:'Distribuidora XYZ', contato:'Patricia Ramos', cargo:'Gerente', telefone:'(11) 97654-3210', agente:'Carlos', campanha:'SP — Campanha Maio', segmento:'Distribuição', status:'em_ligacao', icp:71, potencial:61, tentativa:1, maxTentativas:3, duracao:'0m52s', snippet:'"...disponível hoje à tarde..."', gatilhoDetectado:'Disponibilidade hoje detectada' },
-  { id:'3', empresa:'Construtora Primavera', contato:'Renata Costa', cargo:'Sócia-Diretora', telefone:'(21) 99876-5432', agente:'Julia', campanha:'RJ — Campanha Maio', segmento:'Construção', status:'em_ligacao', icp:78, potencial:65, tentativa:1, maxTentativas:3, duracao:'2m17s', snippet:'"...precisamos de uma solução..."', gatilhoDetectado:'Decisora identificada' },
-  { id:'4', empresa:'TechSolutions LTDA', contato:'Bruno Almeida', cargo:'CTO', telefone:'(51) 98765-4321', agente:'Rafael', campanha:'RS — Campanha Maio', segmento:'SaaS / Tech', status:'em_ligacao', icp:85, potencial:79, tentativa:1, maxTentativas:3, duracao:'1m14s', snippet:'"...quero ver uma demo do sistema..."', gatilhoDetectado:'Demo + técnico', transferindo:true },
-  { id:'5', empresa:'FarmaCenter', contato:'Luciana Pinto', cargo:'Diretora', telefone:'(41) 97777-1234', agente:'Marcos', campanha:'PR — Campanha Maio', segmento:'Saúde / Farma', status:'na_fila', icp:62, potencial:0, tentativa:1, maxTentativas:3 },
-  { id:'6', empresa:'Supermercados Norte', contato:'Ana Costa', cargo:'CEO', telefone:'(92) 98800-1122', agente:'Ana', campanha:'AM — Campanha Maio', segmento:'Varejo', status:'agendado', icp:91, potencial:0, tentativa:1, maxTentativas:3 },
-]
+// Legacy mock removed — TabFila and TabAoVivo use real API data
 
 const AGENDAMENTOS: Agendamento[] = [
   { id:'a1', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', cargo:'Diretor Comercial', telefone:'(11) 98765-4321', email:'marcos@grupoabc.com.br', modalidade:'online', cidade:'São Paulo', cnpj:'12.345.678/0001-90', segmento:'Comércio / Varejo', resumoLigacao:'Cliente demonstrou interesse em reduzir custo de SDRs. Mencionou que tem equipe de 5 vendedores. Aceitou a reunião para conhecer o modelo de IA.', agente:'Ana', duracaoLigacao:'2m34s', dataHora:'14/05 · 14h00', meetLink:'meet.google.com/abc-123', vendedor:'João Silva', vendedorIniciais:'JS', status:'confirmado', noShowRisk:18, campanha:'SP — Campanha Maio' },
@@ -84,12 +77,7 @@ const AGENDAMENTOS: Agendamento[] = [
   { id:'a3', empresa:'Tech Nova Sistemas', contato:'Carla Mendes', cargo:'Gestora Comercial', telefone:'(11) 96543-2109', email:'carla@technova.com.br', modalidade:'online', cidade:'São Paulo', segmento:'SaaS / Tech', resumoLigacao:'Interesse imediato em substituir o processo manual de prospecção. Solicitou demo completa da plataforma.', agente:'Ana', duracaoLigacao:'1m45s', dataHora:'15/05 · 09h30', meetLink:'meet.google.com/xyz-456', vendedor:'Maria Rodrigues', vendedorIniciais:'MR', status:'pendente', noShowRisk:24, campanha:'SP — Campanha Maio' },
 ]
 
-const GRAVACOES = [
-  { id:'g1', empresa:'Supermercados Norte', contato:'Ana Costa', agente:'Ana', campanha:'SP — Campanha Maio', duracao:'1m52s', data:'05/05 · 09:41', resultado:'agendou' as const, icp:91 },
-  { id:'g2', empresa:'Grupo ABC', contato:'Marcos Silva', agente:'Ana', campanha:'SP — Campanha Maio', duracao:'2m44s', data:'05/05 · 09:28', resultado:'agendou' as const, icp:94 },
-  { id:'g3', empresa:'Indústria Delta', contato:'Roberto Alves', agente:'Carlos', campanha:'GO — Campanha Maio', duracao:'0m48s', data:'05/05 · 08:55', resultado:'retornar' as const, icp:78 },
-  { id:'g4', empresa:'Construtora Omega', contato:'Lucas Pereira', agente:'Julia', campanha:'RJ — Campanha Maio', duracao:'0m22s', data:'05/05 · 08:40', resultado:'nao_atendeu' as const, icp:55 },
-]
+// Legacy gravacoes mock removed — TabGravacoes uses real API data
 
 const CAMPANHAS_DISC = [
   { id:'sp', nome:'SP — Campanha Maio', cor:'brand', total:1250, feitas:487, faltam:451, conv:'8.2%', agendados:40, fila:312, consumo:64, alerta:null, status:'ativa', agr:'Média' },
@@ -1918,7 +1906,7 @@ function TabAgendados() {
                     {ETAPAS_JORNADA.map((etapa, i) => {
                       const passada = i < etapaIdx
                       const atual   = i === etapaIdx
-                      const futura  = i > etapaIdx
+                      void (i > etapaIdx) // futura — reserved for future styling
                       return (
                         <div key={etapa.id} className="flex items-center flex-1 min-w-0">
                           <div className="flex flex-col items-center flex-1 min-w-0">
@@ -2546,7 +2534,7 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
         snippet: l.snippet,
         gatilhoDetectado: l.gatilho_detectado,
         transferindo: l.transferindo ?? false,
-      } as EntradaFila)
+      } as EntradaFila))
     ),
     refetchInterval: 5000,
   })
