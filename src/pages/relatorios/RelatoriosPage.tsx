@@ -217,15 +217,15 @@ function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof 
                   <tr key={ag.nome} className="border-b border-gray-100 last:border-0">
                     <td className="px-3 py-2.5 text-xs font-semibold text-gray-900">{ag.nome}</td>
                     <td className="px-3 py-2.5 text-xs text-gray-700 font-mono">{ag.ligacoes}</td>
-                    <td className="px-3 py-2.5 text-xs text-gray-700 font-mono">{ag.atendidas} <span className="text-2xs text-gray-400">({ag.atendPerc}%)</span></td>
-                    <td className="px-3 py-2.5 text-xs text-gray-700 font-mono">{ag.agendadas}</td>
-                    <td className={clsx('px-3 py-2.5 text-xs font-bold', ag.convCor)}>{ag.conv}</td>
+                    <td className="px-3 py-2.5 text-xs text-gray-700 font-mono">{(ag as any).atendidas ?? '—'} <span className="text-2xs text-gray-400">({(ag as any).atendPerc ?? 0}%)</span></td>
+                    <td className="px-3 py-2.5 text-xs text-gray-700 font-mono">{(ag as any).agendadas ?? (ag as any).reunioes ?? 0}</td>
+                    <td className={clsx('px-3 py-2.5 text-xs font-bold', (ag as any).convCor ?? 'text-brand-600')}>{(ag as any).conv ?? `${(ag as any).taxa ?? 0}%`}</td>
                     <td className="px-3 py-2.5 text-xs text-gray-700 font-mono">
-                      {ag.rechFeitas}/{ag.rechTotal}
-                      <div className="text-2xs text-gray-400">{ag.rechMedia} média</div>
+                      {(ag as any).rechFeitas ?? '—'}/{(ag as any).rechTotal ?? '—'}
+                      <div className="text-2xs text-gray-400">{(ag as any).rechMedia ?? '—'} média</div>
                     </td>
-                    <td className={clsx('px-3 py-2.5 text-xs font-mono font-semibold', ag.descartCor)}>{ag.descartados}</td>
-                    <td className="px-3 py-2.5"><Sparkline bars={ag.spark} cor={ag.sparkCor} /></td>
+                    <td className={clsx('px-3 py-2.5 text-xs font-mono font-semibold', (ag as any).descartCor ?? 'text-gray-600')}>{(ag as any).descartados ?? '—'}</td>
+                    <td className="px-3 py-2.5"><Sparkline bars={(ag as any).spark ?? []} cor={(ag as any).sparkCor ?? 'bg-brand-400'} /></td>
                   </tr>
                 ))}
               </tbody>
