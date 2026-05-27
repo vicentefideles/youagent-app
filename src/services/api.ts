@@ -36,6 +36,10 @@ export const authApi = {
     api.post('/auth/login', { email, token }),
   register: (data: { nome: string; email: string; empresa?: string; telefone?: string; token: string }) =>
     api.post('/auth/register', data),
+  forgotPassword: (email: string) =>
+    api.post('/auth/forgot-password', { email }),
+  resetPassword: (reset_token: string, nova_senha: string) =>
+    api.post('/auth/reset-password', { reset_token, nova_senha }),
 }
 
 // Agentes

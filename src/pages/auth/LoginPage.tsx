@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, KeyRound, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { authApi } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
@@ -7,6 +7,7 @@ import EtzLogo from '@/components/EtzLogo'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const login = useAuthStore((s) => s.login)
 
   const [email, setEmail]   = useState('')
@@ -18,6 +19,23 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotSent, setForgotSent]   = useState(false)
   const [forgotLoading, setForgotLoading] = useState(false)
+
+  // Reset password flow
+  const [showReset, setShowReset]           = useState(false)
+  const [resetToken, setResetToken]         = useState('')
+  const [resetSenha, setResetSenha]         = useState('')
+  const [resetSenhaConfirm, setResetSenhaConfirm] = useState('')
+  const [resetDone, setResetDone]           = useState(false)
+  const [resetLoading, setResetLoading]     = useState(false)
+  const [resetError, setResetError]         = useState('')
+
+  useEffect(() => {
+    const resetParam = searchParams.get('reset')
+    if (resetParam) {
+      setResetToken(resetParam)
+      setShowReset(true)
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -44,15 +62,126 @@ export default function LoginPage() {
     }
   }
 
-  function handleForgotSubmit(e: React.FormEvent) {
+  async function handleForgotSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!forgotEmail) return
     setForgotLoading(true)
-    setTimeout(() => {
-      console.log('TODO: chamar API de recuperação para', forgotEmail)
-      setForgotLoading(false)
+    try {
+      await authApi.forgotPassword(forgotEmail)
       setForgotSent(true)
-    }, 1200)
+    } catch {
+      // Always show success to not leak user existence
+      setForgotSent(true)
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  async function handleResetSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!resetSenha || !resetSenhaConfirm) return
+    if (resetSenha !== resetSenhaConfirm) {
+      setResetError('As senhas não coincidem.')
+      return
+    }
+    setResetLoading(true)
+    setResetError('')
+    try {
+      await authApi.resetPassword(resetToken, resetSenha)
+      setResetDone(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      setResetError(msg || 'Erro ao redefinir senha. Tente novamente.')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
+  // ── Reset password view ───────────────────────────────────────────────────
+  if (showReset) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+           style={{ background: 'linear-gradient(160deg, #ede9fe 0%, #f5f3ff 35%, #eef2ff 65%, #f8faff 100%)' }}>
+        <div className="relative w-full max-w-[400px] animate-fade-in">
+          <div className="flex flex-col items-center mb-9">
+            <div className="etz-logo-container mb-5 rounded-3xl flex items-center justify-center"
+                 style={{ width: 96, height: 96, background: 'linear-gradient(145deg, #f5f3ff 0%, #ede9fe 50%, #ddd6fe 100%)', border: '1px solid rgba(167,139,250,0.35)' }}>
+              <EtzLogo size={68} loading={false} />
+            </div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em', color: '#1e1b4b', lineHeight: 1 }}>ETZ</h1>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 8px 40px rgba(109,40,217,0.10), 0 2px 8px rgba(0,0,0,0.06)', padding: '32px 32px 28px' }}>
+            <div style={{ marginBottom: 24 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 600, color: '#1e1b4b', letterSpacing: '-0.02em' }}>Redefinir senha</h2>
+              <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>Digite sua nova senha de acesso</p>
+            </div>
+            {resetDone ? (
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="flex items-center gap-2 text-sm" style={{ color: '#059669' }}>
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                  Senha redefinida com sucesso!
+                </div>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="btn-primary py-2 px-6 text-sm mt-2"
+                >
+                  Ir para o login
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleResetSubmit} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label style={{ fontSize: 12, fontWeight: 500, color: '#6b7280', letterSpacing: '0.01em' }}>Nova senha</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#a78bfa' }} />
+                    <input
+                      type="password"
+                      className="input pl-10"
+                      style={{ background: 'rgba(245,243,255,0.8)', borderColor: 'rgba(196,181,253,0.5)' }}
+                      placeholder="••••••••••••"
+                      value={resetSenha}
+                      onChange={e => setResetSenha(e.target.value)}
+                      disabled={resetLoading}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label style={{ fontSize: 12, fontWeight: 500, color: '#6b7280', letterSpacing: '0.01em' }}>Confirmar nova senha</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#a78bfa' }} />
+                    <input
+                      type="password"
+                      className="input pl-10"
+                      style={{ background: 'rgba(245,243,255,0.8)', borderColor: 'rgba(196,181,253,0.5)' }}
+                      placeholder="••••••••••••"
+                      value={resetSenhaConfirm}
+                      onChange={e => setResetSenhaConfirm(e.target.value)}
+                      disabled={resetLoading}
+                    />
+                  </div>
+                </div>
+                {resetError && (
+                  <div className="flex items-center gap-2 p-3 rounded-xl animate-fade-in"
+                       style={{ background: 'rgba(254,242,242,0.9)', border: '1px solid rgba(252,165,165,0.5)', color: '#dc2626', fontSize: 13 }}>
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {resetError}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={resetLoading || !resetSenha || !resetSenhaConfirm}
+                  className="w-full mt-1 flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)', color: '#fff', borderRadius: 14, padding: '13px 20px', fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', border: 'none', boxShadow: '0 4px 16px rgba(124,58,237,0.35)', cursor: resetLoading ? 'wait' : 'pointer' }}
+                >
+                  {resetLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</> : 'Redefinir senha'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

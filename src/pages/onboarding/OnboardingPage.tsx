@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { claudeApi } from '@/services/api'
+import { claudeApi, agentesApi } from '@/services/api'
 import {
   Check,
   ChevronRight,
@@ -720,6 +720,8 @@ export default function OnboardingPage() {
   const [form, setForm] = useState<FormData>(INITIAL_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [activated, setActivated] = useState(false)
+  const [activating, setActivating] = useState(false)
+  const [activateError, setActivateError] = useState('')
 
   function onChange(k: keyof FormData, v: string) {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -747,10 +749,37 @@ export default function OnboardingPage() {
     setStep(s => Math.max(s - 1, 0))
   }
 
+  async function handleActivate() {
+    setActivating(true)
+    setActivateError('')
+    try {
+      await agentesApi.create({
+        nome: form['empresa-nome'] + ' — Agente IA',
+        empresa: form['empresa-nome'],
+        segmento: form['empresa-segmento'],
+        produto: form['prod-nome'],
+        descricao_produto: form['prod-descricao'],
+        icp_cargo: form['icp-cargo-tipo'],
+        icp_segmento: form['icp-segmento-alvo'],
+        icp_porte: form['icp-porte-alvo'],
+        voz: form['voz'],
+        tom: form['tom'],
+        status: 'ativo',
+      })
+      setActivated(true)
+    } catch {
+      setActivateError('Erro ao ativar agente. Tente novamente.')
+    } finally {
+      setActivating(false)
+    }
+  }
+
   function reset() {
     setForm(INITIAL_FORM)
     setStep(0)
     setActivated(false)
+    setActivating(false)
+    setActivateError('')
     setErrors({})
     setTela('grid')
     setPerfilSelecionado(null)
@@ -897,9 +926,15 @@ export default function OnboardingPage() {
             <Step4
               form={form}
               activated={activated}
-              onActivate={() => setActivated(true)}
+              onActivate={handleActivate}
               onReset={reset}
             />
+          )}
+          {activateError && (
+            <div className="mt-3 flex items-center gap-2 p-3 rounded-xl text-sm"
+                 style={{ background: 'rgba(254,242,242,0.9)', border: '1px solid rgba(252,165,165,0.5)', color: '#dc2626' }}>
+              {activateError}
+            </div>
           )}
 
           {!(step === 3 && activated) && (
