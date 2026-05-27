@@ -102,12 +102,12 @@ const DONUT_SEGMENTS: DonutSegment[] = [
   { label: 'Outro',      pct: 6,  color: '#a855f7' },
 ]
 
-const ICP_DIMS: IcpDimension[] = [
-  { label: 'Setor',              desc: 'Tech & SaaS',              weight: 30, max: 30, color: 'bg-emerald-500' },
-  { label: 'Porte',              desc: '50–500 funcionários',       weight: 25, max: 25, color: 'bg-emerald-500' },
-  { label: 'Cargo do Decisor',   desc: 'Diretor/VP Comercial',      weight: 20, max: 20, color: 'bg-emerald-500' },
-  { label: 'Região',             desc: 'SP + Sul',                  weight: 12, max: 15, color: 'bg-blue-500' },
-  { label: 'Tentativas p/ agen.', desc: '3,2x média',               weight: 8,  max: 10, color: 'bg-amber-500' },
+const ICP_DIMS_FALLBACK: IcpDimension[] = [
+  { label: 'Cargo do Decisor',   desc: 'Diretor/VP Comercial',      weight: 30, max: 30, color: 'bg-emerald-500' },
+  { label: 'Segmento',           desc: 'Tech & SaaS',               weight: 25, max: 25, color: 'bg-emerald-500' },
+  { label: 'Porte',              desc: '50–500 funcionários',        weight: 20, max: 20, color: 'bg-emerald-500' },
+  { label: 'Região',             desc: 'SP + Sul',                   weight: 12, max: 12, color: 'bg-blue-500' },
+  { label: 'Engajamento',        desc: '3,2x média',                 weight: 8,  max: 8,  color: 'bg-amber-500' },
 ]
 
 const PATTERNS: PatternItem[] = [
@@ -766,9 +766,26 @@ export default function DashboardPage() {
           </span>
         </div>
 
+        {(() => {
+          // Build ICP dims from real data if available, otherwise use fallback
+          const icpReal = dash?.icp_dimensoes
+          const icpDims: IcpDimension[] = icpReal
+            ? [
+                { label: icpReal.cargo.label,     desc: `Média: ${icpReal.cargo.valor}/${icpReal.cargo.max}`,      weight: icpReal.cargo.valor,     max: icpReal.cargo.max,     color: icpReal.cargo.valor    >= icpReal.cargo.max    * 0.8 ? 'bg-emerald-500' : icpReal.cargo.valor    >= icpReal.cargo.max    * 0.5 ? 'bg-blue-500' : 'bg-amber-500' },
+                { label: icpReal.segmento.label,  desc: `Média: ${icpReal.segmento.valor}/${icpReal.segmento.max}`, weight: icpReal.segmento.valor,  max: icpReal.segmento.max,  color: icpReal.segmento.valor >= icpReal.segmento.max * 0.8 ? 'bg-emerald-500' : icpReal.segmento.valor >= icpReal.segmento.max * 0.5 ? 'bg-blue-500' : 'bg-amber-500' },
+                { label: icpReal.porte.label,     desc: `Média: ${icpReal.porte.valor}/${icpReal.porte.max}`,      weight: icpReal.porte.valor,     max: icpReal.porte.max,     color: icpReal.porte.valor    >= icpReal.porte.max    * 0.8 ? 'bg-emerald-500' : icpReal.porte.valor    >= icpReal.porte.max    * 0.5 ? 'bg-blue-500' : 'bg-amber-500' },
+                { label: icpReal.regiao.label,    desc: `Média: ${icpReal.regiao.valor}/${icpReal.regiao.max}`,    weight: icpReal.regiao.valor,    max: icpReal.regiao.max,    color: icpReal.regiao.valor   >= icpReal.regiao.max   * 0.8 ? 'bg-emerald-500' : icpReal.regiao.valor   >= icpReal.regiao.max   * 0.5 ? 'bg-blue-500' : 'bg-amber-500' },
+                { label: icpReal.interacao.label, desc: `Média: ${icpReal.interacao.valor}/${icpReal.interacao.max}`, weight: icpReal.interacao.valor, max: icpReal.interacao.max, color: icpReal.interacao.valor >= icpReal.interacao.max * 0.8 ? 'bg-emerald-500' : icpReal.interacao.valor >= icpReal.interacao.max * 0.5 ? 'bg-blue-500' : 'bg-amber-500' },
+              ]
+            : ICP_DIMS_FALLBACK
+          const icpScoreTotal = icpReal
+            ? Object.values(icpReal).reduce((sum: number, d: any) => sum + d.valor, 0)
+            : 87
+
+          return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
-            {ICP_DIMS.map((dim) => (
+            {icpDims.map((dim) => (
               <div key={dim.label}>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="font-medium text-gray-700">{dim.label}</span>
@@ -786,8 +803,8 @@ export default function DashboardPage() {
 
           <div className="flex flex-col gap-4">
             <div className="text-center py-4">
-              <div className="text-4xl font-bold text-gray-900">87<span className="text-xl text-gray-400">/100</span></div>
-              <div className="text-xs text-gray-500 mt-1">Score ICP</div>
+              <div className="text-4xl font-bold text-gray-900">{icpScoreTotal}<span className="text-xl text-gray-400">/95</span></div>
+              <div className="text-xs text-gray-500 mt-1">Score ICP médio{icpReal ? ' (dados reais)' : ' (exemplo)'}</div>
             </div>
             <div className="bg-blue-50 rounded-lg p-3">
               <p className="text-xs text-blue-800">
@@ -802,6 +819,8 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+          )
+        })()}
       </div>
 
       {/* ── Padrões + Memória ──────────────────────────────────────────────── */}
@@ -910,21 +929,30 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 mb-4">
             <Brain size={16} className="text-purple-600" />
             <h2 className="text-sm font-semibold text-gray-900">Inteligência Coletiva</h2>
+            {dash?.ic?.ciclo_ativo && (
+              <span className="ml-auto text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {dash.ic.argumentos_pendentes} pendente{dash.ic.argumentos_pendentes !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           <div className="space-y-3 flex-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Argumentos validados esta semana</span>
-              <span className="font-bold text-gray-900">5</span>
+              <span className="text-gray-500">Argumentos aprovados</span>
+              <span className="font-bold text-gray-900">{dash?.ic?.argumentos_aprovados ?? '—'}</span>
             </div>
             <div className="h-px bg-gray-100" />
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Propagados para novos agentes</span>
-              <span className="font-bold text-gray-900">3</span>
+              <span className="text-gray-500">Pendentes de aprovação</span>
+              <span className={`font-bold ${(dash?.ic?.argumentos_pendentes ?? 0) > 0 ? 'text-amber-600' : 'text-gray-900'}`}>
+                {dash?.ic?.argumentos_pendentes ?? '—'}
+              </span>
             </div>
             <div className="h-px bg-gray-100" />
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Campanhas beneficiadas</span>
-              <span className="font-bold text-gray-900">2</span>
+              <span className="text-gray-500">Ciclo ativo</span>
+              <span className={`font-bold ${dash?.ic?.ciclo_ativo ? 'text-emerald-600' : 'text-gray-400'}`}>
+                {dash?.ic != null ? (dash.ic.ciclo_ativo ? 'Sim' : 'Não') : '—'}
+              </span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-gray-100">

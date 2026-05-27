@@ -157,8 +157,29 @@ function HeatCell({ pct }: { pct: number }) {
 // ─── ABA PERFORMANCE ─────────────────────────────────────────────────────────
 
 function TabPerformance({ agentesTabela, heatmapRows }: { agentesTabela: typeof AGENTES_TABELA; heatmapRows: typeof HEATMAP_ROWS }) {
+  // Melhor agente por conversão (dados reais se disponíveis)
+  const melhorAgente = agentesTabela.length > 0
+    ? [...agentesTabela].sort((a: any, b: any) => (parseFloat(b.conv ?? b.taxa ?? 0) - parseFloat(a.conv ?? a.taxa ?? 0)))[0]
+    : null
+
   return (
     <div className="flex flex-col gap-4">
+
+      {/* Insight dinâmico de melhor agente */}
+      {melhorAgente ? (
+        <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-sm text-green-800 flex items-center gap-2">
+          <span className="text-base">💡</span>
+          <span>
+            <strong>{(melhorAgente as any).nome}</strong> lidera com{' '}
+            <strong>{(melhorAgente as any).conv ?? `${(melhorAgente as any).taxa}%`}</strong> de conversão este mês
+            {(melhorAgente as any).ligacoes ? ` · ${(melhorAgente as any).ligacoes} ligações realizadas` : ''}
+          </span>
+        </div>
+      ) : (
+        <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-500 italic">
+          Dados insuficientes — o insight de melhor agente aparece com o uso.
+        </div>
+      )}
 
       {/* KPIs principais */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1027,10 +1048,161 @@ function TabCrossCliente() {
   )
 }
 
+// ─── CALCULADORA ROI ─────────────────────────────────────────────────────────
+
+function CalculadoraRoi() {
+  const [calcMode, setCalcMode] = useState<'sdr' | 'vendedor'>('sdr')
+  const [numSDRs, setNumSDRs] = useState(2)
+  const [salarioSDR, setSalarioSDR] = useState(3500)
+
+  // Cálculos SDR
+  const custoMensalSDR = numSDRs * (salarioSDR * 1.72) // CLT com encargos
+  const reunioesPorSDR = 12
+  const custoPorReuniaoSDR = Math.round(custoMensalSDR / (numSDRs * reunioesPorSDR))
+
+  // Cálculos ETZ
+  const custoMensalYA = 890
+  const reunioesYA = Math.round(numSDRs * reunioesPorSDR * 1.4)
+  const custoPorReuniaoYA = Math.round(custoMensalYA / reunioesYA)
+
+  const economiaTotal = Math.round(custoMensalSDR - custoMensalYA)
+  const economiaPerc = Math.round((economiaTotal / custoMensalSDR) * 100)
+
+  // Cálculos Vendedor (modo alternativo)
+  const numVendedores = numSDRs
+  const salarioVend = salarioSDR * 2
+  const custoMensalVend = numVendedores * (salarioVend * 1.72)
+  const reunioesVend = Math.round(numVendedores * 8) // vendedores prospectam menos
+  const custoPorReuniaoVend = Math.round(custoMensalVend / Math.max(1, reunioesVend))
+
+  const custoMensalComp = calcMode === 'sdr' ? custoMensalSDR : custoMensalVend
+  const custoPorReuniaoComp = calcMode === 'sdr' ? custoPorReuniaoSDR : custoPorReuniaoVend
+  const economiaComp = Math.max(0, Math.round(custoMensalComp - custoMensalYA))
+  const economiaPercComp = custoMensalComp > 0 ? Math.round((economiaComp / custoMensalComp) * 100) : 0
+
+  return (
+    <div className="card border-t-4 border-t-brand-500 overflow-hidden mb-4">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-900">🧮 Calculadora de ROI — compare com sua situação atual</h3>
+        <p className="text-xs text-gray-500 mt-0.5">Ajuste os valores para calcular sua economia real com o ETZ</p>
+      </div>
+
+      <div className="p-4">
+        {/* Toggle SDR / Vendedor */}
+        <div className="flex gap-2 mb-5">
+          <button
+            onClick={() => setCalcMode('sdr')}
+            className={clsx(
+              'flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors',
+              calcMode === 'sdr'
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            )}
+          >
+            SDR / Pré-vendas
+          </button>
+          <button
+            onClick={() => setCalcMode('vendedor')}
+            className={clsx(
+              'flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors',
+              calcMode === 'vendedor'
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            )}
+          >
+            Vendedores prospectando
+          </button>
+        </div>
+
+        {/* Sliders */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+          <div>
+            <div className="flex justify-between text-xs mb-2">
+              <label className="font-medium text-gray-700">
+                Quantidade de {calcMode === 'sdr' ? 'SDRs' : 'vendedores'}
+              </label>
+              <span className="font-bold text-brand-600">{numSDRs}</span>
+            </div>
+            <input
+              type="range" min={1} max={20} value={numSDRs}
+              onChange={e => setNumSDRs(Number(e.target.value))}
+              className="w-full accent-brand-600"
+            />
+            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+              <span>1</span><span>20</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between text-xs mb-2">
+              <label className="font-medium text-gray-700">Salário base (R$)</label>
+              <span className="font-bold text-brand-600">R$ {salarioSDR.toLocaleString('pt-BR')}</span>
+            </div>
+            <input
+              type="range" min={2000} max={8000} step={500} value={salarioSDR}
+              onChange={e => setSalarioSDR(Number(e.target.value))}
+              className="w-full accent-brand-600"
+            />
+            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+              <span>R$2.000</span><span>R$8.000</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Comparativo lado a lado */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+            <div className="text-xs text-gray-500 mb-1 font-medium">
+              {calcMode === 'sdr' ? `${numSDRs} SDR${numSDRs > 1 ? 's' : ''} CLT` : `${numSDRs} vendedor${numSDRs > 1 ? 'es' : ''} prospectando`}
+            </div>
+            <div className="text-2xl font-bold font-mono text-gray-700">
+              R$ {custoMensalComp.toLocaleString('pt-BR')}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">custo/mês (com encargos)</div>
+            <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
+              <span className="font-bold text-gray-700">R$ {custoPorReuniaoComp}</span> por reunião
+            </div>
+          </div>
+
+          <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-4 text-center">
+            <div className="text-xs text-emerald-600 mb-1 font-semibold">ETZ — plano equivalente</div>
+            <div className="text-2xl font-bold font-mono text-emerald-700">
+              R$ {custoMensalYA.toLocaleString('pt-BR')}
+            </div>
+            <div className="text-xs text-emerald-600 mt-1">custo/mês fixo</div>
+            <div className="mt-2 pt-2 border-t border-emerald-200 text-xs text-emerald-600">
+              <span className="font-bold">R$ {custoPorReuniaoYA}</span> por reunião · {reunioesYA} reuniões/mês
+            </div>
+          </div>
+        </div>
+
+        {/* Resultado destaque */}
+        <div className="rounded-xl bg-emerald-500 p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-xs text-emerald-100 font-medium mb-0.5">Economia mensal estimada</div>
+            <div className="text-3xl font-bold text-white font-mono">
+              R$ {economiaComp.toLocaleString('pt-BR')}
+            </div>
+            <div className="text-xs text-emerald-100 mt-0.5">
+              {economiaPercComp}% de redução de custo · {reunioesYA} reuniões com 40% mais eficiência
+            </div>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <div className="text-4xl font-bold text-white">{economiaPercComp}%</div>
+            <div className="text-xs text-emerald-100">mais barato</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── ABA ROI ─────────────────────────────────────────────────────────────────
 
 function TabRoi() {
   return (
+    <div className="flex flex-col gap-0">
+    <CalculadoraRoi />
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-wrap gap-2">
         <div>
@@ -1098,6 +1270,7 @@ function TabRoi() {
           <span>O custo por reunião caiu <strong className="text-brand-600">50.6%</strong> desde Janeiro — direto resultado do aprendizado do Centro de Inteligência. Cada ciclo do CI melhora a qualificação dos contatos e aumenta a taxa de conversão, reduzindo o custo automaticamente.</span>
         </div>
       </div>
+    </div>
     </div>
   )
 }
