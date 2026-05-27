@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, emailsApi, adminSuporteApi } from '@/services/api';
+import { emailsApi, adminSuporteApi } from '@/services/api';
 import {
   Headphones,
   Phone,
