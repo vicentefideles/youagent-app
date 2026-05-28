@@ -439,12 +439,12 @@ export default function CampanhasPage() {
   })
 
   const pausarMutation = useMutation({
-    mutationFn: (id: string) => campanhasApi.update(id, { status: 'pausada' }),
+    mutationFn: (id: string) => campanhasApi.pausar(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campanhas'] }),
   })
 
   const iniciarMutation = useMutation({
-    mutationFn: (id: string) => campanhasApi.update(id, { status: 'ativa' }),
+    mutationFn: (id: string) => campanhasApi.reativar(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campanhas'] }),
   })
 
