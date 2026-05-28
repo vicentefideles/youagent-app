@@ -10,6 +10,9 @@ interface Contato {
   email?: string
   empresa?: string
   cargo?: string
+  cnpj?: string
+  cidade?: string
+  estado?: string
   [key: string]: string | undefined
 }
 
@@ -19,22 +22,35 @@ interface ColunasDetectadas {
   email: boolean
   empresa: boolean
   cargo: boolean
+  cnpj: boolean
+  cidade: boolean
+  estado: boolean
 }
 
+type CampoContato = keyof ColunasDetectadas
+
 // Mapeamento flexível de nomes de colunas
-const MAPA_COLUNAS = new Map<string, keyof ColunasDetectadas>([
-  // nome
-  ['nome', 'nome'], ['name', 'nome'], ['razao social', 'nome'], ['razao social empresa', 'nome'],
-  ['nome completo', 'nome'], ['contato', 'nome'], ['responsavel', 'nome'], ['nome empresa', 'nome'],
+const MAPA_COLUNAS = new Map<string, CampoContato>([
+  // nome / razão social
+  ['nome', 'nome'], ['name', 'nome'],
+  ['razao social', 'nome'], ['razao social empresa', 'nome'], ['razaosocial', 'nome'],
+  ['nome completo', 'nome'], ['nomecompleto', 'nome'],
+  ['contato', 'nome'], ['responsavel', 'nome'], ['nome empresa', 'nome'],
   // telefone
   ['telefone', 'telefone'], ['fone', 'telefone'], ['celular', 'telefone'], ['phone', 'telefone'],
   ['tel', 'telefone'], ['whatsapp', 'telefone'], ['mobile', 'telefone'], ['tel principal', 'telefone'],
+  ['telprincipal', 'telefone'],
   // email
   ['email', 'email'], ['e-mail', 'email'], ['e mail', 'email'], ['mail', 'email'],
   ['email comercial', 'email'], ['email corporativo', 'email'],
   // empresa
-  ['empresa', 'empresa'], ['company', 'empresa'], ['nome da empresa', 'empresa'],
-  ['cidade', 'empresa'], ['cnpj', 'empresa'],
+  ['empresa', 'empresa'], ['company', 'empresa'], ['nome da empresa', 'empresa'], ['nomedaempresa', 'empresa'],
+  // cnpj
+  ['cnpj', 'cnpj'], ['cpf cnpj', 'cnpj'], ['cpfcnpj', 'cnpj'], ['documento', 'cnpj'],
+  // cidade
+  ['cidade', 'cidade'], ['municipio', 'cidade'], ['city', 'cidade'],
+  // estado
+  ['estado', 'estado'], ['uf', 'estado'], ['state', 'estado'],
   // cargo
   ['cargo', 'cargo'], ['funcao', 'cargo'], ['role', 'cargo'],
   ['titulo', 'cargo'], ['cargo funcao', 'cargo'],
@@ -50,25 +66,29 @@ function detectarSeparador(linha: string): string {
 }
 
 function normalizarChave(col: string): string {
-  return col.trim().toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+  // Remove BOM, aspas, espaços extras
+  return col.trim().replace(/^﻿/, '').replace(/^["']|["']$/g, '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos (range Unicode correto)
     .replace(/[^a-z0-9\s]/g, '').trim()
 }
 
-function mapearColuna(col: string): keyof ColunasDetectadas | null {
+function mapearColuna(col: string): CampoContato | null {
   const normalizada = normalizarChave(col)
   return MAPA_COLUNAS.get(normalizada) ?? null
 }
 
+const COLUNAS_VAZIAS: ColunasDetectadas = { nome: false, telefone: false, email: false, empresa: false, cargo: false, cnpj: false, cidade: false, estado: false }
+
 function parsePlanilha(texto: string): { contatos: Contato[]; colunas: ColunasDetectadas; colunasOriginais: string[] } {
   const linhas = texto.trim().split(/\r?\n/)
-  if (linhas.length < 2) return { contatos: [], colunas: { nome: false, telefone: false, email: false, empresa: false, cargo: false }, colunasOriginais: [] }
+  if (linhas.length < 2) return { contatos: [], colunas: { ...COLUNAS_VAZIAS }, colunasOriginais: [] }
 
   const separador = detectarSeparador(linhas[0])
-  const cabecalhoOriginal = linhas[0].split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''))
-  const mapeamento: (keyof ColunasDetectadas | null)[] = cabecalhoOriginal.map(mapearColuna)
+  const cabecalhoOriginal = linhas[0].split(separador).map(c => c.trim().replace(/^["'﻿]|["']$/g, ''))
+  const mapeamento: (CampoContato | null)[] = cabecalhoOriginal.map(mapearColuna)
 
-  const colunas: ColunasDetectadas = { nome: false, telefone: false, email: false, empresa: false, cargo: false }
+  const colunas: ColunasDetectadas = { ...COLUNAS_VAZIAS }
   mapeamento.forEach(m => { if (m) colunas[m] = true })
 
   const contatos = linhas.slice(1)
@@ -224,14 +244,14 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
               {/* Colunas detectadas */}
               {colunasDetectadas && fase === 'preview' && (
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Colunas identificadas</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Campos identificados</p>
                   <div className="flex flex-wrap gap-2">
-                    {(['nome','telefone','email','empresa','cargo'] as const).map(campo => (
+                    {(Object.keys(COLUNAS_VAZIAS) as (keyof ColunasDetectadas)[]).map(campo => (
                       <span key={campo} className={clsx(
                         'text-xs px-2 py-1 rounded-full font-medium',
                         colunasDetectadas[campo]
                           ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-gray-200 text-gray-400 line-through'
+                          : 'bg-gray-100 text-gray-400 line-through'
                       )}>
                         {campo}
                       </span>
@@ -293,8 +313,13 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                   <div className="flex items-start gap-3">
                     <Sparkles size={18} className={enriquecimento ? 'text-brand mt-0.5' : 'text-gray-400 mt-0.5'} />
                     <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-gray-900">Enriquecimento de dados</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">Enriquecimento inteligente de contatos</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Completamos automaticamente os dados faltantes para aumentar a taxa de qualificação do agente.
+                          </p>
+                        </div>
                         <button
                           onClick={() => setEnriquecimento(v => !v)}
                           className={clsx(
@@ -308,15 +333,11 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                           )} />
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Sua lista não tem: <strong>{camposFaltando.join(', ')}</strong>.
-                        Completamos automaticamente via Receita Federal e Oportunidades.com.br.
-                      </p>
                       {enriquecimento && (
-                        <div className="flex items-start gap-1.5 mt-2 p-2 rounded-lg bg-brand-100">
+                        <div className="flex items-start gap-1.5 mt-3 p-2.5 rounded-lg bg-brand-100">
                           <Info size={12} className="text-brand mt-0.5 flex-shrink-0" />
                           <p className="text-xs text-brand-700">
-                            Custo por contato enriquecido cobrado no fechamento mensal junto com minutagem e outras despesas.
+                            O custo por contato enriquecido será consolidado no seu fechamento mensal junto com a minutagem e demais serviços.
                           </p>
                         </div>
                       )}
