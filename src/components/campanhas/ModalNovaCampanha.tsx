@@ -1,14 +1,7 @@
-import { useState, useEffect } from 'react'
-import { X, Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 import type { NovaCampanhaForm, TipoCampanha } from '@/types/campanha'
-import { inteligenciaApi } from '@/services/api'
-
-interface IcpPerfil {
-  total: number
-  top?: { setor?: { label: string }; cargo?: { label: string }; estado?: { label: string } }
-}
 
 interface Props {
   agentes: { id: string; nome: string }[]
@@ -130,14 +123,6 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
   const [form, setForm] = useState<FormState>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
-  const [icpPerfil, setIcpPerfil] = useState<IcpPerfil | null>(null)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    inteligenciaApi.getIcpPerfil()
-      .then(r => setIcpPerfil(r.data))
-      .catch(() => {/* sem dados — fallback silencioso */})
-  }, [])
 
   function s<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm(f => ({ ...f, [key]: val }))
@@ -316,105 +301,70 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
 
           {/* ── ICP ── */}
           <div className={clsx(
-            'rounded-xl border-2 overflow-hidden transition-all',
-            form.icp_ativo ? 'border-purple-400' : 'border-gray-200'
+            'rounded-xl border-2 transition-all',
+            form.icp_ativo ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-gray-50'
           )}>
-
-            {/* Insight dinâmico do ICP (quando há dados reais) */}
-            {icpPerfil && icpPerfil.total > 0 && (
-              <div className="px-4 py-3 flex items-center justify-between gap-3"
-                style={{ background: 'linear-gradient(135deg,#1e1e2e,#2d1b69)' }}>
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-lg flex-shrink-0">🎯</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white leading-tight">Perfil de Cliente Ideal detectado pelo sistema</p>
-                    <p className="text-2xs text-white/60 leading-relaxed mt-0.5">
-                      Baseado no seu histórico, você fecha mais com{' '}
-                      {icpPerfil.top?.setor ? <strong className="text-white/90">{icpPerfil.top.setor.label}</strong> : 'empresas'}
-                      {icpPerfil.top?.estado ? <> no estado de <strong className="text-white/90">{icpPerfil.top.estado.label}</strong></> : null}
-                      {icpPerfil.top?.cargo ? <>, lideradas por <strong className="text-white/90">{icpPerfil.top.cargo.label}</strong></> : null}.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { onFechar(); navigate('/inteligencia?tab=icp') }}
-                  className="flex-shrink-0 flex items-center gap-1 text-2xs font-bold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg px-2.5 py-1.5 transition-colors"
-                >
-                  Ver ICP completo <ExternalLink size={10} />
-                </button>
-              </div>
-            )}
-
             {/* Header com toggle */}
-            <div
-              className="px-4 py-3 flex items-center justify-between gap-4"
-              style={{ background: form.icp_ativo ? (icpPerfil && icpPerfil.total > 0 ? 'rgba(88,28,235,0.12)' : 'linear-gradient(135deg,#1e1e2e,#2d1b69)') : '#f9fafb' }}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                {!(icpPerfil && icpPerfil.total > 0) && <span className="text-xl flex-shrink-0">🎯</span>}
-                <div className="min-w-0">
-                  <p className={clsx('text-sm font-bold', form.icp_ativo ? (icpPerfil && icpPerfil.total > 0 ? 'text-purple-800' : 'text-white') : 'text-gray-800')}>
+            <div className="p-4 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-xl mt-0.5">🎯</span>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">
                     Usar inteligência do ICP nesta campanha?
                   </p>
-                  <p className={clsx('text-xs leading-relaxed', form.icp_ativo ? (icpPerfil && icpPerfil.total > 0 ? 'text-purple-600' : 'text-white/60') : 'text-gray-500')}>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
                     {form.icp_ativo
-                      ? 'Quando ativado, o sistema analisa sua lista, calcula o score de cada contato e ordena automaticamente os melhores perfis para o topo da fila — o agente liga primeiro para quem tem mais chance de agendar.'
-                      : 'Desativado — todos os leads são discados na ordem de importação'}
+                      ? 'O sistema analisa sua lista, calcula o score de cada contato e coloca os melhores perfis no topo da fila — o agente liga primeiro para quem tem mais chance de agendar.'
+                      : 'Desativado — os leads são discados na ordem de importação, sem priorização inteligente.'}
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-0.5">
                 <Toggle checked={form.icp_ativo} onChange={v => s('icp_ativo', v)} />
-                <span className={clsx('text-2xs font-bold', form.icp_ativo ? 'text-emerald-500' : 'text-gray-400')}>
-                  {form.icp_ativo ? 'ATIVADO' : 'DESATIVADO'}
+                <span className={clsx('text-xs font-bold', form.icp_ativo ? 'text-purple-600' : 'text-gray-400')}>
+                  {form.icp_ativo ? 'ATIVO' : 'INATIVO'}
                 </span>
               </div>
             </div>
 
-            {/* Corpo explicativo */}
-            {form.icp_ativo ? (
-              <div className="border-t border-purple-200 p-4 bg-purple-50">
+            {/* Benefícios quando ativo */}
+            {form.icp_ativo && (
+              <div className="px-4 pb-4 flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { icon: '📊', t: 'Score automático por lead', d: 'Cada contato recebe pontuação baseada em cargo, segmento, porte e região antes de ligar.' },
-                    { icon: '🏆', t: 'Fila inteligente', d: 'Leads com maior score sobem para o topo — você liga primeiro para quem mais converte.' },
-                    { icon: '📈', t: 'Aprendizado contínuo', d: 'A cada ligação o modelo ajusta os pesos — fica mais preciso com o tempo.' },
-                    { icon: '🎯', t: 'Threshold configurável', d: 'Score mínimo: 70. Leads abaixo ficam em espera para reprocessamento.' },
+                    { icon: '📊', t: 'Score por lead', d: 'Cada contato recebe uma pontuação antes de ligar.' },
+                    { icon: '🏆', t: 'Fila inteligente', d: 'Quem converte mais fica no topo automaticamente.' },
+                    { icon: '📈', t: 'Aprende com o tempo', d: 'O modelo fica mais preciso a cada ligação.' },
+                    { icon: '⚙️', t: 'Threshold: 70+', d: 'Leads abaixo do score ficam em espera.' },
                   ].map((b, i) => (
                     <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-white border border-purple-100">
-                      <span className="text-base flex-shrink-0">{b.icon}</span>
+                      <span className="text-sm flex-shrink-0">{b.icon}</span>
                       <div>
                         <p className="text-xs font-semibold text-purple-800">{b.t}</p>
-                        <p className="text-2xs text-purple-500 leading-relaxed mt-0.5">{b.d}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{b.d}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <span className="text-emerald-500 text-base">✅</span>
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <span className="text-sm">✅</span>
                   <p className="text-xs text-emerald-700 font-semibold">
-                    Clientes que ativam o ICP fecham em média <strong>3.2x mais reuniões</strong> com a mesma lista.
+                    Clientes com ICP ativo fecham em média <strong>3.2× mais reuniões</strong> com a mesma lista.
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="border-t border-gray-100 p-4 bg-white flex items-start gap-3">
-                <span className="text-amber-400 text-xl flex-shrink-0">💡</span>
-                <div>
-                  <p className="text-xs font-semibold text-gray-700 mb-1">Por que ativar o ICP?</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    O ICP analisa automaticamente sua lista e coloca na frente da fila os contatos com maior probabilidade de fechar.
-                    Sem ele, o agente liga para todos na mesma ordem — desperdiçando tempo com leads de baixo potencial.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => s('icp_ativo', true)}
-                    className="mt-2.5 text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 transition-colors"
-                  >
-                    🎯 Ativar ICP nesta campanha →
-                  </button>
-                </div>
+            )}
+
+            {/* Sugestão quando inativo */}
+            {!form.icp_ativo && (
+              <div className="px-4 pb-4">
+                <button
+                  type="button"
+                  onClick={() => s('icp_ativo', true)}
+                  className="text-xs font-bold text-purple-600 hover:text-purple-700 transition-colors"
+                >
+                  🎯 Ativar ICP nesta campanha →
+                </button>
               </div>
             )}
           </div>
