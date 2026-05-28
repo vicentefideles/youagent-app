@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { X, Upload, FileText, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { X, Upload, FileText, CheckCircle2, Loader2, AlertCircle, Sparkles, Info } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
 import { contatosApi } from '@/services/api'
@@ -13,39 +13,102 @@ interface Contato {
   [key: string]: string | undefined
 }
 
+interface ColunasDetectadas {
+  nome: boolean
+  telefone: boolean
+  email: boolean
+  empresa: boolean
+  cargo: boolean
+}
+
+// Mapeamento flexível de nomes de colunas
+const MAPA_COLUNAS: Record<string, keyof ColunasDetectadas> = {
+  // nome
+  nome: 'nome', name: 'nome', 'razao social': 'nome', 'razão social': 'nome',
+  'nome completo': 'nome', contato: 'nome', responsavel: 'nome', 'responsável': 'nome',
+  empresa: 'nome', 'nome empresa': 'nome',
+  // telefone
+  telefone: 'telefone', fone: 'telefone', celular: 'telefone', phone: 'telefone',
+  tel: 'telefone', whatsapp: 'telefone', mobile: 'telefone', 'tel principal': 'telefone',
+  // email
+  email: 'email', 'e-mail': 'email', 'e mail': 'email', mail: 'email',
+  'email comercial': 'email', 'email corporativo': 'email',
+  // empresa
+  empresa: 'empresa', company: 'empresa', 'nome da empresa': 'empresa',
+  'razao social empresa': 'empresa', cidade: 'empresa', cnpj: 'empresa',
+  // cargo
+  cargo: 'cargo', funcao: 'cargo', 'função': 'cargo', role: 'cargo',
+  titulo: 'cargo', 'título': 'cargo', 'cargo/funcao': 'cargo',
+}
+
+function detectarSeparador(linha: string): string {
+  const contaSemicolon = (linha.match(/;/g) || []).length
+  const contaVirgula = (linha.match(/,/g) || []).length
+  const contaTab = (linha.match(/\t/g) || []).length
+  if (contaSemicolon >= contaVirgula && contaSemicolon >= contaTab) return ';'
+  if (contaTab >= contaVirgula) return '\t'
+  return ','
+}
+
+function normalizarChave(col: string): string {
+  return col.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+    .replace(/[^a-z0-9\s]/g, '').trim()
+}
+
+function mapearColuna(col: string): keyof ColunasDetectadas | null {
+  const normalizada = normalizarChave(col)
+  return MAPA_COLUNAS[normalizada] ?? null
+}
+
+function parsePlanilha(texto: string): { contatos: Contato[]; colunas: ColunasDetectadas; colunasOriginais: string[] } {
+  const linhas = texto.trim().split(/\r?\n/)
+  if (linhas.length < 2) return { contatos: [], colunas: { nome: false, telefone: false, email: false, empresa: false, cargo: false }, colunasOriginais: [] }
+
+  const separador = detectarSeparador(linhas[0])
+  const cabecalhoOriginal = linhas[0].split(separador).map(c => c.trim().replace(/^["']|["']$/g, ''))
+  const mapeamento: (keyof ColunasDetectadas | null)[] = cabecalhoOriginal.map(mapearColuna)
+
+  const colunas: ColunasDetectadas = { nome: false, telefone: false, email: false, empresa: false, cargo: false }
+  mapeamento.forEach(m => { if (m) colunas[m] = true })
+
+  const contatos = linhas.slice(1)
+    .map(linha => {
+      const valores = linha.split(separador).map(v => v.trim().replace(/^["']|["']$/g, ''))
+      const obj: Contato = {}
+      mapeamento.forEach((campo, i) => {
+        if (campo && valores[i]) {
+          // Se já mapeou, pega o primeiro valor encontrado
+          if (!obj[campo]) obj[campo] = valores[i]
+        }
+      })
+      return obj
+    })
+    .filter(c => c.telefone || c.nome)
+
+  return { contatos, colunas, colunasOriginais: cabecalhoOriginal }
+}
+
 interface Props {
   campanha: Campanha
   onConcluido: (total: number) => void
   onFechar: () => void
 }
 
-function parseCsv(texto: string): Contato[] {
-  const linhas = texto.trim().split('\n')
-  if (linhas.length < 2) return []
-  const cabecalho = linhas[0].split(',').map((c) => c.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''))
-  return linhas.slice(1)
-    .map((linha) => {
-      const valores = linha.split(',')
-      const obj: Contato = {}
-      cabecalho.forEach((col, i) => {
-        obj[col] = (valores[i] ?? '').trim().replace(/^["']|["']$/g, '')
-      })
-      return obj
-    })
-    .filter((c) => c.telefone || c.nome)
-}
-
 export default function ModalImportarLista({ campanha, onConcluido, onFechar }: Props) {
   const [contatos, setContatos] = useState<Contato[]>([])
+  const [colunasDetectadas, setColunasDetectadas] = useState<ColunasDetectadas | null>(null)
+  const [colunasOriginais, setColunasOriginais] = useState<string[]>([])
   const [nomeArquivo, setNomeArquivo] = useState('')
   const [fase, setFase] = useState<'idle' | 'preview' | 'importando' | 'concluido'>('idle')
   const [progresso, setProgresso] = useState(0)
   const [erro, setErro] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [enriquecimento, setEnriquecimento] = useState(false)
 
   function processarArquivo(file: File) {
-    if (!file.name.endsWith('.csv')) {
-      setErro('Somente arquivos .csv são aceitos.')
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.txt')) {
+      setErro('Aceito arquivos .csv ou .txt. Para Excel (.xlsx), use Arquivo → Salvar Como → CSV.')
       return
     }
     setNomeArquivo(file.name)
@@ -53,12 +116,18 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
     const reader = new FileReader()
     reader.onload = (e) => {
       const texto = e.target?.result as string
-      const dados = parseCsv(texto)
+      const { contatos: dados, colunas, colunasOriginais: orig } = parsePlanilha(texto)
       if (dados.length === 0) {
-        setErro('Nenhum contato encontrado. Verifique se o CSV tem as colunas: nome, telefone, email, empresa, cargo')
+        setErro('Nenhum contato encontrado. Verifique se o arquivo tem pelo menos as colunas de nome e telefone.')
+        return
+      }
+      if (!colunas.telefone && !colunas.nome) {
+        setErro('Não foi possível identificar colunas de nome ou telefone. Colunas encontradas: ' + orig.join(', '))
         return
       }
       setContatos(dados)
+      setColunasDetectadas(colunas)
+      setColunasOriginais(orig)
       setFase('preview')
     }
     reader.readAsText(file, 'UTF-8')
@@ -71,13 +140,16 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
     if (file) processarArquivo(file)
   }, [])
 
+  const camposFaltando = colunasDetectadas
+    ? (['email', 'empresa', 'cargo'] as const).filter(c => !colunasDetectadas[c])
+    : []
+
   async function importar() {
     if (!campanha.id || contatos.length === 0) return
     setFase('importando')
     setProgresso(10)
 
     try {
-      // Chunks de 500 (limite do backend)
       const CHUNK = 500
       const total = contatos.length
       let enviados = 0
@@ -90,6 +162,7 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
           empresa:  c.empresa  || '',
           cargo:    c.cargo    || '',
           campanha_id: campanha.id,
+          enriquecimento_solicitado: enriquecimento,
         }))
         await contatosApi.bulkInsert({ contatos: chunk, campanha_id: campanha.id })
         enviados += chunk.length
@@ -109,22 +182,19 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-popup w-full max-w-lg">
+      <div className="bg-white rounded-2xl shadow-popup w-full max-w-lg max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Importar lista de contatos</h2>
             <p className="text-xs text-gray-400 mt-0.5">Campanha: <span className="font-medium text-gray-700">{campanha.nome}</span></p>
           </div>
-          <button onClick={onFechar} className="btn-ghost p-2">
-            <X size={18} />
-          </button>
+          <button onClick={onFechar} className="btn-ghost p-2"><X size={18} /></button>
         </div>
 
         <div className="p-6 flex flex-col gap-5">
 
-          {/* Fase idle / dropzone */}
           {(fase === 'idle' || fase === 'preview') && (
             <>
               {/* Dropzone */}
@@ -135,13 +205,11 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                 onClick={() => document.getElementById('csv-input')?.click()}
                 className={clsx(
                   'border-2 border-dashed rounded-xl p-8 cursor-pointer transition-all text-center',
-                  dragging
-                    ? 'border-brand bg-brand-50'
-                    : 'border-gray-200 hover:border-brand hover:bg-brand-50/50'
+                  dragging ? 'border-brand bg-brand-50' : 'border-gray-200 hover:border-brand hover:bg-brand-50/50'
                 )}
               >
                 <input
-                  id="csv-input" type="file" accept=".csv"
+                  id="csv-input" type="file" accept=".csv,.txt"
                   className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) processarArquivo(f) }}
                 />
@@ -150,15 +218,35 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                   {nomeArquivo || 'Clique ou arraste o arquivo CSV'}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Colunas esperadas: <code className="bg-gray-100 px-1 rounded">nome</code>{' '}
-                  <code className="bg-gray-100 px-1 rounded">telefone</code>{' '}
-                  <code className="bg-gray-100 px-1 rounded">email</code>{' '}
-                  <code className="bg-gray-100 px-1 rounded">empresa</code>{' '}
-                  <code className="bg-gray-100 px-1 rounded">cargo</code>
+                  Detectamos automaticamente as colunas do seu arquivo
                 </p>
               </div>
 
-              {/* Preview */}
+              {/* Colunas detectadas */}
+              {colunasDetectadas && fase === 'preview' && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Colunas identificadas</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(['nome','telefone','email','empresa','cargo'] as const).map(campo => (
+                      <span key={campo} className={clsx(
+                        'text-xs px-2 py-1 rounded-full font-medium',
+                        colunasDetectadas[campo]
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-gray-200 text-gray-400 line-through'
+                      )}>
+                        {campo}
+                      </span>
+                    ))}
+                  </div>
+                  {colunasOriginais.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      Colunas originais: {colunasOriginais.join(' · ')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Preview tabela */}
               {fase === 'preview' && contatos.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
@@ -168,13 +256,11 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                     </span>
                     <span className="badge badge-success">Pronto</span>
                   </div>
-
-                  {/* Tabela preview (5 primeiros) */}
                   <div className="overflow-x-auto rounded-lg border border-gray-100">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-gray-50">
-                          {['Nome','Telefone','Empresa','Cargo'].map((h) => (
+                          {['Nome','Telefone','Empresa','Cargo'].map(h => (
                             <th key={h} className="px-3 py-2 text-left text-gray-500 font-semibold">{h}</th>
                           ))}
                         </tr>
@@ -199,6 +285,47 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                 </div>
               )}
 
+              {/* Enriquecimento */}
+              {fase === 'preview' && camposFaltando.length > 0 && (
+                <div className={clsx(
+                  'rounded-xl border p-4 transition-all',
+                  enriquecimento ? 'border-brand bg-brand-50' : 'border-gray-200 bg-gray-50'
+                )}>
+                  <div className="flex items-start gap-3">
+                    <Sparkles size={18} className={enriquecimento ? 'text-brand mt-0.5' : 'text-gray-400 mt-0.5'} />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-gray-900">Enriquecimento de dados</p>
+                        <button
+                          onClick={() => setEnriquecimento(v => !v)}
+                          className={clsx(
+                            'w-10 h-5 rounded-full transition-all relative flex-shrink-0',
+                            enriquecimento ? 'bg-brand' : 'bg-gray-300'
+                          )}
+                        >
+                          <span className={clsx(
+                            'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all',
+                            enriquecimento ? 'left-5' : 'left-0.5'
+                          )} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Sua lista não tem: <strong>{camposFaltando.join(', ')}</strong>.
+                        Completamos automaticamente via Receita Federal e Oportunidades.com.br.
+                      </p>
+                      {enriquecimento && (
+                        <div className="flex items-start gap-1.5 mt-2 p-2 rounded-lg bg-brand-100">
+                          <Info size={12} className="text-brand mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-brand-700">
+                            Custo por contato enriquecido cobrado no fechamento mensal junto com minutagem e outras despesas.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Erro */}
               {erro && (
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
@@ -209,27 +336,28 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
             </>
           )}
 
-          {/* Fase importando */}
+          {/* Importando */}
           {fase === 'importando' && (
             <div className="py-4 text-center">
               <Loader2 size={32} className="animate-spin text-brand mx-auto mb-4" />
               <p className="text-sm font-semibold text-gray-900">Importando contatos...</p>
               <p className="text-xs text-gray-400 mt-1">{progresso}% concluído</p>
               <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand rounded-full transition-all duration-300"
-                     style={{ width: `${progresso}%` }} />
+                <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: `${progresso}%` }} />
               </div>
             </div>
           )}
 
-          {/* Fase concluído */}
+          {/* Concluído */}
           {fase === 'concluido' && (
             <div className="py-4 text-center">
               <CheckCircle2 size={40} className="text-emerald-500 mx-auto mb-3" />
               <p className="text-sm font-semibold text-gray-900">
                 {contatos.length.toLocaleString('pt-BR')} contatos importados!
               </p>
-              <p className="text-xs text-gray-400 mt-1">A campanha já pode ser iniciada.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {enriquecimento ? 'Enriquecimento em andamento — os dados serão completados em breve.' : 'A campanha já pode ser iniciada.'}
+              </p>
             </div>
           )}
 
