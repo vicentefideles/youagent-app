@@ -197,6 +197,7 @@ export const claudeApi = {
 // Clientes — onboarding e admin
 export const clientesApi = {
   criar: (data: unknown) => api.post('/clientes', data),
+  me: () => api.get('/clientes/me'),
   buscar: (id: string) => api.get(`/clientes/${id}`),
   enviarDocumentos: (id: string, data: unknown) => api.post(`/clientes/${id}/documentos`, data),
   gerarContrato: (id: string) => api.post(`/clientes/${id}/gerar-contrato`, {}),

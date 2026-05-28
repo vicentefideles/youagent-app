@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Phone, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { Phone, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { telnyxApi } from '@/services/api'
 
 interface Solicitacao {
@@ -333,6 +333,27 @@ export default function AdminTelnyxPage() {
         <h1 className="text-xl font-semibold text-gray-900">Números Telnyx — Gestão de Provisionamento</h1>
       </div>
 
+      {/* Alerta de rejeições novas */}
+      {contagens.rejeitados > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 animate-pulse" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-800">
+              {contagens.rejeitados} solicitação{contagens.rejeitados > 1 ? 'ões rejeitadas' : ' rejeitada'} — cliente aguarda retorno
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">
+              Clique em "Rejeitados" abaixo para ver o motivo e tomar uma ação.
+            </p>
+          </div>
+          <button
+            onClick={() => setFiltro('rejeitado')}
+            className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
+          >
+            Ver rejeições
+          </button>
+        </div>
+      )}
+
       {/* Badges de contagem */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-amber-200 p-4">
@@ -347,7 +368,7 @@ export default function AdminTelnyxPage() {
           <p className="text-2xl font-bold text-green-700">{contagens.ativos}</p>
           <p className="text-xs text-gray-500 mt-0.5">Ativos</p>
         </div>
-        <div className="bg-white rounded-xl border border-red-200 p-4">
+        <div className={`rounded-xl border p-4 ${contagens.rejeitados > 0 ? 'bg-red-50 border-red-400' : 'bg-white border-red-200'}`}>
           <p className="text-2xl font-bold text-red-700">{contagens.rejeitados}</p>
           <p className="text-xs text-gray-500 mt-0.5">Rejeitados</p>
         </div>
