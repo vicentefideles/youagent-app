@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { X, Upload, FileText, CheckCircle2, Loader2, AlertCircle, Sparkles, Info } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
-import { contatosApi } from '@/services/api'
+import { contatosApi, campanhasApi } from '@/services/api'
 
 interface Contato {
   nome?: string
