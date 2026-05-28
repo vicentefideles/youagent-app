@@ -196,6 +196,8 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
         return true
       })
 
+      const duplicadosRemovidos = contatos.length - contatosUnicos.length
+
       const CHUNK = 500
       const total = contatosUnicos.length
       let enviados = 0
@@ -217,6 +219,11 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
         await contatosApi.bulkInsert({ contatos: chunk, campanha_id: campanha.id })
         enviados += chunk.length
         setProgresso(Math.round((enviados / total) * 100))
+      }
+
+      // Salva contagem de duplicados na campanha para exibição no card
+      if (duplicadosRemovidos > 0) {
+        await campanhasApi.patch(campanha.id, { lista_duplicados: duplicadosRemovidos })
       }
 
       setFase('concluido')
