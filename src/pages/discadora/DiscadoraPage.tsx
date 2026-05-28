@@ -1,13 +1,13 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
   User, Building2, MapPin, MessageSquare, X,
   Play, Pause, CheckCircle2, XCircle, RotateCcw, Megaphone,
-  AlertTriangle, Volume2, Video,
+  Volume2, Video,
   RefreshCw, Archive, ArrowUpDown, ChevronDown,
   Copy, PhoneForwarded, FileText, Zap
 } from 'lucide-react'

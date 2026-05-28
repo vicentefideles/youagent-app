@@ -10,6 +10,7 @@ export interface CampanhaDashboard {
   agendadas: number
   nao_atendeu: number
   recusou: number
+  gatekeeper: number
   na_fila: number
   custo_total: number
   taxa_conversao: number
