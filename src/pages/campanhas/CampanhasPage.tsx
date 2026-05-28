@@ -409,6 +409,8 @@ export default function CampanhasPage() {
   const { data: campanhasRaw = [], isLoading } = useQuery({
     queryKey: ['campanhas'],
     queryFn: () => campanhasApi.list().then((r) => r.data as Campanha[]),
+    refetchInterval: 10000,   // atualiza o card a cada 10s automaticamente
+    staleTime: 0,             // sempre considera dados desatualizados
   })
 
   const { data: agentes = [] } = useQuery({
@@ -781,8 +783,9 @@ export default function CampanhasPage() {
         <ModalImportarLista
           campanha={campanhaImportar}
           onConcluido={(total) => {
-            qc.invalidateQueries({ queryKey: ['campanhas'] })
             void total
+            // Força refetch imediato para atualizar o card com o novo total_lista
+            qc.refetchQueries({ queryKey: ['campanhas'] })
           }}
           onFechar={() => setCampanhaImportar(null)}
         />
