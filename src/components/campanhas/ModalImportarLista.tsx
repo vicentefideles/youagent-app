@@ -22,24 +22,23 @@ interface ColunasDetectadas {
 }
 
 // Mapeamento flexível de nomes de colunas
-const MAPA_COLUNAS: Record<string, keyof ColunasDetectadas> = {
+const MAPA_COLUNAS = new Map<string, keyof ColunasDetectadas>([
   // nome
-  nome: 'nome', name: 'nome', 'razao social': 'nome', 'razão social': 'nome',
-  'nome completo': 'nome', contato: 'nome', responsavel: 'nome', 'responsável': 'nome',
-  empresa: 'nome', 'nome empresa': 'nome',
+  ['nome', 'nome'], ['name', 'nome'], ['razao social', 'nome'], ['razao social empresa', 'nome'],
+  ['nome completo', 'nome'], ['contato', 'nome'], ['responsavel', 'nome'], ['nome empresa', 'nome'],
   // telefone
-  telefone: 'telefone', fone: 'telefone', celular: 'telefone', phone: 'telefone',
-  tel: 'telefone', whatsapp: 'telefone', mobile: 'telefone', 'tel principal': 'telefone',
+  ['telefone', 'telefone'], ['fone', 'telefone'], ['celular', 'telefone'], ['phone', 'telefone'],
+  ['tel', 'telefone'], ['whatsapp', 'telefone'], ['mobile', 'telefone'], ['tel principal', 'telefone'],
   // email
-  email: 'email', 'e-mail': 'email', 'e mail': 'email', mail: 'email',
-  'email comercial': 'email', 'email corporativo': 'email',
+  ['email', 'email'], ['e-mail', 'email'], ['e mail', 'email'], ['mail', 'email'],
+  ['email comercial', 'email'], ['email corporativo', 'email'],
   // empresa
-  empresa: 'empresa', company: 'empresa', 'nome da empresa': 'empresa',
-  'razao social empresa': 'empresa', cidade: 'empresa', cnpj: 'empresa',
+  ['empresa', 'empresa'], ['company', 'empresa'], ['nome da empresa', 'empresa'],
+  ['cidade', 'empresa'], ['cnpj', 'empresa'],
   // cargo
-  cargo: 'cargo', funcao: 'cargo', 'função': 'cargo', role: 'cargo',
-  titulo: 'cargo', 'título': 'cargo', 'cargo/funcao': 'cargo',
-}
+  ['cargo', 'cargo'], ['funcao', 'cargo'], ['role', 'cargo'],
+  ['titulo', 'cargo'], ['cargo funcao', 'cargo'],
+])
 
 function detectarSeparador(linha: string): string {
   const contaSemicolon = (linha.match(/;/g) || []).length
@@ -58,7 +57,7 @@ function normalizarChave(col: string): string {
 
 function mapearColuna(col: string): keyof ColunasDetectadas | null {
   const normalizada = normalizarChave(col)
-  return MAPA_COLUNAS[normalizada] ?? null
+  return MAPA_COLUNAS.get(normalizada) ?? null
 }
 
 function parsePlanilha(texto: string): { contatos: Contato[]; colunas: ColunasDetectadas; colunasOriginais: string[] } {
