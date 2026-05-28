@@ -10,6 +10,7 @@ import { campanhasApi, agentesApi } from '@/services/api'
 import CampanhaCard from '@/components/campanhas/CampanhaCard'
 import ModalNovaCampanha from '@/components/campanhas/ModalNovaCampanha'
 import ModalImportarLista from '@/components/campanhas/ModalImportarLista'
+import ModalReprocessar from '@/components/campanhas/ModalReprocessar'
 import type { Campanha, NovaCampanhaForm } from '@/types/campanha'
 
 // ─── TIPOS ───────────────────────────────────────────────────────────────────
@@ -390,6 +391,7 @@ export default function CampanhasPage() {
   const [campanhaImportar, setCampanhaImportar] = useState<Campanha | null>(null)
   const [configModal, setConfigModal] = useState<ConfigIAModalState>({ open: false, campanhaId: null, campanhaName: '' })
   const [modalAgressividade, setModalAgressividade] = useState<{ id: string; nome: string; agr: string; simultaneas: number } | null>(null)
+  const [campanhaReprocessar, setCampanhaReprocessar] = useState<Campanha | null>(null)
 
   // ── Upload de lista ──
   const [isDragging, setIsDragging] = useState(false)
@@ -627,6 +629,7 @@ export default function CampanhasPage() {
               onVerFila={(camp) => navigate('/discadora?campanha=' + camp.id)}
               onEditar={(camp) => setConfigModal({ open: true, campanhaId: camp.id, campanhaName: camp.nome })}
               onAgressividade={(camp) => setModalAgressividade({ id: camp.id, nome: camp.nome, agr: camp.agressividade ?? 'media', simultaneas: (camp as unknown as { discagem_simultanea?: number }).discagem_simultanea ?? 1 })}
+              onReprocessar={(camp) => setCampanhaReprocessar(camp)}
             />
           ))}
         </div>
@@ -788,6 +791,13 @@ export default function CampanhasPage() {
             qc.refetchQueries({ queryKey: ['campanhas'] })
           }}
           onFechar={() => setCampanhaImportar(null)}
+        />
+      )}
+      {campanhaReprocessar && (
+        <ModalReprocessar
+          campanha={campanhaReprocessar}
+          onConcluido={() => qc.refetchQueries({ queryKey: ['campanhas'] })}
+          onFechar={() => setCampanhaReprocessar(null)}
         />
       )}
 

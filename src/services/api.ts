@@ -61,6 +61,10 @@ export const campanhasApi = {
   patch:    (id: string, data: unknown) => api.patch(`/campanhas/${id}`, data),
   analisarLista: (id: string, data: { amostra?: Array<{ nome?: string; empresa?: string; cargo?: string }>; total_contatos?: number; segmento?: string }) =>
     api.post(`/campanhas/${id}/analisar-lista`, data),
+  reprocessarPreview: (id: string) =>
+    api.get(`/campanhas/${id}/reprocessar/preview`),
+  reprocessar: (id: string, data: { tipos: string[]; intervalo_horas: number; max_tentativas: number }) =>
+    api.post(`/campanhas/${id}/reprocessar`, data),
 }
 
 // Contatos

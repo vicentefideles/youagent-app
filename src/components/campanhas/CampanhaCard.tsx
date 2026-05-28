@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Brain, MoreHorizontal, Zap, Target,
-  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings, Loader2, X, List
+  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings, Loader2, X, List, RefreshCw
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
@@ -17,6 +17,7 @@ interface Props {
   onVerFila: (campanha: Campanha) => void
   onEditar?: (campanha: Campanha) => void
   onAgressividade?: (campanha: Campanha) => void
+  onReprocessar?: (campanha: Campanha) => void
 }
 
 const TIPO_LABELS: Record<string, string> = {
@@ -54,7 +55,7 @@ interface HorarioSugestao {
   melhores_horarios?: string[]
 }
 
-export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar: _onImportar, onVerFila: _onVerFila, onEditar, onAgressividade }: Props) {
+export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar: _onImportar, onVerFila: _onVerFila, onEditar, onAgressividade, onReprocessar }: Props) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [iaAberta, setIaAberta] = useState(false)
@@ -366,6 +367,17 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
         >
           <List size={13} /> Leads
         </button>
+
+        {/* Reprocessar → reprocessar contatos não alcançados */}
+        {onReprocessar && (
+          <button
+            className="btn-secondary flex-1 text-xs py-2 gap-1.5"
+            onClick={() => onReprocessar(campanha)}
+            title="Reprocessar contatos não alcançados"
+          >
+            <RefreshCw size={13} /> Reprocessar
+          </button>
+        )}
       </div>
 
       {/* Painel Análise Pré-Disparo */}
