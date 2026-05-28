@@ -66,18 +66,28 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
   const [pausandoOuIniciando, setPausandoOuIniciando] = useState(false)
   const [leadsAberto, setLeadsAberto] = useState(false)
   const [leads, setLeads] = useState<Record<string, string>[]>([])
+  const [leadsTotal, setLeadsTotal] = useState(0)
+  const [leadsPagina, setLeadsPagina] = useState(1)
   const [carregandoLeads, setCarregandoLeads] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const LEADS_LIMIT = 100
+
+  async function carregarLeads(pagina = 1) {
+    setCarregandoLeads(true)
+    try {
+      const res = await contatosApi.list(campanha.id, pagina, LEADS_LIMIT)
+      const body = res.data as { data: Record<string, string>[]; total: number; page: number }
+      setLeads(body.data ?? [])
+      setLeadsTotal(body.total ?? 0)
+      setLeadsPagina(pagina)
+    } catch { setLeads([]); setLeadsTotal(0) }
+    finally { setCarregandoLeads(false) }
+  }
 
   async function abrirLeads() {
     setLeadsAberto(true)
     if (leads.length > 0) return
-    setCarregandoLeads(true)
-    try {
-      const res = await contatosApi.list(campanha.id)
-      setLeads((res.data as Record<string, string>[]) ?? [])
-    } catch { setLeads([]) }
-    finally { setCarregandoLeads(false) }
+    carregarLeads(1)
   }
 
   // Fechar menu ao clicar fora
@@ -496,8 +506,8 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
             <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
               <Users size={12} className="text-brand-500" />
               Contatos importados
-              {leads.length > 0 && (
-                <span className="badge badge-brand ml-1">{leads.length}</span>
+              {leadsTotal > 0 && (
+                <span className="badge badge-brand ml-1">{leadsTotal.toLocaleString('pt-BR')}</span>
               )}
             </p>
             <button onClick={() => setLeadsAberto(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400">
@@ -541,8 +551,24 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                   ))}
                 </tbody>
               </table>
-              {leads.length > 50 && (
-                <p className="text-center text-2xs text-gray-400 py-2">Mostrando 50 de {leads.length} contatos</p>
+              {leadsTotal > LEADS_LIMIT && (
+                <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
+                  <span className="text-2xs text-gray-400">
+                    Página {leadsPagina} de {Math.ceil(leadsTotal / LEADS_LIMIT)} · {leadsTotal.toLocaleString('pt-BR')} contatos
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      disabled={leadsPagina <= 1 || carregandoLeads}
+                      onClick={() => carregarLeads(leadsPagina - 1)}
+                      className="px-2 py-0.5 text-2xs rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                    >← Ant</button>
+                    <button
+                      disabled={leadsPagina >= Math.ceil(leadsTotal / LEADS_LIMIT) || carregandoLeads}
+                      onClick={() => carregarLeads(leadsPagina + 1)}
+                      className="px-2 py-0.5 text-2xs rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                    >Próx →</button>
+                  </div>
+                </div>
               )}
             </div>
           )}

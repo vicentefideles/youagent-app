@@ -69,8 +69,9 @@ export const campanhasApi = {
 
 // Contatos
 export const contatosApi = {
-  list:       (campanhaId: string)  => api.get(`/contatos?campanha_id=${campanhaId}`),
-  bulkInsert: (data: unknown)       => api.post('/contatos/bulk', data),
+  list:       (campanhaId: string, page = 1, limit = 100) =>
+    api.get(`/contatos?campanha_id=${campanhaId}&page=${page}&limit=${limit}`),
+  bulkInsert: (data: unknown) => api.post('/contatos/bulk', data),
 }
 
 /** @deprecated Use campanhasApi */
