@@ -193,12 +193,16 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
 
       for (let i = 0; i < total; i += CHUNK) {
         const chunk = contatos.slice(i, i + CHUNK).map((c) => ({
-          nome:     c.nome     || '',
-          telefone: c.telefone || '',
-          email:    c.email    || '',
-          empresa:  c.empresa  || '',
-          cargo:    c.cargo    || '',
-          campanha_id: campanha.id,
+          nome:         c.nome     || '',
+          telefone:     c.telefone || '',
+          email:        c.email    || '',
+          empresa:      c.empresa  || '',
+          cargo:        c.cargo    || '',
+          razao_social: c.nome     || '',  // Razão Social mapeada como nome
+          cnpj:         c.cnpj     || '',
+          estado:       c.estado   || '',
+          cidade:       c.cidade   || '',
+          campanha_id:  campanha.id,
           enriquecimento_solicitado: enriquecimento,
         }))
         await contatosApi.bulkInsert({ contatos: chunk, campanha_id: campanha.id })
