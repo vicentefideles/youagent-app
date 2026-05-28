@@ -66,11 +66,14 @@ function detectarSeparador(linha: string): string {
 }
 
 function normalizarChave(col: string): string {
-  // Remove BOM, aspas, espaços extras
-  return col.trim().replace(/^﻿/, '').replace(/^["']|["']$/g, '')
+  return col.trim()
+    .replace(/^﻿/, '')           // remove BOM UTF-8
+    .replace(/^["']|["']$/g, '')      // remove aspas
     .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos (range Unicode correto)
-    .replace(/[^a-z0-9\s]/g, '').trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')  // remove diacríticos (acentos) — range Unicode correto
+    .replace(/[^a-z0-9\s]/g, '')      // remove caracteres especiais restantes
+    .trim()
 }
 
 function mapearColuna(col: string): CampoContato | null {
@@ -125,6 +128,22 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
   const [dragging, setDragging] = useState(false)
   const [enriquecimento, setEnriquecimento] = useState(false)
 
+  function processarTexto(texto: string) {
+    const { contatos: dados, colunas, colunasOriginais: orig } = parsePlanilha(texto)
+    if (dados.length === 0) {
+      setErro('Nenhum contato encontrado. Verifique se o arquivo tem pelo menos nome ou telefone.')
+      return
+    }
+    if (!colunas.telefone && !colunas.nome) {
+      setErro('Não foi possível identificar nome ou telefone. Colunas encontradas: ' + orig.join(', '))
+      return
+    }
+    setContatos(dados)
+    setColunasDetectadas(colunas)
+    setColunasOriginais(orig)
+    setFase('preview')
+  }
+
   function processarArquivo(file: File) {
     if (!file.name.endsWith('.csv') && !file.name.endsWith('.txt')) {
       setErro('Aceito arquivos .csv ou .txt. Para Excel (.xlsx), use Arquivo → Salvar Como → CSV.')
@@ -132,24 +151,24 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
     }
     setNomeArquivo(file.name)
     setErro('')
-    const reader = new FileReader()
-    reader.onload = (e) => {
+
+    // Tenta UTF-8 primeiro; se detectar mojibake (Ã, caracteres estranhos), re-lê como Windows-1252
+    const readerUtf8 = new FileReader()
+    readerUtf8.onload = (e) => {
       const texto = e.target?.result as string
-      const { contatos: dados, colunas, colunasOriginais: orig } = parsePlanilha(texto)
-      if (dados.length === 0) {
-        setErro('Nenhum contato encontrado. Verifique se o arquivo tem pelo menos as colunas de nome e telefone.')
-        return
+      // Detecta mojibake típico de Windows-1252 lido como UTF-8
+      const temMojibake = /Ã|â€|Â|Ã£|Ã§|Ã©|Ã­|Ã³|Ãº/.test(texto.slice(0, 500))
+      const temSubstituto = texto.slice(0, 500).includes('�')
+      if (temMojibake || temSubstituto) {
+        // Re-lê como Windows-1252 (Latin-1)
+        const readerLatin = new FileReader()
+        readerLatin.onload = (ev) => processarTexto(ev.target?.result as string)
+        readerLatin.readAsText(file, 'windows-1252')
+      } else {
+        processarTexto(texto)
       }
-      if (!colunas.telefone && !colunas.nome) {
-        setErro('Não foi possível identificar colunas de nome ou telefone. Colunas encontradas: ' + orig.join(', '))
-        return
-      }
-      setContatos(dados)
-      setColunasDetectadas(colunas)
-      setColunasOriginais(orig)
-      setFase('preview')
     }
-    reader.readAsText(file, 'UTF-8')
+    readerUtf8.readAsText(file, 'UTF-8')
   }
 
   const handleDrop = useCallback((e: React.DragEvent) => {
