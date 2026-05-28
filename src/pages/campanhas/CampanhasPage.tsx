@@ -257,7 +257,7 @@ function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: M
   async function salvar() {
     setSalvando(true)
     try {
-      if (campanhaId) await campanhasApi.update(campanhaId, {
+      if (campanhaId) await campanhasApi.patch(campanhaId, {
         agressividade: retentativa,
         discagem_simultanea: simultaneas,
       })

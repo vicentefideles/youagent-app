@@ -58,6 +58,7 @@ export const campanhasApi = {
   iniciar: (id: string)               => api.post(`/campanhas/${id}/iniciar`, {}),
   pausar:   (id: string)               => api.patch(`/campanhas/${id}`, { status: 'pausada' }),
   reativar: (id: string)               => api.patch(`/campanhas/${id}`, { status: 'ativa' }),
+  patch:    (id: string, data: unknown) => api.patch(`/campanhas/${id}`, data),
   analisarLista: (id: string, data: { amostra?: Array<{ nome?: string; empresa?: string; cargo?: string }>; total_contatos?: number; segmento?: string }) =>
     api.post(`/campanhas/${id}/analisar-lista`, data),
 }
