@@ -12,8 +12,11 @@ export interface CampanhaDashboard {
   recusou: number
   gatekeeper: number
   na_fila: number
+  em_contato: number
+  esgotados: number
   custo_total: number
   taxa_conversao: number
+  duplicados: number
 }
 
 export interface Campanha {

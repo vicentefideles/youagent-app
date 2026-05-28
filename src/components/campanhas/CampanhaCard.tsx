@@ -123,12 +123,13 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
   }
 
   const d = campanha.dashboard
-  const total    = d?.total_lista    ?? 0
-  const feitas   = d?.ligacoes_feitas ?? 0
-  const faltam   = Math.max(0, total - feitas)
-  const agendadas= d?.agendadas      ?? 0
-  const naFila   = d?.na_fila        ?? 0
-  const conversao= total > 0 ? ((agendadas / Math.max(feitas, 1)) * 100).toFixed(1) : '0.0'
+  const total      = d?.total_lista    ?? 0
+  const feitas     = d?.ligacoes_feitas ?? 0
+  const faltam     = Math.max(0, total - feitas)
+  const agendadas  = d?.agendadas      ?? 0
+  const naFila     = d?.na_fila        ?? 0
+  const duplicados = d?.duplicados     ?? 0
+  const conversao  = total > 0 ? ((agendadas / Math.max(feitas, 1)) * 100).toFixed(1) : '0.0'
   const consumoPct = total > 0 ? Math.min(100, Math.round((feitas / total) * 100)) : 0
 
   const modal   = MODAL_CONFIG[campanha.modalidade] ?? MODAL_CONFIG.online
@@ -317,6 +318,17 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
           </div>
         ))}
       </div>
+
+      {/* Linha de duplicados — só aparece se houver duplicatas */}
+      {duplicados > 0 && (
+        <div className="mx-4 mb-0 mt-0 px-3 py-2 rounded-lg border border-orange-100 bg-orange-50 flex items-center justify-between">
+          <span className="text-xs text-orange-700 flex items-center gap-1.5">
+            <AlertTriangle size={12} className="text-orange-500" />
+            Telefones duplicados na lista
+          </span>
+          <span className="text-xs font-bold font-mono text-orange-700">{duplicados.toLocaleString('pt-BR')}</span>
+        </div>
+      )}
 
       {/* Alerta */}
       <div className={clsx(

@@ -187,12 +187,21 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
     setProgresso(10)
 
     try {
+      // Deduplica por telefone para evitar conflitos de constraint
+      const vistos = new Set<string>()
+      const contatosUnicos = contatos.filter(c => {
+        const key = c.telefone || c.nome || Math.random().toString()
+        if (vistos.has(key)) return false
+        vistos.add(key)
+        return true
+      })
+
       const CHUNK = 500
-      const total = contatos.length
+      const total = contatosUnicos.length
       let enviados = 0
 
       for (let i = 0; i < total; i += CHUNK) {
-        const chunk = contatos.slice(i, i + CHUNK).map((c) => ({
+        const chunk = contatosUnicos.slice(i, i + CHUNK).map((c) => ({
           nome:         c.nome     || '',
           telefone:     c.telefone || '',
           email:        c.email    || '',
@@ -212,7 +221,7 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
 
       setFase('concluido')
       setTimeout(() => {
-        onConcluido(total)
+        onConcluido(contatosUnicos.length)
         onFechar()
       }, 1500)
     } catch (e: unknown) {
