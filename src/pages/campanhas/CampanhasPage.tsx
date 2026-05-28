@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Filter, Activity,
-  Upload, Shield, X, AlertTriangle, Zap, Loader2,
+  Upload, Shield, X, AlertTriangle, Zap, Loader2, Clock, BarChart2,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { campanhasApi, agentesApi } from '@/services/api'
@@ -632,6 +632,75 @@ export default function CampanhasPage() {
               onReprocessar={(camp) => setCampanhaReprocessar(camp)}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Horários de ligação por agente ────────────────────────────────── */}
+      {campanhasRaw.length > 0 && (
+        <div className="card p-5 mb-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-brand-500" />
+                <h3 className="text-sm font-semibold text-gray-900">Horários de ligação por agente</h3>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">Configure quando cada agente pode ligar. O motor de IA respeita essas janelas automaticamente.</p>
+            </div>
+            <button
+              onClick={() => navigate('/inteligencia')}
+              className="btn-secondary text-xs gap-2 whitespace-nowrap"
+            >
+              <BarChart2 size={13} /> Ver inteligência de horários →
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {campanhasRaw
+              .filter(c => c.status !== 'arquivada')
+              .map(c => {
+                const dias = (c.dias_operacao ?? [])
+                const diasLabel = dias.length === 5 && !dias.includes('sab') && !dias.includes('dom')
+                  ? 'Seg – Sex'
+                  : dias.length === 7
+                    ? 'Todos os dias'
+                    : dias.map((d: string) => d.charAt(0).toUpperCase() + d.slice(1, 3)).join(', ')
+                return (
+                  <div key={c.id} className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={clsx(
+                        'w-2 h-2 rounded-full flex-shrink-0',
+                        c.status === 'ativa' ? 'bg-emerald-500' : 'bg-gray-300'
+                      )} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{c.nome}</p>
+                        <p className="text-xs text-gray-400">{diasLabel}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      {c.icp_ativo && (
+                        <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-700">
+                          🎯 ICP {c.icp_threshold}+
+                        </span>
+                      )}
+                      <div className="text-right">
+                        <p className="text-sm font-bold font-mono text-gray-900">
+                          {c.hora_inicio ?? '09:00'} – {c.hora_fim ?? '18:00'}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {c.pausa_almoco ? 'com pausa almoço' : 'sem pausa'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setConfigModal({ open: true, campanhaId: c.id, campanhaName: c.nome })}
+                        className="btn-secondary text-xs py-1.5 px-3"
+                      >
+                        ✏️ Editar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
         </div>
       )}
 

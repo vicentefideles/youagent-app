@@ -184,7 +184,7 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
             <h3 className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2">
               {campanha.nome}
             </h3>
-            <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className={clsx('text-xs font-medium', modal.color)}>
                 {modal.icon} {modal.label}
               </span>
@@ -192,8 +192,8 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                 <span className="text-xs text-gray-400">{campanha.estado}</span>
               )}
               {campanha.icp_ativo && (
-                <span className="flex items-center gap-1 text-xs text-purple-600">
-                  <Target size={11} /> ICP {campanha.icp_threshold}+
+                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-purple-50 border-purple-300 text-purple-700">
+                  <Target size={10} /> ICP ativo · {campanha.icp_threshold}+
                 </span>
               )}
             </div>
