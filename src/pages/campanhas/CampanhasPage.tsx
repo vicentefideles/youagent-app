@@ -414,9 +414,14 @@ export default function CampanhasPage() {
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragging(false)
-    // Abre o modal real de importação — usa a primeira campanha ativa, ou solicita seleção
-    const primeira = campanhasRaw.find(c => c.status === 'ativa') ?? campanhasRaw[0] ?? null
-    setCampanhaUpload(primeira)
+    // Se já tem campanha selecionada, abre o modal diretamente
+    if (campanhaUpload) {
+      setCampanhaImportar(campanhaUpload)
+    } else {
+      // Usa a primeira campanha ativa para facilitar
+      const primeira = campanhasRaw.find(c => c.status === 'ativa') ?? campanhasRaw[0] ?? null
+      if (primeira) setCampanhaImportar(primeira)
+    }
   }
 
   return (
@@ -561,23 +566,17 @@ export default function CampanhasPage() {
             campanhaUpload ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
             isDragging && campanhaUpload ? 'border-brand-400 bg-brand-50' : 'border-gray-300 hover:border-brand-300 hover:bg-gray-50'
           )}
-          onClick={() => campanhaUpload && setCampanhaUpload(prev => prev)} // abre via estado
+          onClick={() => campanhaUpload && setCampanhaImportar(campanhaUpload)}
         >
           <Upload size={28} className={clsx('mx-auto mb-3', isDragging ? 'text-brand-500' : 'text-gray-400')} />
           {campanhaUpload ? (
             <>
               <div className="text-sm font-semibold text-gray-700 mb-1">
-                Arraste o CSV ou clique em "+ Lista" no card da campanha
+                Arraste seu CSV aqui ou clique para selecionar
               </div>
-              <div className="text-xs text-gray-400">
-                Campanha selecionada: <span className="font-semibold text-gray-600">{campanhaUpload.nome}</span>
+              <div className="text-xs text-gray-400 mt-1">
+                Campanha: <span className="font-semibold text-brand-600">{campanhaUpload.nome}</span>
               </div>
-              <button
-                onClick={e => { e.stopPropagation(); setCampanhaImportar(campanhaUpload) }}
-                className="btn-primary mt-4 gap-2 text-sm mx-auto"
-              >
-                <Upload size={13}/> Selecionar arquivo CSV
-              </button>
             </>
           ) : (
             <>

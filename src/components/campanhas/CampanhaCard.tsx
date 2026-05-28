@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
-  Upload, Brain, MoreHorizontal, Zap, Target,
-  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings
+  Brain, MoreHorizontal, Zap, Target,
+  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings, Loader2
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
@@ -11,8 +11,8 @@ import { claudeApi, campanhasApi } from '@/services/api'
 
 interface Props {
   campanha: Campanha
-  onPausar: (id: string) => void
-  onIniciar: (id: string) => void
+  onPausar: (id: string) => void | Promise<void>
+  onIniciar: (id: string) => void | Promise<void>
   onImportar: (campanha: Campanha) => void
   onVerFila: (campanha: Campanha) => void
   onEditar?: (campanha: Campanha) => void
@@ -33,10 +33,11 @@ const MODAL_CONFIG = {
   hibrido:    { icon: '🔀', label: 'Híbrido',    color: 'text-emerald-700', bg: 'bg-emerald-50' },
 }
 
-const AGRESS_CONFIG = {
-  alta:  { label: 'Alta',  color: 'text-red-600',   bg: 'bg-red-50'   },
-  media: { label: 'Média', color: 'text-amber-700',  bg: 'bg-amber-50' },
-  baixa: { label: 'Baixa', color: 'text-emerald-700',bg: 'bg-emerald-50'},
+const AGRESS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  baixa:  { label: 'Baixa',  color: 'text-brand-700',   bg: 'bg-brand-50'  },
+  media:  { label: 'Média',  color: 'text-amber-700',   bg: 'bg-amber-50'  },
+  alta:   { label: 'Alta',   color: 'text-orange-700',  bg: 'bg-orange-50' },
+  maxima: { label: 'Máxima', color: 'text-red-700',     bg: 'bg-red-50'    },
 }
 
 interface AnaliseLista {
@@ -53,7 +54,7 @@ interface HorarioSugestao {
   melhores_horarios?: string[]
 }
 
-export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar, onVerFila, onEditar, onAgressividade }: Props) {
+export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar: _onImportar, onVerFila: _onVerFila, onEditar, onAgressividade }: Props) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [iaAberta, setIaAberta] = useState(false)
@@ -61,6 +62,20 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
   const [analise, setAnalise] = useState<AnaliseLista | null>(null)
   const [buscandoHorario, setBuscandoHorario] = useState(false)
   const [horarioSugerido, setHorarioSugerido] = useState<HorarioSugestao | null>(null)
+  const [pausandoOuIniciando, setPausandoOuIniciando] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    if (!menuOpen) return
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   async function handleAnalisarLista() {
     setAnalisando(true)
@@ -184,22 +199,33 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
 
             {/* Play/Pause */}
             <button
-              onClick={() => ativa ? onPausar(campanha.id) : onIniciar(campanha.id)}
+              disabled={pausandoOuIniciando}
+              onClick={async () => {
+                setPausandoOuIniciando(true)
+                try {
+                  if (ativa) await onPausar(campanha.id)
+                  else await onIniciar(campanha.id)
+                } catch (e) { console.error(e) }
+                finally { setPausandoOuIniciando(false) }
+              }}
               className={clsx(
-                'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+                'w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50',
                 ativa
                   ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
                   : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
               )}
-              title={ativa ? 'Pausar' : 'Iniciar'}
+              title={ativa ? 'Pausar campanha' : 'Iniciar campanha'}
             >
-              {ativa ? <Pause size={14} /> : <Play size={14} />}
+              {pausandoOuIniciando
+                ? <Loader2 size={13} className="animate-spin" />
+                : ativa ? <Pause size={14} /> : <Play size={14} />
+              }
             </button>
 
             {/* Menu */}
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
-                onClick={() => setMenuOpen(!menuOpen)}
+                onClick={() => setMenuOpen(v => !v)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center
                            text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               >
@@ -288,27 +314,29 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
 
       {/* Ações */}
       <div className="px-4 pb-4 flex flex-wrap gap-2">
+        {/* Fila → discadora, aba fila desta campanha */}
         <button
-          onClick={() => onVerFila(campanha)}
+          onClick={() => navigate('/discadora?campanha=' + campanha.id + '&tab=fila')}
           className="btn-secondary flex-1 text-xs py-2 gap-1.5"
+          title="Ver fila de chamadas desta campanha na Discadora"
         >
           <BarChart2 size={13} /> Fila
         </button>
-        <button
-          onClick={() => onImportar(campanha)}
-          className="btn-secondary flex-1 text-xs py-2 gap-1.5"
-        >
-          <Upload size={13} /> + Lista
-        </button>
+
+        {/* IA → análise pré-disparo */}
         <button
           onClick={() => setIaAberta(v => !v)}
-          className={clsx('btn-secondary flex-1 text-xs py-2 gap-1.5', iaAberta && 'bg-purple-50 border-purple-200 text-purple-700')}
+          className={clsx('btn-secondary flex-1 text-xs py-2 gap-1.5', iaAberta && 'bg-brand-50 border-brand-200 text-brand-700')}
+          title="Analisar lista com IA e sugerir melhor horário de disparo"
         >
           <Brain size={13} /> IA
         </button>
+
+        {/* Leads → histórico de resultados */}
         <button
           className="btn-secondary flex-1 text-xs py-2 gap-1.5"
-          onClick={() => navigate('/discadora?campanha=' + campanha.id)}
+          onClick={() => navigate('/discadora?campanha=' + campanha.id + '&tab=historico')}
+          title="Ver histórico de resultados e contatos desta campanha"
         >
           <CheckCircle2 size={13} /> Leads
         </button>
@@ -318,18 +346,26 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
       {iaAberta && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-3">
           <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-            <Sparkles size={12} className="text-purple-500" />
-            Análise Pré-Disparo
+            <Sparkles size={12} className="text-brand-500" />
+            Análise Pré-Disparo — Inteligência da campanha
           </p>
 
           {/* Analisar Lista */}
-          <button
-            onClick={handleAnalisarLista}
-            disabled={analisando}
-            className="w-full flex items-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors disabled:opacity-50"
-          >
-            <Brain size={12} /> {analisando ? 'Analisando...' : '🧠 Analisar Lista com IA'}
-          </button>
+          <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3 space-y-2">
+            <div>
+              <p className="text-xs font-semibold text-gray-800 mb-0.5">🧠 Analisar Lista com IA</p>
+              <p className="text-2xs text-gray-500 leading-relaxed">
+                A IA avalia a qualidade dos seus contatos: verifica aderência ao ICP, identifica o perfil dominante da lista e aponta recomendações antes de você disparar a campanha.
+              </p>
+            </div>
+            <button
+              onClick={handleAnalisarLista}
+              disabled={analisando}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+            >
+              {analisando ? <><Loader2 size={12} className="animate-spin"/> Analisando...</> : <><Brain size={12}/> Executar análise</>}
+            </button>
+          </div>
 
           {analise && (
             <div className="space-y-2">
@@ -384,13 +420,21 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
           )}
 
           {/* Sugerir Horário */}
-          <button
-            onClick={handleSugerirHorario}
-            disabled={buscandoHorario}
-            className="w-full flex items-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
-          >
-            <Clock size={12} /> {buscandoHorario ? 'Buscando...' : '🕐 Sugerir Melhor Horário'}
-          </button>
+          <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-2">
+            <div>
+              <p className="text-xs font-semibold text-gray-800 mb-0.5">🕐 Sugerir Melhor Horário</p>
+              <p className="text-2xs text-gray-500 leading-relaxed">
+                Baseado no segmento da campanha ({campanha.segmento ?? 'geral'}), a IA sugere os horários de maior taxa de atendimento — para você não desperdiçar ligações em momentos de baixa receptividade.
+              </p>
+            </div>
+            <button
+              onClick={handleSugerirHorario}
+              disabled={buscandoHorario}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              {buscandoHorario ? <><Loader2 size={12} className="animate-spin"/> Buscando...</> : <><Clock size={12}/> Ver melhores horários</>}
+            </button>
+          </div>
 
           {horarioSugerido && (
             <div className="space-y-2">
