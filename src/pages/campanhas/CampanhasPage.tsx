@@ -19,10 +19,30 @@ type FiltroStatus = 'todas' | 'ativa' | 'pausada' | 'arquivada'
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 
 const NIVEIS_AGRESSIVIDADE = [
-  { id: 'baixa',  label: 'Baixa',  calls_min: '1-2', cor: 'bg-brand-50 border-brand-400 text-brand-700',  badge: 'bg-brand-100 text-brand-700',   descricao: 'Ideal para Enterprise — mais pausa entre tentativas' },
-  { id: 'media',  label: 'Média',  calls_min: '3-4', cor: 'bg-brand-100 border-brand-500 text-brand-800', badge: 'bg-brand-200 text-brand-800',   descricao: 'Equilíbrio entre volume e qualidade' },
-  { id: 'alta',   label: 'Alta',   calls_min: '5-7', cor: 'bg-amber-50 border-amber-400 text-amber-800',  badge: 'bg-amber-100 text-amber-800',  descricao: 'Recomendado para SMB — maior volume' },
-  { id: 'maxima', label: 'Máxima', calls_min: '8+',  cor: 'bg-red-50 border-red-400 text-red-700',        badge: 'bg-red-100 text-red-700',      descricao: 'Verificar conformidade ANATEL antes de ativar' },
+  {
+    id: 'baixa', label: 'Baixa', calls_min: '1-2',
+    cor: 'bg-brand-50 border-brand-400 text-brand-700', badge: 'bg-brand-100 text-brand-700',
+    descricao: 'Ideal para Enterprise e contas estratégicas',
+    detalhes: '1-2 ligações por lead · Intervalo de 48h entre tentativas · Abordagem consultiva e sem pressão',
+  },
+  {
+    id: 'media', label: 'Média', calls_min: '3-4',
+    cor: 'bg-brand-100 border-brand-500 text-brand-800', badge: 'bg-brand-200 text-brand-800',
+    descricao: 'Configuração padrão — equilibra volume e qualidade',
+    detalhes: '3-4 ligações por lead · Intervalo de 24h entre tentativas · Melhor taxa de contato sem desgastar o lead',
+  },
+  {
+    id: 'alta', label: 'Alta', calls_min: '5-7',
+    cor: 'bg-amber-50 border-amber-400 text-amber-800', badge: 'bg-amber-100 text-amber-800',
+    descricao: 'Indicado para SMB com ciclo de venda curto',
+    detalhes: '5-7 ligações por lead · Intervalo de 4-8h entre tentativas · Maximiza contatos, ideal para produtos de decisão rápida',
+  },
+  {
+    id: 'maxima', label: 'Máxima', calls_min: '8+',
+    cor: 'bg-red-50 border-red-400 text-red-700', badge: 'bg-red-100 text-red-700',
+    descricao: '⚠️ Alta intensidade — verifique conformidade ANATEL',
+    detalhes: '8+ ligações por lead · Intervalos curtos · Use apenas em listas de alta intenção ou leads que solicitaram contato. Limite legal: máx. 3 tentativas/dia por número.',
+  },
 ]
 
 
@@ -239,25 +259,31 @@ function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: M
               key={n.id}
               onClick={() => setSelecionado(n.id)}
               className={clsx(
-                'flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all',
+                'flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all w-full',
                 selecionado === n.id
                   ? n.cor + ' shadow-sm'
                   : 'border-gray-200 hover:border-brand-200 hover:bg-brand-50/30 bg-white'
               )}
             >
               <div className={clsx(
-                'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm font-mono border-2 flex-shrink-0',
+                'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs font-mono border-2 flex-shrink-0 mt-0.5',
                 selecionado === n.id ? n.badge + ' border-current/30' : 'bg-gray-100 text-gray-500 border-gray-200'
               )}>{n.calls_min}</div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-gray-900">{n.label}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{n.descricao}</div>
-              </div>
-              <div className={clsx(
-                'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors',
-                selecionado === n.id ? 'border-brand-500 bg-brand-500' : 'border-gray-300'
-              )}>
-                {selecionado === n.id && <div className="w-2 h-2 rounded-full bg-white"/>}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-gray-900">{n.label}</span>
+                  <div className={clsx(
+                    'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors',
+                    selecionado === n.id ? 'border-brand-500 bg-brand-500' : 'border-gray-300'
+                  )}>
+                    {selecionado === n.id && <div className="w-2 h-2 rounded-full bg-white"/>}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-600 mt-0.5">{n.descricao}</div>
+                <div className={clsx(
+                  'text-2xs mt-1.5 leading-relaxed',
+                  selecionado === n.id ? 'text-current opacity-75' : 'text-gray-400'
+                )}>{n.detalhes}</div>
               </div>
             </button>
           ))}
@@ -522,8 +548,8 @@ export default function CampanhasPage() {
             <CampanhaCard
               key={c.id}
               campanha={c}
-              onPausar={(id) => pausarMutation.mutate(id)}
-              onIniciar={(id) => iniciarMutation.mutate(id)}
+              onPausar={(id) => pausarMutation.mutateAsync(id).then(() => undefined)}
+              onIniciar={(id) => iniciarMutation.mutateAsync(id).then(() => undefined)}
               onImportar={setCampanhaImportar}
               onVerFila={(camp) => navigate('/discadora?campanha=' + camp.id)}
               onEditar={(camp) => setConfigModal({ open: true, campanhaId: camp.id, campanhaName: camp.nome })}

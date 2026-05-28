@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Brain, MoreHorizontal, Zap, Target,
-  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings, Loader2
+  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings, Loader2, X, List
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
-import { claudeApi, campanhasApi } from '@/services/api'
+import { claudeApi, campanhasApi, contatosApi } from '@/services/api'
 
 interface Props {
   campanha: Campanha
@@ -63,7 +63,21 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
   const [buscandoHorario, setBuscandoHorario] = useState(false)
   const [horarioSugerido, setHorarioSugerido] = useState<HorarioSugestao | null>(null)
   const [pausandoOuIniciando, setPausandoOuIniciando] = useState(false)
+  const [leadsAberto, setLeadsAberto] = useState(false)
+  const [leads, setLeads] = useState<Record<string, string>[]>([])
+  const [carregandoLeads, setCarregandoLeads] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  async function abrirLeads() {
+    setLeadsAberto(true)
+    if (leads.length > 0) return
+    setCarregandoLeads(true)
+    try {
+      const res = await contatosApi.list(campanha.id)
+      setLeads((res.data as Record<string, string>[]) ?? [])
+    } catch { setLeads([]) }
+    finally { setCarregandoLeads(false) }
+  }
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -332,13 +346,13 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
           <Brain size={13} /> IA
         </button>
 
-        {/* Leads → histórico de resultados */}
+        {/* Leads → lista de contatos importados */}
         <button
-          className="btn-secondary flex-1 text-xs py-2 gap-1.5"
-          onClick={() => navigate('/discadora?campanha=' + campanha.id + '&tab=historico')}
-          title="Ver histórico de resultados e contatos desta campanha"
+          className={clsx('btn-secondary flex-1 text-xs py-2 gap-1.5', leadsAberto && 'bg-brand-50 border-brand-200 text-brand-700')}
+          onClick={abrirLeads}
+          title="Ver contatos importados nesta campanha"
         >
-          <CheckCircle2 size={13} /> Leads
+          <List size={13} /> Leads
         </button>
       </div>
 
@@ -447,6 +461,66 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
               )}
               {horarioSugerido.justificativa && (
                 <p className="text-xs text-gray-600 italic">{horarioSugerido.justificativa}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Painel Leads */}
+      {leadsAberto && (
+        <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+              <Users size={12} className="text-brand-500" />
+              Contatos importados
+              {leads.length > 0 && (
+                <span className="badge badge-brand ml-1">{leads.length}</span>
+              )}
+            </p>
+            <button onClick={() => setLeadsAberto(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400">
+              <X size={13}/>
+            </button>
+          </div>
+
+          {carregandoLeads ? (
+            <div className="flex items-center justify-center py-4 gap-2 text-xs text-gray-400">
+              <Loader2 size={13} className="animate-spin"/> Carregando contatos...
+            </div>
+          ) : leads.length === 0 ? (
+            <div className="text-center py-4 text-xs text-gray-400">
+              Nenhum contato importado ainda.<br/>
+              <span className="text-brand-500 cursor-pointer hover:underline" onClick={() => navigate('/campanhas')}>
+                Use o Upload de lista para importar.
+              </span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-48 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-gray-50">
+                  <tr>
+                    {['Nome','Empresa','Telefone','Status'].map(h => (
+                      <th key={h} className="px-3 py-2 text-left text-gray-500 font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {leads.slice(0, 50).map((l, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-800 font-medium">{l.nome ?? '—'}</td>
+                      <td className="px-3 py-2 text-gray-500">{l.empresa ?? '—'}</td>
+                      <td className="px-3 py-2 text-gray-500 font-mono">{l.telefone ?? '—'}</td>
+                      <td className="px-3 py-2">
+                        <span className={clsx('badge text-2xs', l.status === 'agendado' ? 'badge-success' : l.status === 'nao_atendeu' ? 'text-amber-700 bg-amber-50' : 'badge-neutral')}>
+                          {l.status ?? 'na fila'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {leads.length > 50 && (
+                <p className="text-center text-2xs text-gray-400 py-2">Mostrando 50 de {leads.length} contatos</p>
               )}
             </div>
           )}
