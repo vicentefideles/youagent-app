@@ -4,7 +4,7 @@ import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Brain, MoreHorizontal, Zap, Target,
   TrendingUp, Clock, CheckCircle2, AlertTriangle,
-  Sparkles, Settings, Loader2, X, List, RefreshCw
+  Sparkles, Loader2, X, List, RefreshCw
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
