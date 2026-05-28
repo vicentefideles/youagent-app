@@ -91,7 +91,6 @@ interface ConfigIAState {
   aguardarConfirmacao: boolean
   gravarLigacoes: boolean
   notificarGerente: boolean
-  tom: string
   horarioInicio: string
   horarioFim: string
   pausarFds: boolean
@@ -102,7 +101,7 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
     icpMin: 65, sensibilidade: 70,
     gatilhos: { urgencia: true, preco: true, proposta: true, decisor: true, interesse: true, demo: false, concorrente: false },
     aguardarConfirmacao: true, gravarLigacoes: true, notificarGerente: true,
-    tom: 'Consultivo', horarioInicio: '09:00', horarioFim: '18:00', pausarFds: true,
+    horarioInicio: '09:00', horarioFim: '18:00', pausarFds: true,
   })
 
   const gatilhoLabels: Record<string, string> = {
@@ -201,12 +200,6 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
                   <Toggle checked={cfg[field]} onChange={() => toggle(field)} />
                 </div>
               ))}
-              <div>
-                <label className="text-sm text-gray-700 block mb-1.5">Tom do agente</label>
-                <select value={cfg.tom} onChange={e => setCfg(p => ({ ...p, tom: e.target.value }))} className="input">
-                  <option>Formal</option><option>Consultivo</option><option>Descontraído</option>
-                </select>
-              </div>
             </div>
           </div>
           {/* Horários */}
