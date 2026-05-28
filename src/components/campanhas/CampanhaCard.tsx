@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Brain, MoreHorizontal, Zap, Target,
-  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings, Loader2, X, List, RefreshCw
+  TrendingUp, Clock, CheckCircle2, AlertTriangle,
+  Sparkles, Settings, Loader2, X, List, RefreshCw
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
@@ -29,9 +30,9 @@ const TIPO_LABELS: Record<string, string> = {
 }
 
 const MODAL_CONFIG = {
-  online:     { icon: '💻', label: 'Online',     color: 'text-brand-600',   bg: 'bg-brand-50' },
-  presencial: { icon: '🏢', label: 'Presencial', color: 'text-amber-700',   bg: 'bg-amber-50' },
-  hibrido:    { icon: '🔀', label: 'Híbrido',    color: 'text-emerald-700', bg: 'bg-emerald-50' },
+  online:     { icon: '💻', label: 'Online',     color: 'text-brand-600' },
+  presencial: { icon: '🏢', label: 'Presencial', color: 'text-amber-700' },
+  hibrido:    { icon: '🔀', label: 'Híbrido',    color: 'text-emerald-700' },
 }
 
 const AGRESS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -55,20 +56,26 @@ interface HorarioSugestao {
   melhores_horarios?: string[]
 }
 
-export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar: _onImportar, onVerFila: _onVerFila, onEditar, onAgressividade, onReprocessar }: Props) {
+export default function CampanhaCard({
+  campanha, onPausar, onIniciar,
+  onImportar: _onImportar, onVerFila: _onVerFila,
+  onEditar, onAgressividade, onReprocessar
+}: Props) {
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [iaAberta, setIaAberta] = useState(false)
+  const [menuOpen, setMenuOpen]     = useState(false)
+  const [iaAberta, setIaAberta]     = useState(false)
   const [analisando, setAnalisando] = useState(false)
-  const [analise, setAnalise] = useState<AnaliseLista | null>(null)
+  const [analise, setAnalise]       = useState<AnaliseLista | null>(null)
   const [buscandoHorario, setBuscandoHorario] = useState(false)
   const [horarioSugerido, setHorarioSugerido] = useState<HorarioSugestao | null>(null)
   const [pausandoOuIniciando, setPausandoOuIniciando] = useState(false)
-  const [leadsAberto, setLeadsAberto] = useState(false)
-  const [leads, setLeads] = useState<Record<string, string>[]>([])
-  const [leadsTotal, setLeadsTotal] = useState(0)
-  const [leadsPagina, setLeadsPagina] = useState(1)
+  const [leadsAberto, setLeadsAberto]   = useState(false)
+  const [leads, setLeads]               = useState<Record<string, string>[]>([])
+  const [leadsTotal, setLeadsTotal]     = useState(0)
+  const [leadsPagina, setLeadsPagina]   = useState(1)
   const [carregandoLeads, setCarregandoLeads] = useState(false)
+  const [icpConfirm, setIcpConfirm]     = useState(false)
+  const [ativandoIcp, setAtivandoIcp]   = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const LEADS_LIMIT = 100
 
@@ -90,21 +97,26 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
     carregarLeads(1)
   }
 
-  // Fechar menu ao clicar fora
+  async function ativarIcp() {
+    setAtivandoIcp(true)
+    try {
+      await campanhasApi.patch(campanha.id, { icp_ativo: true, icp_threshold: 70 })
+      window.location.reload()
+    } catch { /* silencioso */ }
+    finally { setAtivandoIcp(false) }
+  }
+
   useEffect(() => {
     if (!menuOpen) return
     function handler(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [menuOpen])
 
   async function handleAnalisarLista() {
-    setAnalisando(true)
-    setAnalise(null)
+    setAnalisando(true); setAnalise(null)
     try {
       const d = campanha.dashboard
       const res = await claudeApi.analisarLista({
@@ -115,187 +127,117 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
       setAnalise(res.data as AnaliseLista)
     } catch {
       setAnalise({ alertas: ['Erro ao analisar lista. Tente novamente.'] })
-    } finally {
-      setAnalisando(false)
-    }
+    } finally { setAnalisando(false) }
   }
 
   async function handleSugerirHorario() {
-    setBuscandoHorario(true)
-    setHorarioSugerido(null)
+    setBuscandoHorario(true); setHorarioSugerido(null)
     try {
       const res = await claudeApi.sugerirHorario({ segmento: campanha.segmento ?? undefined })
       setHorarioSugerido(res.data as HorarioSugestao)
     } catch {
       setHorarioSugerido({ justificativa: 'Erro ao buscar sugestão. Tente novamente.' })
-    } finally {
-      setBuscandoHorario(false)
-    }
+    } finally { setBuscandoHorario(false) }
   }
 
-  const d = campanha.dashboard
+  const d          = campanha.dashboard
   const total      = d?.total_lista    ?? 0
   const feitas     = d?.ligacoes_feitas ?? 0
-  const faltam     = Math.max(0, total - feitas)
   const agendadas  = d?.agendadas      ?? 0
-  const naFila     = d?.na_fila        ?? 0
   const duplicados = campanha.lista_duplicados ?? d?.duplicados ?? 0
-  const conversao  = total > 0 ? ((agendadas / Math.max(feitas, 1)) * 100).toFixed(1) : '0.0'
+  const conversao  = feitas > 0 ? ((agendadas / feitas) * 100).toFixed(1) : '0.0'
   const consumoPct = total > 0 ? Math.min(100, Math.round((feitas / total) * 100)) : 0
 
-  const modal   = MODAL_CONFIG[campanha.modalidade] ?? MODAL_CONFIG.online
-  const agress  = AGRESS_CONFIG[campanha.agressividade] ?? AGRESS_CONFIG.media
-  const ativa   = campanha.status === 'ativa'
+  const modal  = MODAL_CONFIG[campanha.modalidade as keyof typeof MODAL_CONFIG] ?? MODAL_CONFIG.online
+  const agress = AGRESS_CONFIG[campanha.agressividade] ?? AGRESS_CONFIG.media
+  const ativa  = campanha.status === 'ativa'
 
-  // Cor da barra de consumo
   const barColor = consumoPct >= 90 ? 'bg-red-500'
                  : consumoPct >= 70 ? 'bg-amber-400'
                  : 'bg-brand'
 
-  // Alerta dinâmico
-  const alerta = (() => {
-    if (!ativa)       return { icon: '⏸️', text: 'Campanha pausada', color: 'bg-gray-50 border-gray-200 text-gray-500' }
-    if (faltam === 0) return { icon: '✅', text: 'Lista esgotada — importe novos leads', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
-    if (consumoPct >= 80) return { icon: '⚠️', text: `${faltam} leads restantes — considere importar mais`, color: 'bg-amber-50 border-amber-200 text-amber-700' }
-    return { icon: '🟢', text: `${naFila} leads na fila · rodando normalmente`, color: 'bg-emerald-50 border-emerald-200 text-emerald-700' }
-  })()
-
   return (
     <div className={clsx(
       'card flex flex-col gap-0 overflow-hidden transition-shadow hover:shadow-md',
-      !ativa && 'opacity-80'
+      !ativa && 'opacity-90'
     )}>
 
-      {/* Header */}
-      <div className="p-5 pb-3">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className={clsx('badge', ativa ? 'badge-success' : 'badge-neutral')}>
-                {ativa ? '● Ativa' : '⏸ Pausada'}
-              </span>
-              <span className="badge badge-neutral text-xs">
-                {TIPO_LABELS[campanha.tipo] ?? campanha.tipo}
-              </span>
-              <span className={clsx('badge text-xs', agress.color, agress.bg)}>
-                {agress.label}
-              </span>
-            </div>
-            <h3 className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2">
-              {campanha.nome}
-            </h3>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className={clsx('text-xs font-medium', modal.color)}>
-                {modal.icon} {modal.label}
-              </span>
-              {campanha.estado && (
-                <span className="text-xs text-gray-400">{campanha.estado}</span>
-              )}
-              <button
-                onClick={() => navigate('/inteligencia?tab=icp')}
-                className={clsx(
-                  'flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border transition-colors',
-                  campanha.icp_ativo
-                    ? 'bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100'
-                    : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'
-                )}
-                title={campanha.icp_ativo ? 'Ver análise ICP no Centro de Inteligência' : 'Ativar ICP nesta campanha'}
-              >
-                <Target size={10} />
-                {campanha.icp_ativo ? `ICP ativo · ${campanha.icp_threshold}+` : 'ICP desativado'}
-              </button>
-            </div>
+      {/* ── HEADER ── */}
+      <div className="p-4 pb-3">
+
+        {/* Linha 1: controles */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Status */}
+            <span className={clsx(
+              'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
+              ativa ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+            )}>
+              {ativa ? '● Ativa' : '⏸ Pausada'}
+            </span>
+            {/* Tipo */}
+            <span className="text-xs text-gray-400 font-medium">
+              {TIPO_LABELS[campanha.tipo] ?? campanha.tipo}
+            </span>
+            {/* Separador */}
+            <span className="text-gray-200">·</span>
+            {/* Modalidade + Estado */}
+            <span className={clsx('text-xs font-medium', modal.color)}>
+              {modal.icon} {modal.label}
+            </span>
+            {campanha.estado && (
+              <span className="text-xs text-gray-400">{campanha.estado}</span>
+            )}
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Config IA */}
-            <button
-              onClick={() => onEditar && onEditar(campanha)}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium
-                         text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-              title="Configurar IA"
-            >
-              <Settings size={12} /> Config IA
-            </button>
-
-            {/* Agressividade */}
+          {/* Ações rápidas */}
+          <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => onAgressividade && onAgressividade(campanha)}
-              className={clsx(
-                'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors',
-                agress.color, agress.bg,
-                'hover:opacity-80'
-              )}
+              className={clsx('flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors', agress.color, agress.bg, 'hover:opacity-80')}
               title="Alterar agressividade"
             >
-              ⚡ {agress.label}
+              <Zap size={10} /> {agress.label}
             </button>
-
-            {/* Play/Pause */}
             <button
               disabled={pausandoOuIniciando}
               onClick={async () => {
                 setPausandoOuIniciando(true)
-                try {
-                  if (ativa) await onPausar(campanha.id)
-                  else await onIniciar(campanha.id)
-                } catch (e) { console.error(e) }
+                try { if (ativa) await onPausar(campanha.id); else await onIniciar(campanha.id) }
+                catch (e) { console.error(e) }
                 finally { setPausandoOuIniciando(false) }
               }}
               className={clsx(
-                'w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50',
-                ativa
-                  ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
-                  : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                'w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50',
+                ativa ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
               )}
-              title={ativa ? 'Pausar campanha' : 'Iniciar campanha'}
+              title={ativa ? 'Pausar' : 'Iniciar'}
             >
               {pausandoOuIniciando
-                ? <Loader2 size={13} className="animate-spin" />
-                : ativa ? <Pause size={14} /> : <Play size={14} />
-              }
+                ? <Loader2 size={12} className="animate-spin" />
+                : ativa ? <Pause size={13} /> : <Play size={13} />}
             </button>
-
-            {/* Menu */}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(v => !v)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center
-                           text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
               >
-                <MoreHorizontal size={15} />
+                <MoreHorizontal size={14} />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-9 z-20 bg-white border border-gray-100
-                                rounded-xl shadow-popup py-1 w-44 animate-fade-in">
-                  {['Editar', 'Duplicar', 'Arquivar', 'Excluir'].map((op) => (
-                    <button key={op}
-                            onClick={() => {
-                              setMenuOpen(false)
-                              if (op === 'Editar') {
-                                if (onEditar) onEditar(campanha)
-                                else navigate('/campanhas?edit=' + campanha.id)
-                              } else if (op === 'Duplicar') {
-                                campanhasApi.create({ ...campanha, nome: campanha.nome + ' (cópia)', status: 'pausada' })
-                                  .then(() => window.location.reload())
-                                  .catch(console.error)
-                              } else if (op === 'Arquivar') {
-                                campanhasApi.update(campanha.id, { status: 'arquivada' })
-                                  .then(() => window.location.reload())
-                                  .catch(console.error)
-                              } else if (op === 'Excluir') {
-                                if (confirm('Excluir campanha ' + campanha.nome + '?')) {
-                                  campanhasApi.update(campanha.id, { status: 'excluida' })
-                                    .then(() => window.location.reload())
-                                    .catch(console.error)
-                                }
-                              }
-                            }}
-                            className={clsx(
-                              'w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors',
-                              op === 'Excluir' ? 'text-red-600' : 'text-gray-700'
-                            )}>
-                      {op}
+                <div className="absolute right-0 top-8 z-20 bg-white border border-gray-100 rounded-xl shadow-popup py-1 w-44 animate-fade-in">
+                  {[
+                    { label: 'Editar campanha', action: () => onEditar && onEditar(campanha) },
+                    { label: 'Config IA', action: () => onEditar && onEditar(campanha) },
+                    { label: 'Duplicar', action: () => campanhasApi.create({ ...campanha, nome: campanha.nome + ' (cópia)', status: 'pausada' }).then(() => window.location.reload()) },
+                    { label: 'Arquivar', action: () => campanhasApi.update(campanha.id, { status: 'arquivada' }).then(() => window.location.reload()) },
+                    { label: 'Excluir', action: () => confirm('Excluir ' + campanha.nome + '?') && campanhasApi.update(campanha.id, { status: 'excluida' }).then(() => window.location.reload()) },
+                  ].map(item => (
+                    <button key={item.label}
+                      onClick={() => { setMenuOpen(false); item.action() }}
+                      className={clsx('w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors',
+                        item.label === 'Excluir' ? 'text-red-600' : 'text-gray-700')}>
+                      {item.label}
                     </button>
                   ))}
                 </div>
@@ -304,123 +246,159 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
           </div>
         </div>
 
+        {/* Linha 2: nome */}
+        <h3 className="text-sm font-bold text-gray-900 leading-snug mb-2">
+          {campanha.nome}
+        </h3>
+
+        {/* Linha 3: ICP badge */}
+        <div className="flex items-center gap-2">
+          {campanha.icp_ativo ? (
+            <button
+              onClick={() => navigate('/inteligencia?tab=icp')}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+            >
+              <Target size={10} /> ICP ativo · {campanha.icp_threshold ?? 70}+
+            </button>
+          ) : (
+            <div className="relative">
+              <button
+                onClick={() => setIcpConfirm(v => !v)}
+                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+              >
+                <Target size={10} /> ICP desativado
+              </button>
+              {/* Popup de confirmação inline */}
+              {icpConfirm && (
+                <div className="absolute left-0 top-8 z-10 bg-white border border-purple-200 rounded-xl shadow-lg p-3 w-56 animate-fade-in">
+                  <p className="text-xs font-semibold text-gray-800 mb-1">🎯 Ativar ICP nesta campanha?</p>
+                  <p className="text-xs text-gray-500 mb-2.5 leading-relaxed">
+                    O agente vai priorizar os leads com maior score de conversão.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={ativarIcp}
+                      disabled={ativandoIcp}
+                      className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      {ativandoIcp ? <Loader2 size={10} className="animate-spin" /> : null}
+                      Ativar
+                    </button>
+                    <button
+                      onClick={() => setIcpConfirm(false)}
+                      className="flex-1 text-xs font-semibold py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Barra de consumo */}
-        <div className="mb-1">
+        <div className="mt-3">
           <div className="flex justify-between items-center mb-1">
             <span className="text-xs text-gray-400">Consumo da lista</span>
-            <span className="text-xs font-semibold text-gray-700">{consumoPct}%</span>
+            <span className="text-xs font-semibold text-gray-600">{consumoPct}%</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={clsx('h-full rounded-full transition-all', barColor)}
-              style={{ width: `${consumoPct}%` }}
-            />
+            <div className={clsx('h-full rounded-full transition-all', barColor)} style={{ width: `${consumoPct}%` }} />
           </div>
         </div>
       </div>
 
-      {/* Métricas 3x2 */}
-      <div className="grid grid-cols-3 divide-x divide-y divide-gray-100 border-t border-gray-100">
+      {/* ── MÉTRICAS (4 em 2x2) ── */}
+      <div className="grid grid-cols-4 divide-x divide-gray-100 border-t border-gray-100">
         {[
-          { icon: <Users size={13} />,       label: 'Total',      value: total.toLocaleString('pt-BR'),    color: 'text-gray-900' },
-          { icon: <Phone size={13} />,       label: 'Ligadas',    value: feitas.toLocaleString('pt-BR'),   color: 'text-brand-600' },
-          { icon: <Clock size={13} />,       label: 'Faltam',     value: faltam.toLocaleString('pt-BR'),   color: 'text-amber-600' },
-          { icon: <TrendingUp size={13} />,  label: 'Conversão',  value: `${conversao}%`,                  color: 'text-emerald-600' },
-          { icon: <Calendar size={13} />,    label: 'Agendados',  value: agendadas.toLocaleString('pt-BR'),color: 'text-purple-600' },
-          { icon: <Zap size={13} />,         label: 'Na fila',    value: naFila.toLocaleString('pt-BR'),   color: 'text-gray-700' },
-        ].map((m) => (
+          { icon: <Users size={12} />,      label: 'Total',     value: total.toLocaleString('pt-BR'),     color: 'text-gray-800' },
+          { icon: <Phone size={12} />,      label: 'Ligadas',   value: feitas.toLocaleString('pt-BR'),    color: 'text-brand-600' },
+          { icon: <Calendar size={12} />,   label: 'Agendados', value: agendadas.toLocaleString('pt-BR'), color: 'text-purple-600' },
+          { icon: <TrendingUp size={12} />, label: 'Conversão', value: `${conversao}%`,                   color: 'text-emerald-600' },
+        ].map(m => (
           <div key={m.label} className="flex flex-col items-center py-3 gap-0.5">
-            <span className={clsx('font-bold font-mono text-base', m.color)}>{m.value}</span>
-            <span className="flex items-center gap-1 text-2xs text-gray-400">
-              {m.icon}{m.label}
-            </span>
+            <span className={clsx('text-sm font-bold font-mono', m.color)}>{m.value}</span>
+            <span className="flex items-center gap-0.5 text-xs text-gray-400">{m.icon}{m.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Linha de duplicados — só aparece se houver duplicatas */}
-      {duplicados > 0 && (
-        <div className="mx-4 mb-0 mt-0 px-3 py-2 rounded-lg border border-orange-100 bg-orange-50 flex items-center justify-between">
-          <span className="text-xs text-orange-700 flex items-center gap-1.5">
-            <AlertTriangle size={12} className="text-orange-500" />
-            Telefones duplicados na lista
-          </span>
-          <span className="text-xs font-bold font-mono text-orange-700">{duplicados.toLocaleString('pt-BR')}</span>
+      {/* ── ALERTAS ── */}
+      <div className="px-4 py-2 flex flex-col gap-1.5">
+        {duplicados > 0 && (
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-100">
+            <span className="text-xs text-orange-700 flex items-center gap-1.5">
+              <AlertTriangle size={11} className="text-orange-500" />
+              Telefones duplicados na lista
+            </span>
+            <span className="text-xs font-bold text-orange-700">{duplicados.toLocaleString('pt-BR')}</span>
+          </div>
+        )}
+        <div className={clsx('px-3 py-1.5 rounded-lg border text-xs font-medium',
+          !ativa         ? 'bg-gray-50 border-gray-200 text-gray-500'
+          : consumoPct >= 80 ? 'bg-amber-50 border-amber-100 text-amber-700'
+          : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+        )}>
+          {!ativa         ? '⏸ Campanha pausada'
+          : consumoPct >= 80 ? `⚠️ Apenas ${(total - feitas).toLocaleString('pt-BR')} leads restantes — considere importar mais`
+          : `🟢 ${(d?.na_fila ?? 0).toLocaleString('pt-BR')} leads na fila · rodando normalmente`}
         </div>
-      )}
-
-      {/* Alerta */}
-      <div className={clsx(
-        'mx-4 my-3 px-3 py-2 rounded-lg border text-xs font-medium',
-        alerta.color
-      )}>
-        {alerta.icon} {alerta.text}
       </div>
 
-      {/* Ações */}
-      <div className="px-4 pb-4 grid grid-cols-2 gap-2">
-        {/* Fila → discadora, aba fila desta campanha */}
+      {/* ── AÇÕES ── */}
+      <div className="px-4 pb-4 grid grid-cols-4 gap-1.5">
         <button
           onClick={() => navigate('/discadora?campanha=' + campanha.id + '&tab=fila')}
-          className="btn-secondary text-xs py-2 gap-1.5 justify-center"
-          title="Ver fila de chamadas desta campanha na Discadora"
+          className="btn-secondary text-xs py-2 gap-1 justify-center flex-col"
+          title="Fila de chamadas"
         >
-          <BarChart2 size={13} /> Fila
+          <BarChart2 size={13} />
+          <span>Fila</span>
         </button>
-
-        {/* IA → análise pré-disparo */}
         <button
           onClick={() => setIaAberta(v => !v)}
-          className={clsx('btn-secondary text-xs py-2 gap-1.5 justify-center', iaAberta && 'bg-brand-50 border-brand-200 text-brand-700')}
-          title="Analisar lista com IA e sugerir melhor horário de disparo"
+          className={clsx('btn-secondary text-xs py-2 gap-1 justify-center flex-col', iaAberta && 'bg-brand-50 border-brand-200 text-brand-700')}
+          title="Análise com IA"
         >
-          <Brain size={13} /> IA
+          <Brain size={13} />
+          <span>IA</span>
         </button>
-
-        {/* Leads → lista de contatos importados */}
         <button
-          className={clsx('btn-secondary text-xs py-2 gap-1.5 justify-center', leadsAberto && 'bg-brand-50 border-brand-200 text-brand-700')}
+          className={clsx('btn-secondary text-xs py-2 gap-1 justify-center flex-col', leadsAberto && 'bg-brand-50 border-brand-200 text-brand-700')}
           onClick={abrirLeads}
-          title="Ver contatos importados nesta campanha"
+          title="Ver leads importados"
         >
-          <List size={13} /> Leads
+          <List size={13} />
+          <span>Leads</span>
         </button>
-
-        {/* Reprocessar → reprocessar contatos não alcançados */}
         <button
-          className="btn-secondary text-xs py-2 gap-1.5 justify-center"
+          className="btn-secondary text-xs py-2 gap-1 justify-center flex-col"
           onClick={() => onReprocessar && onReprocessar(campanha)}
           title="Reprocessar contatos não alcançados"
         >
-          <RefreshCw size={13} /> Reprocessar
+          <RefreshCw size={13} />
+          <span>Reprocessar</span>
         </button>
       </div>
 
-      {/* Painel Análise Pré-Disparo */}
+      {/* ── PAINEL IA ── */}
       {iaAberta && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-3">
           <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
             <Sparkles size={12} className="text-brand-500" />
-            Análise Pré-Disparo — Inteligência da campanha
+            Análise Pré-Disparo
           </p>
-
-          {/* Analisar Lista */}
           <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3 space-y-2">
-            <div>
-              <p className="text-xs font-semibold text-gray-800 mb-0.5">🧠 Analisar Lista com IA</p>
-              <p className="text-2xs text-gray-500 leading-relaxed">
-                A IA avalia a qualidade dos seus contatos: verifica aderência ao ICP, identifica o perfil dominante da lista e aponta recomendações antes de você disparar a campanha.
-              </p>
-            </div>
-            <button
-              onClick={handleAnalisarLista}
-              disabled={analisando}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
-            >
+            <p className="text-xs font-semibold text-gray-800">🧠 Analisar Lista com IA</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              A IA avalia qualidade dos contatos, aderência ao ICP e aponta recomendações antes do disparo.
+            </p>
+            <button onClick={handleAnalisarLista} disabled={analisando}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
               {analisando ? <><Loader2 size={12} className="animate-spin"/> Analisando...</> : <><Brain size={12}/> Executar análise</>}
             </button>
           </div>
-
           {analise && (
             <div className="space-y-2">
               {analise.score_qualidade != null && (
@@ -430,10 +408,8 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                     <span className="font-mono font-bold text-gray-900">{analise.score_qualidade}/100</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={clsx('h-full rounded-full', analise.score_qualidade >= 70 ? 'bg-emerald-500' : analise.score_qualidade >= 50 ? 'bg-amber-400' : 'bg-red-400')}
-                      style={{ width: `${analise.score_qualidade}%` }}
-                    />
+                    <div className={clsx('h-full rounded-full', analise.score_qualidade >= 70 ? 'bg-emerald-500' : analise.score_qualidade >= 50 ? 'bg-amber-400' : 'bg-red-400')}
+                      style={{ width: `${analise.score_qualidade}%` }} />
                   </div>
                 </div>
               )}
@@ -472,24 +448,16 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
               )}
             </div>
           )}
-
-          {/* Sugerir Horário */}
           <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-2">
-            <div>
-              <p className="text-xs font-semibold text-gray-800 mb-0.5">🕐 Sugerir Melhor Horário</p>
-              <p className="text-2xs text-gray-500 leading-relaxed">
-                Baseado no segmento da campanha ({campanha.segmento ?? 'geral'}), a IA sugere os horários de maior taxa de atendimento — para você não desperdiçar ligações em momentos de baixa receptividade.
-              </p>
-            </div>
-            <button
-              onClick={handleSugerirHorario}
-              disabled={buscandoHorario}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
-            >
+            <p className="text-xs font-semibold text-gray-800">🕐 Sugerir Melhor Horário</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Baseado no segmento ({campanha.segmento ?? 'geral'}), a IA sugere horários de maior taxa de atendimento.
+            </p>
+            <button onClick={handleSugerirHorario} disabled={buscandoHorario}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-3 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50">
               {buscandoHorario ? <><Loader2 size={12} className="animate-spin"/> Buscando...</> : <><Clock size={12}/> Ver melhores horários</>}
             </button>
           </div>
-
           {horarioSugerido && (
             <div className="space-y-2">
               {((horarioSugerido.horarios ?? horarioSugerido.melhores_horarios) ?? []).length > 0 && (
@@ -507,32 +475,26 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
         </div>
       )}
 
-      {/* Painel Leads */}
+      {/* ── PAINEL LEADS ── */}
       {leadsAberto && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
               <Users size={12} className="text-brand-500" />
               Contatos importados
-              {leadsTotal > 0 && (
-                <span className="badge badge-brand ml-1">{leadsTotal.toLocaleString('pt-BR')}</span>
-              )}
+              {leadsTotal > 0 && <span className="badge badge-brand ml-1">{leadsTotal.toLocaleString('pt-BR')}</span>}
             </p>
             <button onClick={() => setLeadsAberto(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400">
               <X size={13}/>
             </button>
           </div>
-
           {carregandoLeads ? (
             <div className="flex items-center justify-center py-4 gap-2 text-xs text-gray-400">
               <Loader2 size={13} className="animate-spin"/> Carregando contatos...
             </div>
           ) : leads.length === 0 ? (
             <div className="text-center py-4 text-xs text-gray-400">
-              Nenhum contato importado ainda.<br/>
-              <span className="text-brand-500 cursor-pointer hover:underline" onClick={() => navigate('/campanhas')}>
-                Use o Upload de lista para importar.
-              </span>
+              Nenhum contato importado ainda.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-48 overflow-y-auto">
@@ -551,7 +513,7 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                       <td className="px-3 py-2 text-gray-500">{l.empresa ?? '—'}</td>
                       <td className="px-3 py-2 text-gray-500 font-mono">{l.telefone ?? '—'}</td>
                       <td className="px-3 py-2">
-                        <span className={clsx('badge text-2xs', l.status === 'agendado' ? 'badge-success' : l.status === 'nao_atendeu' ? 'text-amber-700 bg-amber-50' : 'badge-neutral')}>
+                        <span className={clsx('badge text-xs', l.status === 'agendado' ? 'badge-success' : l.status === 'nao_atendeu' ? 'text-amber-700 bg-amber-50' : 'badge-neutral')}>
                           {l.status ?? 'na fila'}
                         </span>
                       </td>
@@ -561,20 +523,14 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
               </table>
               {leadsTotal > LEADS_LIMIT && (
                 <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
-                  <span className="text-2xs text-gray-400">
-                    Página {leadsPagina} de {Math.ceil(leadsTotal / LEADS_LIMIT)} · {leadsTotal.toLocaleString('pt-BR')} contatos
+                  <span className="text-xs text-gray-400">
+                    Pág {leadsPagina}/{Math.ceil(leadsTotal / LEADS_LIMIT)} · {leadsTotal.toLocaleString('pt-BR')} contatos
                   </span>
                   <div className="flex gap-1">
-                    <button
-                      disabled={leadsPagina <= 1 || carregandoLeads}
-                      onClick={() => carregarLeads(leadsPagina - 1)}
-                      className="px-2 py-0.5 text-2xs rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
-                    >← Ant</button>
-                    <button
-                      disabled={leadsPagina >= Math.ceil(leadsTotal / LEADS_LIMIT) || carregandoLeads}
-                      onClick={() => carregarLeads(leadsPagina + 1)}
-                      className="px-2 py-0.5 text-2xs rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
-                    >Próx →</button>
+                    <button disabled={leadsPagina <= 1 || carregandoLeads} onClick={() => carregarLeads(leadsPagina - 1)}
+                      className="px-2 py-0.5 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">← Ant</button>
+                    <button disabled={leadsPagina >= Math.ceil(leadsTotal / LEADS_LIMIT) || carregandoLeads} onClick={() => carregarLeads(leadsPagina + 1)}
+                      className="px-2 py-0.5 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">Próx →</button>
                   </div>
                 </div>
               )}
