@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Filter, Activity,
-  Upload, Shield, X, AlertTriangle,
-  Pause, Play, Brain, Zap,
+  Upload, Shield, X, AlertTriangle, Zap, Loader2,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { campanhasApi, agentesApi } from '@/services/api'
@@ -25,20 +25,7 @@ const NIVEIS_AGRESSIVIDADE = [
   { id: 'maxima', label: 'Máxima', calls_min: '8+',  cor: 'bg-red-100 border-red-400 text-red-800',       descricao: 'Verificar conformidade ANATEL antes de ativar' },
 ]
 
-const LEADS_UPLOAD_PREVIEW = [
-  { nome: 'Marcos Ferreira', empresa: 'Grupo Delta',        segmento: 'Indústria', porte: 'Médio',   uf: 'SP' },
-  { nome: 'Carla Neves',     empresa: 'Tech Innovations',   segmento: 'SaaS',      porte: 'Pequeno', uf: 'RJ' },
-  { nome: 'Roberto Souza',   empresa: 'Construtora Sul',    segmento: 'Construção',porte: 'Grande',  uf: 'RS' },
-  { nome: 'Patricia Lima',   empresa: 'FarmaNet',           segmento: 'Saúde',     porte: 'Médio',   uf: 'MG' },
-  { nome: 'André Costa',     empresa: 'LogisBrasil',        segmento: 'Logística', porte: 'Grande',  uf: 'SP' },
-]
 
-const ORQ_NODES = [
-  { label: 'Não Atendeu', count: 87, acao: 'Rechamar em 4h',         cor: 'border-amber-400 bg-amber-50',   label_cor: 'text-amber-700'   },
-  { label: 'Recusou',     count: 23, acao: 'Enviar e-mail em 2h',    cor: 'border-red-300 bg-red-50',       label_cor: 'text-red-700'     },
-  { label: 'Agendou',     count: 40, acao: 'Invite + reminder 24h',  cor: 'border-emerald-400 bg-emerald-50',label_cor: 'text-emerald-700' },
-  { label: 'Gatekeeper',  count: 12, acao: 'Script alternativo',     cor: 'border-purple-400 bg-purple-50', label_cor: 'text-purple-700'  },
-]
 
 // ─── MODAL CONFIG IA ─────────────────────────────────────────────────────────
 
@@ -269,6 +256,7 @@ function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: M
 
 export default function CampanhasPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
 
   // ── Filtros e busca ──
   const [busca, setBusca] = useState('')
@@ -281,13 +269,15 @@ export default function CampanhasPage() {
   const [modalAgressividade, setModalAgressividade] = useState<{ id: string; nome: string; agr: string } | null>(null)
 
   // ── Upload de lista ──
-  const [listaCarregada, setListaCarregada] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [campanhaUpload, setCampanhaUpload] = useState<Campanha | null>(null)
 
-  // ── LGPD ──
+  // ── LGPD — estado + salvando ──
   const [lgpdOptOutAuto, setLgpdOptOutAuto] = useState(true)
   const [lgpdExcluirDados, setLgpdExcluirDados] = useState(false)
   const [lgpdBloquearOptOut, setLgpdBloquearOptOut] = useState(true)
+  const [lgpdSalvando, setLgpdSalvando] = useState(false)
+  const [lgpdSalvo, setLgpdSalvo] = useState(false)
 
   // ── Orquestração ──
   const [orqCampanha, setOrqCampanha] = useState('')
@@ -353,10 +343,53 @@ export default function CampanhasPage() {
     arquivada: campanhasRaw.filter((c) => c.status === 'arquivada').length,
   }
 
+  // ── LGPD save ──
+  async function salvarLgpd() {
+    setLgpdSalvando(true)
+    try {
+      const ativas = campanhasRaw.filter(c => c.status === 'ativa')
+      await Promise.all(
+        ativas.map(c =>
+          campanhasApi.update(c.id, {
+            lgpd_opt_out: lgpdOptOutAuto,
+            lgpd_excluir: lgpdExcluirDados,
+            lgpd_nao_ligar: lgpdBloquearOptOut,
+          })
+        )
+      )
+      setLgpdSalvo(true)
+      setTimeout(() => setLgpdSalvo(false), 2500)
+    } catch (e) { console.error(e) }
+    setLgpdSalvando(false)
+  }
+
+  // ── Orquestração — dados calculados das campanhas reais ──
+  const orqDados = (() => {
+    const fonte = campanhasRaw.length > 0
+      ? orqCampanha
+        ? campanhasRaw.filter(c => c.id === orqCampanha)
+        : campanhasRaw
+      : []
+    const naoAtendeu = fonte.reduce((acc, c) => acc + (c.dashboard?.nao_atendeu ?? 0), 0)
+    const recusou    = fonte.reduce((acc, c) => acc + (c.dashboard?.recusou     ?? 0), 0)
+    const agendou    = fonte.reduce((acc, c) => acc + (c.dashboard?.agendadas   ?? 0), 0)
+    const gatekeeper = fonte.reduce((acc, c) => acc + (c.dashboard?.gatekeeper  ?? 0), 0)
+    // Se todos zerados (campos ainda não existem no backend), usa fallback visual
+    const usarFallback = naoAtendeu + recusou + agendou + gatekeeper === 0
+    return [
+      { label: 'Não Atendeu', count: usarFallback ? '—' : naoAtendeu, acao: 'Rechamar em 4h',        cor: 'border-amber-400 bg-amber-50',    label_cor: 'text-amber-700'   },
+      { label: 'Recusou',     count: usarFallback ? '—' : recusou,    acao: 'Enviar e-mail em 2h',   cor: 'border-red-300 bg-red-50',        label_cor: 'text-red-700'     },
+      { label: 'Agendou',     count: usarFallback ? '—' : agendou,    acao: 'Invite + reminder 24h', cor: 'border-emerald-400 bg-emerald-50', label_cor: 'text-emerald-700' },
+      { label: 'Gatekeeper',  count: usarFallback ? '—' : gatekeeper, acao: 'Script alternativo',    cor: 'border-purple-400 bg-purple-50',  label_cor: 'text-purple-700'  },
+    ]
+  })()
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragging(false)
-    setListaCarregada(true)
+    // Abre o modal real de importação — usa a primeira campanha ativa, ou solicita seleção
+    const primeira = campanhasRaw.find(c => c.status === 'ativa') ?? campanhasRaw[0] ?? null
+    setCampanhaUpload(primeira)
   }
 
   return (
@@ -460,7 +493,7 @@ export default function CampanhasPage() {
               onPausar={(id) => pausarMutation.mutate(id)}
               onIniciar={(id) => iniciarMutation.mutate(id)}
               onImportar={setCampanhaImportar}
-              onVerFila={(_camp) => {}}
+              onVerFila={(camp) => navigate('/discadora?campanha=' + camp.id)}
               onEditar={(camp) => setConfigModal({ open: true, campanhaId: camp.id, campanhaName: camp.nome })}
             />
           ))}
@@ -469,91 +502,97 @@ export default function CampanhasPage() {
 
       {/* ── Upload de lista com enriquecimento ─────────────────────────────── */}
       <div className="card p-5 mb-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Upload size={16} className="text-brand-500" />
-          <h3 className="text-sm font-semibold text-gray-900">Upload de lista com enriquecimento</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Upload size={16} className="text-brand-500" />
+            <h3 className="text-sm font-semibold text-gray-900">Upload de lista</h3>
+          </div>
+          {campanhasRaw.length > 0 && (
+            <select
+              className="input py-1.5 text-xs w-52"
+              value={campanhaUpload?.id ?? ''}
+              onChange={e => {
+                const c = campanhasRaw.find(x => x.id === e.target.value) ?? null
+                setCampanhaUpload(c)
+              }}
+            >
+              <option value="">— selecionar campanha —</option>
+              {campanhasRaw.filter(c => c.status !== 'arquivada').map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {!listaCarregada ? (
-          <div
-            onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={clsx(
-              'border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer',
-              isDragging ? 'border-brand-400 bg-brand-50' : 'border-gray-300 hover:border-brand-300 hover:bg-gray-50'
-            )}
-            onClick={() => setListaCarregada(true)}
-          >
-            <Upload size={28} className={clsx('mx-auto mb-3', isDragging ? 'text-brand-500' : 'text-gray-400')} />
-            <div className="text-sm font-semibold text-gray-700 mb-1">Arraste seu CSV aqui ou clique para selecionar</div>
-            <div className="text-xs text-gray-400">Colunas esperadas: nome, empresa, segmento, porte, uf, telefone, email</div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-gray-200 p-3">
-                <div className="text-2xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Top UFs</div>
-                {[{ uf:'SP', pct:48 }, { uf:'RJ', pct:22 }, { uf:'RS', pct:15 }].map(u => (
-                  <div key={u.uf} className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold w-6 text-gray-800">{u.uf}</span>
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-brand-500 rounded-full" style={{ width:`${u.pct}%` }} />
-                    </div>
-                    <span className="text-2xs text-gray-500 w-7 text-right">{u.pct}%</span>
-                  </div>
-                ))}
+        <div
+          onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={clsx(
+            'border-2 border-dashed rounded-xl p-8 text-center transition-colors',
+            campanhaUpload ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
+            isDragging && campanhaUpload ? 'border-brand-400 bg-brand-50' : 'border-gray-300 hover:border-brand-300 hover:bg-gray-50'
+          )}
+          onClick={() => campanhaUpload && setCampanhaUpload(prev => prev)} // abre via estado
+        >
+          <Upload size={28} className={clsx('mx-auto mb-3', isDragging ? 'text-brand-500' : 'text-gray-400')} />
+          {campanhaUpload ? (
+            <>
+              <div className="text-sm font-semibold text-gray-700 mb-1">
+                Arraste o CSV ou clique em "+ Lista" no card da campanha
               </div>
-              <div className="rounded-xl border border-gray-200 p-3">
-                <div className="text-2xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Por Segmento</div>
-                {[{ label:'Indústria', pct:35 }, { label:'SaaS', pct:28 }, { label:'Saúde', pct:20 }].map(s => (
-                  <div key={s.label} className="flex items-center gap-2 mb-1">
-                    <span className="text-2xs text-gray-700 flex-1 truncate">{s.label}</span>
-                    <span className="text-2xs font-bold text-gray-600">{s.pct}%</span>
-                  </div>
-                ))}
+              <div className="text-xs text-gray-400">
+                Campanha selecionada: <span className="font-semibold text-gray-600">{campanhaUpload.nome}</span>
               </div>
-              <div className="rounded-xl border border-gray-200 p-3">
-                <div className="text-2xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Por Porte</div>
-                {[{ label:'Médio', pct:42 }, { label:'Grande', pct:33 }, { label:'Pequeno', pct:25 }].map(p => (
-                  <div key={p.label} className="flex items-center gap-2 mb-1">
-                    <span className="text-2xs text-gray-700 flex-1">{p.label}</span>
-                    <span className="text-2xs font-bold text-gray-600">{p.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <div className="grid grid-cols-5 px-3 py-2 bg-gray-50 border-b border-gray-200">
-                {['Nome','Empresa','Segmento','Porte','UF'].map(h => (
-                  <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
-                ))}
-              </div>
-              {LEADS_UPLOAD_PREVIEW.map((l, i) => (
-                <div key={i} className={clsx('grid grid-cols-5 px-3 py-2 border-b border-gray-100 text-xs', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50')}>
-                  <span className="text-gray-800 font-medium">{l.nome}</span>
-                  <span className="text-gray-600">{l.empresa}</span>
-                  <span className="text-gray-600">{l.segmento}</span>
-                  <span className="text-gray-600">{l.porte}</span>
-                  <span className="font-mono text-gray-700">{l.uf}</span>
-                </div>
-              ))}
-              <div className="px-3 py-2 bg-gray-50 text-2xs text-gray-400">5 de 1.250 leads — arquivo: lista_leads.csv</div>
-            </div>
-            <div className="flex gap-3 items-center">
-              <button className="btn-primary gap-2 text-sm"><Upload size={13}/> Importar e Enriquecer</button>
-              <button onClick={() => setListaCarregada(false)} className="btn-secondary text-sm">Trocar arquivo</button>
-              <span className="text-xs text-gray-400 ml-auto">1.250 leads · Enriquecimento estimado: ~2min</span>
-            </div>
-          </div>
-        )}
+              <button
+                onClick={e => { e.stopPropagation(); setCampanhaImportar(campanhaUpload) }}
+                className="btn-primary mt-4 gap-2 text-sm mx-auto"
+              >
+                <Upload size={13}/> Selecionar arquivo CSV
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-semibold text-gray-700 mb-1">Selecione uma campanha acima</div>
+              <div className="text-xs text-gray-400">para habilitar o upload de lista de contatos</div>
+            </>
+          )}
+        </div>
+
+        <p className="text-xs text-gray-400 mt-3">
+          Colunas esperadas: <code className="bg-gray-100 px-1 rounded">nome</code>{' '}
+          <code className="bg-gray-100 px-1 rounded">telefone</code>{' '}
+          <code className="bg-gray-100 px-1 rounded">email</code>{' '}
+          <code className="bg-gray-100 px-1 rounded">empresa</code>{' '}
+          <code className="bg-gray-100 px-1 rounded">cargo</code>
+          {' '}— máx. 500 contatos por vez (processamento automático em chunks)
+        </p>
       </div>
 
       {/* ── Conformidade LGPD ──────────────────────────────────────────────── */}
       <div className="card p-5 mb-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Shield size={16} className="text-brand-500" />
-          <h3 className="text-sm font-semibold text-gray-900">Conformidade LGPD</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Shield size={16} className="text-brand-500" />
+            <h3 className="text-sm font-semibold text-gray-900">Conformidade LGPD</h3>
+            <span className="text-xs text-gray-400">— aplicado a todas as campanhas ativas</span>
+          </div>
+          <button
+            onClick={salvarLgpd}
+            disabled={lgpdSalvando}
+            className={clsx(
+              'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors',
+              lgpdSalvo
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50'
+            )}
+          >
+            {lgpdSalvando
+              ? <><Loader2 size={12} className="animate-spin"/> Salvando...</>
+              : lgpdSalvo
+                ? '✓ Salvo'
+                : 'Salvar alterações'}
+          </button>
         </div>
         <div className="flex flex-col gap-4">
           {([
@@ -567,7 +606,7 @@ export default function CampanhasPage() {
                 <div className="text-xs text-gray-400 mt-0.5">{t.desc}</div>
               </div>
               <button
-                onClick={() => t.set(!t.value)}
+                onClick={() => { t.set(!t.value); setLgpdSalvo(false) }}
                 className={clsx('w-10 h-5 rounded-full transition-colors relative flex-shrink-0 mt-0.5', t.value ? 'bg-brand-600' : 'bg-gray-300')}
               >
                 <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', t.value ? 'translate-x-5' : 'translate-x-0.5')} />
@@ -599,7 +638,7 @@ export default function CampanhasPage() {
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {ORQ_NODES.map((node) => (
+          {orqDados.map((node) => (
             <div key={node.label} className={clsx('rounded-xl border-2 p-4 flex flex-col gap-2', node.cor)}>
               <div className={clsx('text-xs font-bold', node.label_cor)}>{node.label}</div>
               <div className="text-xl font-bold font-mono text-gray-900">{node.count}</div>
