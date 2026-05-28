@@ -152,23 +152,22 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
     setNomeArquivo(file.name)
     setErro('')
 
-    // Tenta UTF-8 primeiro; se detectar mojibake (Ã, caracteres estranhos), re-lê como Windows-1252
-    const readerUtf8 = new FileReader()
-    readerUtf8.onload = (e) => {
-      const texto = e.target?.result as string
-      // Detecta mojibake típico de Windows-1252 lido como UTF-8
-      const temMojibake = /Ã|â€|Â|Ã£|Ã§|Ã©|Ã­|Ã³|Ãº/.test(texto.slice(0, 500))
-      const temSubstituto = texto.slice(0, 500).includes('�')
-      if (temMojibake || temSubstituto) {
-        // Re-lê como Windows-1252 (Latin-1)
-        const readerLatin = new FileReader()
-        readerLatin.onload = (ev) => processarTexto(ev.target?.result as string)
-        readerLatin.readAsText(file, 'windows-1252')
-      } else {
-        processarTexto(texto)
+    // Lê nos dois encodings em paralelo e usa o que identificar mais campos
+    const lerCom = (enc: string) => new Promise<string>(resolve => {
+      const r = new FileReader()
+      r.onload = (e) => resolve(e.target?.result as string)
+      r.readAsText(file, enc)
+    })
+
+    Promise.all([lerCom('UTF-8'), lerCom('windows-1252')]).then(([utf8, latin]) => {
+      const contarCampos = (texto: string) => {
+        const linha = texto.split(/\r?\n/)[0] || ''
+        const sep = detectarSeparador(linha)
+        return linha.split(sep).filter(c => mapearColuna(c) !== null).length
       }
-    }
-    readerUtf8.readAsText(file, 'UTF-8')
+      const textoFinal = contarCampos(latin) >= contarCampos(utf8) ? latin : utf8
+      processarTexto(textoFinal)
+    })
   }
 
   const handleDrop = useCallback((e: React.DragEvent) => {
