@@ -340,11 +340,11 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
       </div>
 
       {/* Ações */}
-      <div className="px-4 pb-4 flex flex-wrap gap-2">
+      <div className="px-4 pb-4 grid grid-cols-2 gap-2">
         {/* Fila → discadora, aba fila desta campanha */}
         <button
           onClick={() => navigate('/discadora?campanha=' + campanha.id + '&tab=fila')}
-          className="btn-secondary flex-1 text-xs py-2 gap-1.5"
+          className="btn-secondary text-xs py-2 gap-1.5 justify-center"
           title="Ver fila de chamadas desta campanha na Discadora"
         >
           <BarChart2 size={13} /> Fila
@@ -353,7 +353,7 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
         {/* IA → análise pré-disparo */}
         <button
           onClick={() => setIaAberta(v => !v)}
-          className={clsx('btn-secondary flex-1 text-xs py-2 gap-1.5', iaAberta && 'bg-brand-50 border-brand-200 text-brand-700')}
+          className={clsx('btn-secondary text-xs py-2 gap-1.5 justify-center', iaAberta && 'bg-brand-50 border-brand-200 text-brand-700')}
           title="Analisar lista com IA e sugerir melhor horário de disparo"
         >
           <Brain size={13} /> IA
@@ -361,7 +361,7 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
 
         {/* Leads → lista de contatos importados */}
         <button
-          className={clsx('btn-secondary flex-1 text-xs py-2 gap-1.5', leadsAberto && 'bg-brand-50 border-brand-200 text-brand-700')}
+          className={clsx('btn-secondary text-xs py-2 gap-1.5 justify-center', leadsAberto && 'bg-brand-50 border-brand-200 text-brand-700')}
           onClick={abrirLeads}
           title="Ver contatos importados nesta campanha"
         >
@@ -369,15 +369,13 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
         </button>
 
         {/* Reprocessar → reprocessar contatos não alcançados */}
-        {onReprocessar && (
-          <button
-            className="btn-secondary flex-1 text-xs py-2 gap-1.5"
-            onClick={() => onReprocessar(campanha)}
-            title="Reprocessar contatos não alcançados"
-          >
-            <RefreshCw size={13} /> Reprocessar
-          </button>
-        )}
+        <button
+          className="btn-secondary text-xs py-2 gap-1.5 justify-center"
+          onClick={() => onReprocessar && onReprocessar(campanha)}
+          title="Reprocessar contatos não alcançados"
+        >
+          <RefreshCw size={13} /> Reprocessar
+        </button>
       </div>
 
       {/* Painel Análise Pré-Disparo */}
