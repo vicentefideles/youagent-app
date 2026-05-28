@@ -495,6 +495,7 @@ export default function CampanhasPage() {
               onImportar={setCampanhaImportar}
               onVerFila={(camp) => navigate('/discadora?campanha=' + camp.id)}
               onEditar={(camp) => setConfigModal({ open: true, campanhaId: camp.id, campanhaName: camp.nome })}
+              onAgressividade={(camp) => setModalAgressividade({ id: camp.id, nome: camp.nome, agr: camp.agressividade ?? 'media' })}
             />
           ))}
         </div>

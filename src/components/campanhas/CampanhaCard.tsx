@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Upload, Brain, MoreHorizontal, Zap, Target,
-  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles
+  TrendingUp, Clock, CheckCircle2, AlertTriangle, Sparkles, Settings
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
@@ -16,6 +16,7 @@ interface Props {
   onImportar: (campanha: Campanha) => void
   onVerFila: (campanha: Campanha) => void
   onEditar?: (campanha: Campanha) => void
+  onAgressividade?: (campanha: Campanha) => void
 }
 
 const TIPO_LABELS: Record<string, string> = {
@@ -52,7 +53,7 @@ interface HorarioSugestao {
   melhores_horarios?: string[]
 }
 
-export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar, onVerFila, onEditar }: Props) {
+export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar, onVerFila, onEditar, onAgressividade }: Props) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [iaAberta, setIaAberta] = useState(false)
@@ -158,6 +159,29 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
           </div>
 
           <div className="flex items-center gap-1">
+            {/* Config IA */}
+            <button
+              onClick={() => onEditar && onEditar(campanha)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium
+                         text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Configurar IA"
+            >
+              <Settings size={12} /> Config IA
+            </button>
+
+            {/* Agressividade */}
+            <button
+              onClick={() => onAgressividade && onAgressividade(campanha)}
+              className={clsx(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors',
+                agress.color, agress.bg,
+                'hover:opacity-80'
+              )}
+              title="Alterar agressividade"
+            >
+              ⚡ {agress.label}
+            </button>
+
             {/* Play/Pause */}
             <button
               onClick={() => ativa ? onPausar(campanha.id) : onIniciar(campanha.id)}
