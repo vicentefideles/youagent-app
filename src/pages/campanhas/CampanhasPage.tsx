@@ -27,6 +27,26 @@ const NIVEIS_AGRESSIVIDADE = [
 
 
 
+// ─── TOGGLE ──────────────────────────────────────────────────────────────────
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className={clsx(
+        'relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none',
+        checked ? 'bg-brand' : 'bg-gray-200'
+      )}
+    >
+      <span className={clsx(
+        'absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200',
+        checked ? 'translate-x-5' : 'translate-x-0'
+      )} />
+    </button>
+  )
+}
+
 // ─── MODAL CONFIG IA ─────────────────────────────────────────────────────────
 
 interface ConfigIAModalState {
@@ -131,11 +151,9 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
                 ['gravarLigacoes',      'Gravar todas as ligações'],
                 ['notificarGerente',    'Notificar gerente em cada transferência'],
               ] as const).map(([field, label]) => (
-                <div key={field} className="flex items-center justify-between">
+                <div key={field} className="flex items-center justify-between gap-4">
                   <span className="text-sm text-gray-700">{label}</span>
-                  <button onClick={() => toggle(field)} className={clsx('w-10 h-5 rounded-full transition-colors relative', cfg[field] ? 'bg-brand-600' : 'bg-gray-300')}>
-                    <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', cfg[field] ? 'translate-x-5' : 'translate-x-0.5')} />
-                  </button>
+                  <Toggle checked={cfg[field]} onChange={() => toggle(field)} />
                 </div>
               ))}
               <div>
@@ -160,11 +178,9 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
                   <input type="time" value={cfg.horarioFim} onChange={e => setCfg(p => ({ ...p, horarioFim: e.target.value }))} className="input" />
                 </div>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-gray-700">Pausar aos finais de semana</span>
-                <button onClick={() => toggle('pausarFds')} className={clsx('w-10 h-5 rounded-full transition-colors relative', cfg.pausarFds ? 'bg-brand-600' : 'bg-gray-300')}>
-                  <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', cfg.pausarFds ? 'translate-x-5' : 'translate-x-0.5')} />
-                </button>
+                <Toggle checked={cfg.pausarFds} onChange={() => toggle('pausarFds')} />
               </div>
             </div>
           </div>
@@ -617,12 +633,7 @@ export default function CampanhasPage() {
                 <div className="text-sm font-medium text-gray-800">{t.label}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{t.desc}</div>
               </div>
-              <button
-                onClick={() => { t.set(!t.value); setLgpdSalvo(false) }}
-                className={clsx('w-10 h-5 rounded-full transition-colors relative flex-shrink-0 mt-0.5', t.value ? 'bg-brand-600' : 'bg-gray-300')}
-              >
-                <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', t.value ? 'translate-x-5' : 'translate-x-0.5')} />
-              </button>
+              <Toggle checked={t.value} onChange={() => { t.set(!t.value); setLgpdSalvo(false) }} />
             </div>
           ))}
         </div>
