@@ -191,15 +191,19 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
               {campanha.estado && (
                 <span className="text-xs text-gray-400">{campanha.estado}</span>
               )}
-              {campanha.icp_ativo && (
-                <button
-                  onClick={() => navigate('/inteligencia?tab=icp')}
-                  className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 transition-colors"
-                  title="Ver análise ICP no Centro de Inteligência"
-                >
-                  <Target size={10} /> ICP ativo · {campanha.icp_threshold}+
-                </button>
-              )}
+              <button
+                onClick={() => navigate('/inteligencia?tab=icp')}
+                className={clsx(
+                  'flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border transition-colors',
+                  campanha.icp_ativo
+                    ? 'bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100'
+                    : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'
+                )}
+                title={campanha.icp_ativo ? 'Ver análise ICP no Centro de Inteligência' : 'Ativar ICP nesta campanha'}
+              >
+                <Target size={10} />
+                {campanha.icp_ativo ? `ICP ativo · ${campanha.icp_threshold}+` : 'ICP desativado'}
+              </button>
             </div>
           </div>
 

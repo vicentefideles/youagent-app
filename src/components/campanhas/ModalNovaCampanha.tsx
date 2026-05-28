@@ -299,35 +299,87 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
             )}
           </div>
 
-          {/* ── BANNER ICP ── */}
-          <div className="rounded-xl overflow-hidden" style={{background:'linear-gradient(135deg,#1e1e2e,#1a2240)'}}>
-            <div className="p-4">
-              <div className="flex items-start gap-3 mb-3">
+          {/* ── ICP ── */}
+          <div className={clsx(
+            'rounded-xl border-2 overflow-hidden transition-all',
+            form.icp_ativo ? 'border-purple-400' : 'border-gray-200'
+          )}>
+            {/* Header do bloco */}
+            <div
+              className="p-4 flex items-center justify-between gap-4"
+              style={{ background: form.icp_ativo ? 'linear-gradient(135deg,#1e1e2e,#2d1b69)' : '#f9fafb' }}
+            >
+              <div className="flex items-center gap-3">
                 <span className="text-2xl flex-shrink-0">🎯</span>
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-white mb-1">Perfil de Cliente Ideal detectado pelo sistema</p>
-                  <p className="text-xs text-white/60 leading-relaxed">
-                    Baseado no histórico, você fecha <strong className="text-white">3.2x mais</strong> com{' '}
-                    <strong className="text-white">indústrias de 50–200 func.</strong> no{' '}
-                    <strong className="text-white">interior de SP</strong>, lideradas por{' '}
-                    <strong className="text-white">Diretores de Operações</strong>.
+                <div>
+                  <p className={clsx('text-sm font-bold', form.icp_ativo ? 'text-white' : 'text-gray-800')}>
+                    ICP — Perfil de Cliente Ideal
+                  </p>
+                  <p className={clsx('text-xs', form.icp_ativo ? 'text-white/60' : 'text-gray-500')}>
+                    {form.icp_ativo
+                      ? 'Ativo — o sistema vai priorizar os leads com maior chance de fechar'
+                      : 'Desativado — todos os leads são discados na ordem de importação'}
                   </p>
                 </div>
               </div>
-              <div className="border-t border-white/10 pt-3 flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-white mb-1">Usar inteligência do ICP nesta campanha?</p>
-                  <p className="text-2xs text-white/50 leading-relaxed">
-                    Quando ativado, analisa sua lista, calcula o score de cada contato e ordena automaticamente os melhores perfis para o topo da fila.
-                  </p>
-                </div>
-                <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                  <Toggle checked={form.icp_ativo} onChange={v => s('icp_ativo', v)} />
-                  <span className={clsx('text-2xs font-bold', form.icp_ativo ? 'text-emerald-400' : 'text-gray-400')}>
-                    {form.icp_ativo ? 'ATIVADO' : 'DESATIVADO'}
-                  </span>
-                </div>
+              <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                <Toggle checked={form.icp_ativo} onChange={v => s('icp_ativo', v)} />
+                <span className={clsx('text-2xs font-bold', form.icp_ativo ? 'text-emerald-400' : 'text-gray-400')}>
+                  {form.icp_ativo ? 'ATIVADO' : 'DESATIVADO'}
+                </span>
               </div>
+            </div>
+
+            {/* Explicação expansível */}
+            <div className={clsx(
+              'border-t p-4',
+              form.icp_ativo ? 'border-purple-500/30 bg-purple-950/20' : 'border-gray-100 bg-white'
+            )}>
+              {form.icp_ativo ? (
+                <>
+                  <p className="text-xs font-semibold text-purple-200 mb-3">O que acontece quando o ICP está ativo:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { icon: '📊', t: 'Score automático por lead', d: 'Cada contato recebe uma pontuação baseada em cargo, segmento, porte e região antes de ligar.' },
+                      { icon: '🏆', t: 'Fila inteligente', d: 'Leads com maior score sobem automaticamente para o topo — você liga primeiro para quem mais converte.' },
+                      { icon: '📈', t: 'Aprendizado contínuo', d: 'A cada ligação o modelo ajusta os pesos do score — fica mais preciso com o tempo.' },
+                      { icon: '🎯', t: 'Threshold configurável', d: `Score mínimo: ${form.icp_ativo ? '70' : '—'}. Leads abaixo do threshold são colocados em espera.` },
+                    ].map((b, i) => (
+                      <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-white/10">
+                        <span className="text-base flex-shrink-0">{b.icon}</span>
+                        <div>
+                          <p className="text-xs font-semibold text-purple-100">{b.t}</p>
+                          <p className="text-2xs text-purple-200/70 leading-relaxed mt-0.5">{b.d}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                    <span className="text-emerald-400 text-base">✅</span>
+                    <p className="text-xs text-emerald-300 font-semibold">
+                      Clientes que ativam o ICP fecham em média <strong>3.2x mais reuniões</strong> com a mesma lista.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <span className="text-amber-400 text-xl flex-shrink-0">💡</span>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700 mb-1">Por que ativar o ICP?</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      O ICP analisa automaticamente sua lista e coloca na frente da fila os contatos com maior probabilidade de fechar.
+                      Sem ele, o agente liga para todos na mesma ordem — desperdiçando tempo com leads de baixo potencial.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => s('icp_ativo', true)}
+                      className="mt-2.5 text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 transition-colors"
+                    >
+                      🎯 Ativar ICP nesta campanha →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
