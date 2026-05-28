@@ -245,12 +245,14 @@ interface ModalAgressividadeProps {
   campanhaId: string | null
   campanhaName: string
   valorAtual: string
+  simultaneasAtual: number
   onClose: () => void
 }
 
-function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: ModalAgressividadeProps) {
+function ModalAgressividade({ campanhaId, campanhaName, valorAtual, simultaneasAtual, onClose }: ModalAgressividadeProps) {
+  const qc = useQueryClient()
   const [retentativa, setRetentativa] = useState(valorAtual.toLowerCase())
-  const [simultaneas, setSimultaneas] = useState(3)
+  const [simultaneas, setSimultaneas] = useState(simultaneasAtual)
   const [salvando, setSalvando] = useState(false)
   const showAnatel = retentativa === 'alta' || retentativa === 'maxima'
 
@@ -261,6 +263,7 @@ function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: M
         agressividade: retentativa,
         discagem_simultanea: simultaneas,
       })
+      await qc.invalidateQueries({ queryKey: ['campanhas'] })
     } catch (e) { console.error(e) }
     setSalvando(false)
     onClose()
@@ -386,7 +389,7 @@ export default function CampanhasPage() {
   const [modalNova, setModalNova] = useState(false)
   const [campanhaImportar, setCampanhaImportar] = useState<Campanha | null>(null)
   const [configModal, setConfigModal] = useState<ConfigIAModalState>({ open: false, campanhaId: null, campanhaName: '' })
-  const [modalAgressividade, setModalAgressividade] = useState<{ id: string; nome: string; agr: string } | null>(null)
+  const [modalAgressividade, setModalAgressividade] = useState<{ id: string; nome: string; agr: string; simultaneas: number } | null>(null)
 
   // ── Upload de lista ──
   const [isDragging, setIsDragging] = useState(false)
@@ -527,6 +530,7 @@ export default function CampanhasPage() {
           campanhaId={modalAgressividade.id}
           campanhaName={modalAgressividade.nome}
           valorAtual={modalAgressividade.agr}
+          simultaneasAtual={modalAgressividade.simultaneas}
           onClose={() => setModalAgressividade(null)}
         />
       )}
@@ -620,7 +624,7 @@ export default function CampanhasPage() {
               onImportar={setCampanhaImportar}
               onVerFila={(camp) => navigate('/discadora?campanha=' + camp.id)}
               onEditar={(camp) => setConfigModal({ open: true, campanhaId: camp.id, campanhaName: camp.nome })}
-              onAgressividade={(camp) => setModalAgressividade({ id: camp.id, nome: camp.nome, agr: camp.agressividade ?? 'media' })}
+              onAgressividade={(camp) => setModalAgressividade({ id: camp.id, nome: camp.nome, agr: camp.agressividade ?? 'media', simultaneas: (camp as unknown as { discagem_simultanea?: number }).discagem_simultanea ?? 1 })}
             />
           ))}
         </div>

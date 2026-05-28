@@ -38,6 +38,7 @@ export interface Campanha {
   icp_threshold: number
   duracao_reuniao: string
   criado_em: string
+  discagem_simultanea?: number
   // Dashboard (contadores)
   dashboard?: CampanhaDashboard
   // Total de contatos
