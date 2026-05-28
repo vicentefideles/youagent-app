@@ -63,7 +63,7 @@ export const campanhasApi = {
     api.post(`/campanhas/${id}/analisar-lista`, data),
   reprocessarPreview: (id: string) =>
     api.get(`/campanhas/${id}/reprocessar/preview`),
-  reprocessar: (id: string, data: { tipos: string[]; intervalo_horas: number; max_tentativas: number }) =>
+  reprocessar: (id: string, data: { tipos: string[]; intervalo_horas: number; max_tentativas: number; horario_preferencial?: string; agente_preferencia?: string }) =>
     api.post(`/campanhas/${id}/reprocessar`, data),
 }
 

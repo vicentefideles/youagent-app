@@ -61,9 +61,21 @@ const INTERVALOS = [
 ]
 
 const MAX_TENTATIVAS = [
-  { value: 1, label: '1 tentativa adicional' },
-  { value: 2, label: '2 tentativas adicionais' },
-  { value: 3, label: '3 tentativas adicionais' },
+  { value: 1, label: '1 tentativa' },
+  { value: 2, label: '2 tentativas' },
+  { value: 3, label: '3 tentativas' },
+]
+
+const HORARIOS_PREFERENCIAL = [
+  { value: 'qualquer', label: 'Qualquer horário' },
+  { value: 'manha',    label: 'Manhã (08h–12h)' },
+  { value: 'tarde',    label: 'Tarde (13h–18h)' },
+  { value: 'noite',    label: 'Noite (18h–21h)' },
+]
+
+const AGENTES_OPCOES = [
+  { value: 'mesmo',     label: 'Mesmo agente anterior' },
+  { value: 'qualquer',  label: 'Qualquer agente disponível' },
 ]
 
 export default function ModalReprocessar({ campanha, onConcluido, onFechar }: Props) {
@@ -72,6 +84,8 @@ export default function ModalReprocessar({ campanha, onConcluido, onFechar }: Pr
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set(['nao_atendeu', 'ligacao_caiu', 'retornar']))
   const [intervalo, setIntervalo] = useState(24)
   const [maxTentativas, setMaxTentativas] = useState(2)
+  const [horarioPreferencial, setHorarioPreferencial] = useState('qualquer')
+  const [agente, setAgente] = useState('mesmo')
   const [reprocessando, setReprocessando] = useState(false)
   const [concluido, setConcluido] = useState(false)
   const [erro, setErro] = useState('')
@@ -106,6 +120,8 @@ export default function ModalReprocessar({ campanha, onConcluido, onFechar }: Pr
         tipos: [...selecionados],
         intervalo_horas: intervalo,
         max_tentativas: maxTentativas,
+        horario_preferencial: horarioPreferencial,
+        agente_preferencia: agente,
       })
       setResultado((r.data as { reprocessados: number }).reprocessados)
       setConcluido(true)
@@ -245,6 +261,34 @@ export default function ModalReprocessar({ campanha, onConcluido, onFechar }: Pr
                           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-brand"
                         >
                           {MAX_TENTATIVAS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-2xs text-gray-500 font-semibold uppercase tracking-wide block mb-1">
+                          Horário preferencial
+                        </label>
+                        <select
+                          value={horarioPreferencial}
+                          onChange={e => setHorarioPreferencial(e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-brand"
+                        >
+                          {HORARIOS_PREFERENCIAL.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-2xs text-gray-500 font-semibold uppercase tracking-wide block mb-1">
+                          Agente para reprocessar
+                        </label>
+                        <select
+                          value={agente}
+                          onChange={e => setAgente(e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-brand"
+                        >
+                          {AGENTES_OPCOES.map(o => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                           ))}
                         </select>
