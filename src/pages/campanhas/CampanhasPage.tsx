@@ -18,31 +18,40 @@ type FiltroStatus = 'todas' | 'ativa' | 'pausada' | 'arquivada'
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 
-const NIVEIS_AGRESSIVIDADE = [
+// Retentativas — quantas vezes ligar para o mesmo número
+const NIVEIS_RETENTATIVAS = [
   {
-    id: 'baixa', label: 'Baixa', calls_min: '1-2',
+    id: 'baixa', label: 'Baixa', tentativas: '1-2',
     cor: 'bg-brand-50 border-brand-400 text-brand-700', badge: 'bg-brand-100 text-brand-700',
     descricao: 'Ideal para Enterprise e contas estratégicas',
-    detalhes: '1-2 ligações por lead · Intervalo de 48h entre tentativas · Abordagem consultiva e sem pressão',
+    detalhes: '1-2 tentativas por lead · Intervalo de 48h · Abordagem consultiva, sem pressão',
   },
   {
-    id: 'media', label: 'Média', calls_min: '3-4',
+    id: 'media', label: 'Média', tentativas: '3-4',
     cor: 'bg-brand-100 border-brand-500 text-brand-800', badge: 'bg-brand-200 text-brand-800',
-    descricao: 'Configuração padrão — equilibra volume e qualidade',
-    detalhes: '3-4 ligações por lead · Intervalo de 24h entre tentativas · Melhor taxa de contato sem desgastar o lead',
+    descricao: 'Padrão recomendado — equilíbrio entre volume e qualidade',
+    detalhes: '3-4 tentativas por lead · Intervalo de 24h · Máxima taxa de contato sem desgastar o lead',
   },
   {
-    id: 'alta', label: 'Alta', calls_min: '5-7',
+    id: 'alta', label: 'Alta', tentativas: '5-7',
     cor: 'bg-amber-50 border-amber-400 text-amber-800', badge: 'bg-amber-100 text-amber-800',
-    descricao: 'Indicado para SMB com ciclo de venda curto',
-    detalhes: '5-7 ligações por lead · Intervalo de 4-8h entre tentativas · Maximiza contatos, ideal para produtos de decisão rápida',
+    descricao: 'Para SMB com ciclo de venda curto',
+    detalhes: '5-7 tentativas por lead · Intervalo de 4-8h · Ideal para produtos de decisão rápida',
   },
   {
-    id: 'maxima', label: 'Máxima', calls_min: '8+',
+    id: 'maxima', label: 'Máxima', tentativas: '8+',
     cor: 'bg-red-50 border-red-400 text-red-700', badge: 'bg-red-100 text-red-700',
     descricao: '⚠️ Alta intensidade — verifique conformidade ANATEL',
-    detalhes: '8+ ligações por lead · Intervalos curtos · Use apenas em listas de alta intenção ou leads que solicitaram contato. Limite legal: máx. 3 tentativas/dia por número.',
+    detalhes: '8+ tentativas · Intervalos curtos · Use só em leads de alta intenção. Limite legal: máx. 3x/dia por número.',
   },
+]
+
+// Discagem simultânea — quantas ligações o agente dispara em paralelo
+const NIVEIS_SIMULTANEAS = [
+  { valor: 1,  label: '1 por vez',    descricao: 'Liga para 1 empresa de cada vez. O agente só faz a próxima ligação quando a atual terminar.' },
+  { valor: 3,  label: '3 simultâneas', descricao: 'Liga para 3 empresas ao mesmo tempo. A primeira que atender inicia a conversa; as outras são reagendadas automaticamente.' },
+  { valor: 5,  label: '5 simultâneas', descricao: 'Liga para 5 empresas ao mesmo tempo. Aumenta muito a taxa de contato em listas frias.' },
+  { valor: 10, label: '10 simultâneas', descricao: 'Discagem preditiva máxima. Ideal para listas grandes (+1k contatos) onde a taxa de atendimento é baixa.' },
 ]
 
 
@@ -231,70 +240,119 @@ interface ModalAgressividadeProps {
 }
 
 function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: ModalAgressividadeProps) {
-  const [selecionado, setSelecionado] = useState(valorAtual.toLowerCase())
+  const [retentativa, setRetentativa] = useState(valorAtual.toLowerCase())
+  const [simultaneas, setSimultaneas] = useState(3)
   const [salvando, setSalvando] = useState(false)
-  const showAnatel = selecionado === 'alta' || selecionado === 'maxima'
+  const showAnatel = retentativa === 'alta' || retentativa === 'maxima'
 
   async function salvar() {
     setSalvando(true)
-    try { if (campanhaId) await campanhasApi.update(campanhaId, { agressividade: selecionado }) }
-    catch (e) { console.error(e) }
+    try {
+      if (campanhaId) await campanhasApi.update(campanhaId, {
+        agressividade: retentativa,
+        discagem_simultanea: simultaneas,
+      })
+    } catch (e) { console.error(e) }
     setSalvando(false)
     onClose()
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[460px]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Agressividade da campanha</h2>
+            <h2 className="text-base font-semibold text-gray-900">Configuração de discagem</h2>
             <p className="text-xs text-gray-400 mt-0.5">{campanhaName}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18}/></button>
         </div>
-        <div className="p-6 flex flex-col gap-3">
-          {NIVEIS_AGRESSIVIDADE.map(n => (
-            <button
-              key={n.id}
-              onClick={() => setSelecionado(n.id)}
-              className={clsx(
-                'flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all w-full',
-                selecionado === n.id
-                  ? n.cor + ' shadow-sm'
-                  : 'border-gray-200 hover:border-brand-200 hover:bg-brand-50/30 bg-white'
-              )}
-            >
-              <div className={clsx(
-                'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs font-mono border-2 flex-shrink-0 mt-0.5',
-                selecionado === n.id ? n.badge + ' border-current/30' : 'bg-gray-100 text-gray-500 border-gray-200'
-              )}>{n.calls_min}</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-gray-900">{n.label}</span>
-                  <div className={clsx(
-                    'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors',
-                    selecionado === n.id ? 'border-brand-500 bg-brand-500' : 'border-gray-300'
-                  )}>
-                    {selecionado === n.id && <div className="w-2 h-2 rounded-full bg-white"/>}
-                  </div>
-                </div>
-                <div className="text-xs text-gray-600 mt-0.5">{n.descricao}</div>
-                <div className={clsx(
-                  'text-2xs mt-1.5 leading-relaxed',
-                  selecionado === n.id ? 'text-current opacity-75' : 'text-gray-400'
-                )}>{n.detalhes}</div>
-              </div>
-            </button>
-          ))}
-          {showAnatel && (
-            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700">
-              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5"/>
-              <span>⚠️ Respeite o limite de tentativas ANATEL: máx. 3x/dia por número</span>
+
+        <div className="p-6 flex flex-col gap-6">
+
+          {/* SEÇÃO 1: Retentativas */}
+          <div>
+            <div className="mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">1. Retentativas por lead</h3>
+              <p className="text-xs text-gray-400 mt-1">Quantas vezes o agente tentará ligar para o <strong className="text-gray-600">mesmo número</strong> antes de desistir desse contato.</p>
             </div>
-          )}
+            <div className="flex flex-col gap-2">
+              {NIVEIS_RETENTATIVAS.map(n => (
+                <button
+                  key={n.id}
+                  onClick={() => setRetentativa(n.id)}
+                  className={clsx(
+                    'flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all w-full',
+                    retentativa === n.id ? n.cor + ' shadow-sm' : 'border-gray-200 hover:border-brand-200 hover:bg-brand-50/30 bg-white'
+                  )}
+                >
+                  <div className={clsx(
+                    'w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs font-mono border-2 flex-shrink-0',
+                    retentativa === n.id ? n.badge + ' border-current/30' : 'bg-gray-100 text-gray-500 border-gray-200'
+                  )}>{n.tentativas}×</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-gray-900">{n.label}</span>
+                      <div className={clsx('w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors', retentativa === n.id ? 'border-brand-500 bg-brand-500' : 'border-gray-300')}>
+                        {retentativa === n.id && <div className="w-1.5 h-1.5 rounded-full bg-white"/>}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{n.detalhes}</div>
+                  </div>
+                </button>
+              ))}
+              {showAnatel && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700">
+                  <AlertTriangle size={13} className="flex-shrink-0 mt-0.5"/>
+                  <span>Limite legal ANATEL: máx. 3 tentativas por dia para o mesmo número.</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SEÇÃO 2: Discagem simultânea */}
+          <div>
+            <div className="mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">2. Discagem simultânea</h3>
+              <p className="text-xs text-gray-400 mt-1">Quantas empresas o agente liga <strong className="text-gray-600">ao mesmo tempo</strong>. A primeira que atender inicia a conversa — as demais são reagendadas automaticamente para outro momento.</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              {NIVEIS_SIMULTANEAS.map(n => (
+                <button
+                  key={n.valor}
+                  onClick={() => setSimultaneas(n.valor)}
+                  className={clsx(
+                    'flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all w-full',
+                    simultaneas === n.valor
+                      ? 'bg-brand-50 border-brand-400 text-brand-800 shadow-sm'
+                      : 'border-gray-200 hover:border-brand-200 hover:bg-brand-50/30 bg-white'
+                  )}
+                >
+                  <div className={clsx(
+                    'w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm font-mono border-2 flex-shrink-0',
+                    simultaneas === n.valor ? 'bg-brand-100 text-brand-700 border-brand-300' : 'bg-gray-100 text-gray-500 border-gray-200'
+                  )}>{n.valor}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-gray-900">{n.label}</span>
+                      <div className={clsx('w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors', simultaneas === n.valor ? 'border-brand-500 bg-brand-500' : 'border-gray-300')}>
+                        {simultaneas === n.valor && <div className="w-1.5 h-1.5 rounded-full bg-white"/>}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{n.descricao}</div>
+                  </div>
+                </button>
+              ))}
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-700">
+                <Zap size={13} className="flex-shrink-0 mt-0.5"/>
+                <span>Com discagem simultânea ativa, o sistema reagenda automaticamente os contatos que não atenderam — sem perder nenhum lead da lista.</span>
+              </div>
+            </div>
+          </div>
+
         </div>
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
           <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
           <button onClick={salvar} disabled={salvando} className="btn-primary flex-1 justify-center disabled:opacity-60">
             {salvando ? 'Salvando...' : 'Salvar'}
