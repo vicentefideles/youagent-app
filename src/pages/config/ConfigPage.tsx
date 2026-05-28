@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { claudeApi, api, calendarApi, clientesApi } from '@/services/api'
+import { claudeApi, api, calendarApi, clientesApi, telnyxApi } from '@/services/api'
 import TelnyxNumeroSection from '@/components/TelnyxNumeroSection'
 import {
   Building2,
@@ -171,6 +171,85 @@ function SectionEmpresa() {
   )
 }
 
+// ─── Card Telnyx com dados reais da sub-conta Managed Account ─────────────────
+
+interface TelnyxContaInfo {
+  provisionada: boolean
+  account_id?: string
+  connection_id?: string
+  phone?: string
+}
+
+function TelnyxContaCard({ enabled, onToggle }: { enabled: boolean; onToggle: (v: boolean) => void }) {
+  const [conta, setConta] = useState<TelnyxContaInfo | null>(null)
+
+  useEffect(() => {
+    telnyxApi.getConta()
+      .then(res => setConta(res.data as TelnyxContaInfo))
+      .catch(() => setConta({ provisionada: false }))
+  }, [])
+
+  function mascarar(id?: string) {
+    if (!id) return '—'
+    return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
+  }
+
+  function formatarNumero(num?: string) {
+    if (!num) return '—'
+    const d = num.replace(/\D/g, '')
+    if (d.length === 13) return `+${d.slice(0,2)} (${d.slice(2,4)}) ${d.slice(4,9)}-${d.slice(9)}`
+    return num
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm text-gray-900">Telnyx</span>
+            {conta?.provisionada ? (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700 font-medium">Conectado</span>
+            ) : (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 text-amber-700 font-medium">Aguardando provisionamento</span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Voz + WhatsApp · Conta dedicada</p>
+        </div>
+        <Toggle checked={enabled} onChange={onToggle} />
+      </div>
+
+      {conta?.provisionada ? (
+        <div className="space-y-2.5">
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-0.5">Account ID</p>
+            <p className="font-mono text-xs text-gray-800 bg-gray-50 rounded px-2 py-1">{mascarar(conta.account_id)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-0.5">Connection ID</p>
+            <p className="font-mono text-xs text-gray-800 bg-gray-50 rounded px-2 py-1">{mascarar(conta.connection_id)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-0.5">Número principal</p>
+            <p className="font-mono text-xs text-gray-800 bg-gray-50 rounded px-2 py-1">{formatarNumero(conta.phone)}</p>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700">Voz ativa</span>
+            <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700">WhatsApp ativo</span>
+            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700">Gerenciado pela ETZ</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500">
+            Sua sub-conta Telnyx será criada automaticamente quando o número for aprovado.
+          </p>
+          <p className="text-xs text-gray-400">Solicite um número +55 acima para iniciar.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Seção: Integrações ───────────────────────────────────────────────────────
 
 function SectionIntegracoes() {
@@ -232,36 +311,7 @@ function SectionIntegracoes() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm text-gray-900">Telnyx</span>
-              <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700 font-medium">Conectado</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5">Voz + WhatsApp</p>
-          </div>
-          <Toggle checked={telnyxEnabled} onChange={handleToggleTelnyx} />
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">API Key</label>
-            <input type="password" defaultValue="sk_live_xxxxxxxxxxxx" className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">SIP Trunk</label>
-            <input defaultValue="sip.telnyx.com" className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Número principal</label>
-            <input defaultValue="+55 11 99999-0000" className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="flex gap-2">
-            <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700">Voz ativa</span>
-            <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-700">WhatsApp ativo</span>
-          </div>
-        </div>
-      </div>
+      <TelnyxContaCard enabled={telnyxEnabled} onToggle={handleToggleTelnyx} />
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-3">

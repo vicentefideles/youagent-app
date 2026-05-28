@@ -282,5 +282,7 @@ export const telnyxApi = {
     api.patch(`/telnyx/numeros/admin/${id}`, data),
   adminProvisionar: (id: string) =>
     api.post(`/telnyx/numeros/provisionar/${id}`, {}),
+  getConta: () =>
+    api.get('/telnyx/numeros/conta'),
 }
 
