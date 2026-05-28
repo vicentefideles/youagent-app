@@ -128,7 +128,7 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
   const faltam     = Math.max(0, total - feitas)
   const agendadas  = d?.agendadas      ?? 0
   const naFila     = d?.na_fila        ?? 0
-  const duplicados = d?.duplicados     ?? 0
+  const duplicados = campanha.lista_duplicados ?? d?.duplicados ?? 0
   const conversao  = total > 0 ? ((agendadas / Math.max(feitas, 1)) * 100).toFixed(1) : '0.0'
   const consumoPct = total > 0 ? Math.min(100, Math.round((feitas / total) * 100)) : 0
 

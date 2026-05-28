@@ -42,6 +42,7 @@ export interface Campanha {
   duracao_reuniao: string
   criado_em: string
   discagem_simultanea?: number
+  lista_duplicados?: number
   // Dashboard (contadores)
   dashboard?: CampanhaDashboard
   // Total de contatos
