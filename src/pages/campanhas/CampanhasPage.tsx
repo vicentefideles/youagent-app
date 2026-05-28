@@ -19,10 +19,10 @@ type FiltroStatus = 'todas' | 'ativa' | 'pausada' | 'arquivada'
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 
 const NIVEIS_AGRESSIVIDADE = [
-  { id: 'baixa',  label: 'Baixa',  calls_min: '1-2', cor: 'bg-green-100 border-green-400 text-green-800',  descricao: 'Ideal para Enterprise — mais pausa entre tentativas' },
-  { id: 'media',  label: 'Média',  calls_min: '3-4', cor: 'bg-blue-100 border-blue-400 text-blue-800',    descricao: 'Equilíbrio entre volume e qualidade' },
-  { id: 'alta',   label: 'Alta',   calls_min: '5-7', cor: 'bg-amber-100 border-amber-400 text-amber-800', descricao: 'Recomendado para SMB — maior volume' },
-  { id: 'maxima', label: 'Máxima', calls_min: '8+',  cor: 'bg-red-100 border-red-400 text-red-800',       descricao: 'Verificar conformidade ANATEL antes de ativar' },
+  { id: 'baixa',  label: 'Baixa',  calls_min: '1-2', cor: 'bg-brand-50 border-brand-400 text-brand-700',  badge: 'bg-brand-100 text-brand-700',   descricao: 'Ideal para Enterprise — mais pausa entre tentativas' },
+  { id: 'media',  label: 'Média',  calls_min: '3-4', cor: 'bg-brand-100 border-brand-500 text-brand-800', badge: 'bg-brand-200 text-brand-800',   descricao: 'Equilíbrio entre volume e qualidade' },
+  { id: 'alta',   label: 'Alta',   calls_min: '5-7', cor: 'bg-amber-50 border-amber-400 text-amber-800',  badge: 'bg-amber-100 text-amber-800',  descricao: 'Recomendado para SMB — maior volume' },
+  { id: 'maxima', label: 'Máxima', calls_min: '8+',  cor: 'bg-red-50 border-red-400 text-red-700',        badge: 'bg-red-100 text-red-700',      descricao: 'Verificar conformidade ANATEL antes de ativar' },
 ]
 
 
@@ -93,14 +93,14 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
                   <label className="text-sm text-gray-700">ICP mínimo para transferir</label>
                   <span className="text-sm font-bold text-brand-600 font-mono w-8 text-right">{cfg.icpMin}</span>
                 </div>
-                <input type="range" min={0} max={100} value={cfg.icpMin} onChange={e => setCfg(p => ({ ...p, icpMin: Number(e.target.value) }))} className="w-full accent-indigo-600" />
+                <input type="range" min={0} max={100} value={cfg.icpMin} onChange={e => setCfg(p => ({ ...p, icpMin: Number(e.target.value) }))} className="w-full accent-brand" />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm text-gray-700">Sensibilidade de gatilhos</label>
                   <span className="text-sm font-bold text-brand-600 font-mono w-8 text-right">{cfg.sensibilidade}</span>
                 </div>
-                <input type="range" min={0} max={100} value={cfg.sensibilidade} onChange={e => setCfg(p => ({ ...p, sensibilidade: Number(e.target.value) }))} className="w-full accent-indigo-600" />
+                <input type="range" min={0} max={100} value={cfg.sensibilidade} onChange={e => setCfg(p => ({ ...p, sensibilidade: Number(e.target.value) }))} className="w-full accent-brand" />
               </div>
               <div>
                 <label className="text-sm text-gray-700 block mb-1.5">Máximo de tentativas por lead</label>
@@ -116,7 +116,7 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
             <div className="flex flex-col gap-2">
               {Object.entries(gatilhoLabels).map(([key, label]) => (
                 <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked={cfg.gatilhos[key] ?? false} onChange={() => setCfg(p => ({ ...p, gatilhos: { ...p.gatilhos, [key]: !p.gatilhos[key] } }))} className="w-4 h-4 accent-indigo-600 rounded" />
+                  <input type="checkbox" checked={cfg.gatilhos[key] ?? false} onChange={() => setCfg(p => ({ ...p, gatilhos: { ...p.gatilhos, [key]: !p.gatilhos[key] } }))} className="w-4 h-4 accent-brand rounded" />
                   <span className="text-sm text-gray-700 group-hover:text-gray-900">{label}</span>
                 </label>
               ))}
@@ -222,15 +222,26 @@ function ModalAgressividade({ campanhaId, campanhaName, valorAtual, onClose }: M
             <button
               key={n.id}
               onClick={() => setSelecionado(n.id)}
-              className={clsx('flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all', selecionado === n.id ? n.cor + ' ring-2 ring-offset-1 ring-current' : 'border-gray-200 hover:border-gray-300 bg-white')}
+              className={clsx(
+                'flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all',
+                selecionado === n.id
+                  ? n.cor + ' shadow-sm'
+                  : 'border-gray-200 hover:border-brand-200 hover:bg-brand-50/30 bg-white'
+              )}
             >
-              <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border-2 flex-shrink-0', selecionado === n.id ? 'bg-white/70 ' + n.cor : 'bg-gray-100 text-gray-500 border-gray-200')}>{n.calls_min}</div>
+              <div className={clsx(
+                'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm font-mono border-2 flex-shrink-0',
+                selecionado === n.id ? n.badge + ' border-current/30' : 'bg-gray-100 text-gray-500 border-gray-200'
+              )}>{n.calls_min}</div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-gray-900">{n.label}</div>
+                <div className="text-sm font-semibold text-gray-900">{n.label}</div>
                 <div className="text-xs text-gray-500 mt-0.5">{n.descricao}</div>
               </div>
-              <div className={clsx('w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center', selecionado === n.id ? 'border-current bg-current/20' : 'border-gray-300')}>
-                {selecionado === n.id && <div className="w-2.5 h-2.5 rounded-full bg-current"/>}
+              <div className={clsx(
+                'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors',
+                selecionado === n.id ? 'border-brand-500 bg-brand-500' : 'border-gray-300'
+              )}>
+                {selecionado === n.id && <div className="w-2 h-2 rounded-full bg-white"/>}
               </div>
             </button>
           ))}
