@@ -28,8 +28,8 @@ const TIPOS = [
   },
   {
     key: 'ligacao_caiu',
-    label: 'Ligação caiu / Ocupado',
-    desc: 'Conexão encerrada antes de completar',
+    label: 'Número não encontrado',
+    desc: 'Número inexistente ou fora de serviço',
     cor: 'text-orange-600',
     bg: 'bg-orange-50',
     border: 'border-orange-200',
