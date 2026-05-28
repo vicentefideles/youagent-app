@@ -219,7 +219,13 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                 try {
                   if (ativa) await onPausar(campanha.id)
                   else await onIniciar(campanha.id)
-                } catch (e) { console.error(e) }
+                } catch (e: unknown) {
+                  const msg = (e as { response?: { status?: number; data?: { error?: string } }; message?: string })
+                  const status = msg?.response?.status
+                  const detail = msg?.response?.data?.error || msg?.message || 'Erro desconhecido'
+                  alert(`Erro ao ${ativa ? 'pausar' : 'iniciar'} campanha:\nHTTP ${status} — ${detail}`)
+                  console.error(e)
+                }
                 finally { setPausandoOuIniciando(false) }
               }}
               className={clsx(
