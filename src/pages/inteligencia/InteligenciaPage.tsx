@@ -457,19 +457,41 @@ function TabColetiva() {
   )
 }
 
+interface CampanhaHorario {
+  id: string; nome: string
+  hora_inicio_atual: string; hora_fim_atual: string
+  melhorFaixa: string; pctMelhor: number; totalLigs: number
+  hora_inicio_rec: string | null; hora_fim_rec: string | null
+}
+
 function TabHorarios() {
+  const queryClient = useQueryClient()
   const { data: analise, isLoading, refetch } = useQuery({
     queryKey: ['horarios-analise'],
     queryFn: () => inteligenciaApi.getHorariosAnalise().then(r => r.data as {
       total: number; melhorFaixa: string; atualizado: string;
       faixas: { label: string; total: number; sucesso: number; pct: number }[];
       porAgente: { nome: string; melhorFaixa: string; pctMelhor: number }[];
+      porCampanha: CampanhaHorario[];
     }),
     staleTime: 60000,
   })
+  const [aplicando, setAplicando] = useState<string | null>(null)
+
+  async function aplicarHorario(c: CampanhaHorario) {
+    if (!c.hora_inicio_rec) return
+    setAplicando(c.id)
+    try {
+      await campanhasApi.patch(c.id, { hora_inicio: c.hora_inicio_rec, hora_fim: c.hora_fim_rec })
+      queryClient.invalidateQueries({ queryKey: ['campanhas'] })
+      refetch()
+    } catch { /* silencioso */ }
+    finally { setAplicando(null) }
+  }
 
   const faixas = analise?.faixas ?? []
   const porAgente = analise?.porAgente ?? []
+  const porCampanha = analise?.porCampanha ?? []
   const melhorFaixa = analise?.melhorFaixa ?? '—'
   const melhorPct = faixas.find(f => f.label === melhorFaixa)?.pct ?? 0
   const mediaPct = faixas.length > 0 ? (faixas.reduce((a, f) => a + f.pct, 0) / faixas.length).toFixed(1) : '0'
@@ -545,10 +567,10 @@ function TabHorarios() {
             </div>
           </div>
 
-          {/* Sugestões + por agente */}
+          {/* Sugestões globais + por agente */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">💡 Sugestões da IA — Ajuste de horários</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">💡 Ranking global de faixas</h3>
               <div className="space-y-2">
                 {faixas
                   .filter(f => f.total > 0)
@@ -584,6 +606,79 @@ function TabHorarios() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── Por campanha — análise individual + aplicar ── */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">🎯 Janela ideal por campanha</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Cada campanha tem um perfil diferente — aplique o horário recomendado individualmente.
+                </p>
+              </div>
+            </div>
+            {porCampanha.length === 0 ? (
+              <p className="text-xs text-gray-400 py-4 text-center">
+                Dados aparecerão após as primeiras ligações por campanha.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {porCampanha.map((c) => {
+                  const temRec = !!c.hora_inicio_rec
+                  const jaAplicado = temRec && c.hora_inicio_atual === c.hora_inicio_rec
+                  return (
+                    <div key={c.id} className="flex items-center gap-4 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100/60 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{c.nome}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {c.totalLigs} ligações analisadas
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {/* Janela atual */}
+                        <div className="text-right">
+                          <p className="text-xs text-gray-400">Atual</p>
+                          <p className="text-xs font-mono font-semibold text-gray-700">
+                            {c.hora_inicio_atual}–{c.hora_fim_atual}
+                          </p>
+                        </div>
+                        {/* Recomendação */}
+                        {temRec && (
+                          <>
+                            <span className="text-gray-300">→</span>
+                            <div className="text-right">
+                              <p className="text-xs text-emerald-600 font-medium">Recomendado</p>
+                              <p className="text-xs font-mono font-bold text-emerald-700">
+                                {c.hora_inicio_rec}–{c.hora_fim_rec}
+                              </p>
+                              <p className="text-xs text-gray-400">faixa {c.melhorFaixa} · {c.pctMelhor}%</p>
+                            </div>
+                          </>
+                        )}
+                        {/* Botão aplicar */}
+                        {jaAplicado ? (
+                          <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                            ✅ Aplicado
+                          </span>
+                        ) : temRec ? (
+                          <button
+                            onClick={() => aplicarHorario(c)}
+                            disabled={aplicando === c.id}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {aplicando === c.id ? <Loader2 size={11} className="animate-spin" /> : null}
+                            Aplicar
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400">Sem dados</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </>
       )}
