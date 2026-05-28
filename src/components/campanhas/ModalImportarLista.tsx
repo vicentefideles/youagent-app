@@ -211,8 +211,11 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
         onConcluido(total)
         onFechar()
       }, 1500)
-    } catch {
-      setErro('Erro ao importar. Tente novamente.')
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { error?: string } }; message?: string }
+      const detail = err?.response?.data?.error || err?.message || 'Erro desconhecido'
+      const status = err?.response?.status || ''
+      setErro(`Erro HTTP ${status}: ${detail}`)
       setFase('preview')
     }
   }
