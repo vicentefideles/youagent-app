@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DollarSign, Save, Calculator, TrendingUp, CheckCircle } from 'lucide-react'
+import { DollarSign, Save, Calculator, TrendingUp, CheckCircle, Sparkles, Users } from 'lucide-react'
 import { api } from '@/services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,7 +45,8 @@ const CUSTOS_BASE: CustoFornecedor[] = [
   { id: 'wz-marketing', fornecedor: 'Telnyx', servico: 'WhatsApp — Marketing/Utility', custo: 0.0108, unidade: '/msg', moeda: 'USD', cor: 'text-green-600' },
   { id: 'wz-auth', fornecedor: 'Telnyx', servico: 'WhatsApp — Autenticação', custo: 0.0665, unidade: '/msg', moeda: 'USD', cor: 'text-green-600' },
   { id: 'telnyx-numero', fornecedor: 'Telnyx', servico: 'Número de telefone BR', custo: 1.00, unidade: '/mês', moeda: 'USD', cor: 'text-blue-600' },
-  { id: 'oportunidados', fornecedor: 'Oportunidados', servico: 'Enriquecimento CNPJ', custo: 0.05, unidade: '/consulta', moeda: 'BRL', cor: 'text-purple-600' },
+  { id: 'oportunidados', fornecedor: 'Oportunidados', servico: 'Enriquecimento — cargo/segmento', custo: 0.05, unidade: '/contato', moeda: 'BRL', cor: 'text-purple-600' },
+  { id: 'receitafederal', fornecedor: 'Receita Federal', servico: 'Enriquecimento — razão social/CNPJ', custo: 0.02, unidade: '/contato', moeda: 'BRL', cor: 'text-purple-600' },
   { id: 'supabase', fornecedor: 'Supabase', servico: 'Banco de dados / Auth', custo: 25, unidade: '/mês', moeda: 'USD', cor: 'text-gray-600' },
   { id: 'servidor', fornecedor: 'Servidor', servico: 'Cloud / Hosting (Vercel)', custo: 20, unidade: '/mês', moeda: 'USD', cor: 'text-gray-600' },
 ]
@@ -104,7 +105,7 @@ function CustosTab() {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 gap-4 items-start">
       {/* Tabela de fornecedores */}
       <div className="bg-white border border-gray-200 rounded-2xl p-6">
         <div className="mb-4">
@@ -160,6 +161,40 @@ function CustosTab() {
             {salvo ? <CheckCircle className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
             {salvando ? 'Salvando...' : salvo ? '✓ Salvo' : 'Salvar custos'}
           </button>
+        </div>
+      </div>
+
+      {/* Enriquecimento de leads */}
+      <div className="col-span-2 bg-white border border-gray-200 rounded-2xl p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          <h3 className="text-sm font-semibold text-gray-900">Enriquecimento de Leads — Cobrança por Cliente</h3>
+          <span className="ml-auto text-xs text-gray-400">Cobrado no fechamento mensal junto com minutagem</span>
+        </div>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          {[
+            { label: 'Custo ETZ — Receita Federal', valor: 'R$ 0,02/contato', desc: 'Razão social, CNAE, situação cadastral', cor: 'bg-purple-50 border-purple-100' },
+            { label: 'Custo ETZ — Oportunidados', valor: 'R$ 0,05/contato', desc: 'Cargo decisor, segmento, porte estimado', cor: 'bg-purple-50 border-purple-100' },
+            { label: 'Margem sugerida ao cliente', valor: 'R$ 0,10–0,15/contato', desc: 'Repasse com margem de ~50–100%', cor: 'bg-emerald-50 border-emerald-100' },
+          ].map(item => (
+            <div key={item.label} className={`rounded-xl border p-4 ${item.cor}`}>
+              <p className="text-xs font-semibold text-gray-700 mb-1">{item.label}</p>
+              <p className="text-lg font-bold text-gray-900">{item.valor}</p>
+              <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-3.5 h-3.5 text-gray-500" />
+            <p className="text-xs font-semibold text-gray-600">Como funciona o ciclo de cobrança</p>
+          </div>
+          <ol className="text-xs text-gray-500 space-y-1.5 list-decimal list-inside">
+            <li>Cliente ativa enriquecimento no momento de importar a lista de contatos</li>
+            <li>Sistema consulta Receita Federal (CNPJ) e Oportunidados (cargo/segmento) para cada contato</li>
+            <li>Quantidade de contatos enriquecidos é registrada na tabela <code className="bg-gray-200 px-1 rounded">enriquecimentos</code> com data, cliente e custo unitário</li>
+            <li>No fechamento mensal, o total é somado à fatura junto com minutagem e número Telnyx</li>
+          </ol>
         </div>
       </div>
 
