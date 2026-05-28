@@ -458,25 +458,23 @@ function TabColetiva() {
 }
 
 function TabHorarios() {
-  const hours = ['8h', '9h', '10h', '11h', '12h', '13h', '14h', '15h', '16h', '17h']
-  const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-  const heatData: number[][] = [
-    [30,40,80,70,60,10,5],
-    [50,75,95,90,80,15,8],
-    [60,85,100,95,85,20,10],
-    [55,80,90,85,78,18,8],
-    [40,70,80,75,65,12,5],
-    [30,55,65,60,55,10,4],
-    [25,45,60,55,50,8,3],
-    [35,65,75,70,60,10,5],
-    [45,70,82,78,65,12,6],
-    [20,40,55,50,45,8,3],
-  ]
-  const suggestions = [
-    { time: '10h–11h30', day: 'Terças e Quartas', impact: '+18% conversão', active: true },
-    { time: '14h–15h30', day: 'Segundas a Quintas', impact: '+12% conversão', active: true },
-    { time: '9h–9h30', day: 'Sextas', impact: '+8% conversão', active: false },
-  ]
+  const { data: analise, isLoading, refetch } = useQuery({
+    queryKey: ['horarios-analise'],
+    queryFn: () => inteligenciaApi.getHorariosAnalise().then(r => r.data as {
+      total: number; melhorFaixa: string; atualizado: string;
+      faixas: { label: string; total: number; sucesso: number; pct: number }[];
+      porAgente: { nome: string; melhorFaixa: string; pctMelhor: number }[];
+    }),
+    staleTime: 60000,
+  })
+
+  const faixas = analise?.faixas ?? []
+  const porAgente = analise?.porAgente ?? []
+  const melhorFaixa = analise?.melhorFaixa ?? '—'
+  const melhorPct = faixas.find(f => f.label === melhorFaixa)?.pct ?? 0
+  const mediaPct = faixas.length > 0 ? (faixas.reduce((a, f) => a + f.pct, 0) / faixas.length).toFixed(1) : '0'
+  const semDados = analise?.total === 0
+
   return (
     <div className="space-y-4">
       <div
@@ -484,110 +482,111 @@ function TabHorarios() {
         style={{ background: 'linear-gradient(135deg,#1a56e8,#2563eb)' }}
       >
         <div>
-          <h2 className="text-lg font-semibold">Horários Inteligentes</h2>
-          <p className="text-sm text-white/70">IA detecta os melhores momentos para ligar</p>
+          <h2 className="text-lg font-semibold">⏰ Horários Inteligentes</h2>
+          <p className="text-sm text-white/70">
+            A IA analisa <strong>todas as ligações realizadas</strong> e identifica os horários com maior taxa de conversão.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-white/30 flex items-center gap-1.5 transition-colors"
-            onClick={() => { api.post('/inteligencia/horarios/reanalisar', {}).catch(console.error); alert('Reanalisando...') }}
-          >
-            <RefreshCw size={12} /> Reanalisar
-          </button>
-          <button
-            className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 flex items-center gap-1.5 transition-colors font-semibold"
-            onClick={() => alert('Sugestões de horário aplicadas aos agentes.')}
-          >
-            <CheckCircle size={12} /> Aplicar todas
-          </button>
-        </div>
+        <button
+          className="bg-white/20 text-white text-xs px-4 py-2 rounded-lg hover:bg-white/30 flex items-center gap-1.5 transition-colors font-semibold border border-white/30"
+          onClick={() => refetch()}
+        >
+          <RefreshCw size={12} /> Reanalisar ligações
+        </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <KpiCard label="Melhor hora" value="10h" sub="Terças e Quartas" accent="blue" />
-        <KpiCard label="Taxa hora ouro" value="38%" sub="vs média de 14%" accent="green" />
-        <KpiCard label="Sugestões IA" value="3" sub="Esta semana" accent="purple" />
-        <KpiCard label="Aplicadas" value="2" sub="de 3 sugestões" accent="amber" />
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4 overflow-x-auto">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Mapa de calor semanal</h3>
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(16,185,129,0.85)' }} /> Alta (&gt;80%)</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(59,130,246,0.65)' }} /> Média (50–79%)</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block bg-gray-200" /> Baixa (&lt;50%)</span>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 gap-2 text-gray-400 text-sm">
+          <Loader2 size={18} className="animate-spin" /> Analisando ligações...
+        </div>
+      ) : semDados ? (
+        <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
+          <p className="text-gray-400 text-sm">Nenhuma ligação registrada nos últimos 60 dias.</p>
+          <p className="text-gray-300 text-xs mt-1">Os dados aparecerão automaticamente após as primeiras ligações.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-4">
+            <KpiCard label="Melhor faixa de horário" value={melhorFaixa} accent="blue" />
+            <KpiCard label="Taxa na faixa de ouro" value={`${melhorPct}%`} sub={`média geral: ${mediaPct}%`} accent="green" />
+            <KpiCard label="Total ligações analisadas" value={String(analise?.total ?? 0)} sub="últimos 60 dias" accent="purple" />
+            <KpiCard label="Agentes analisados" value={String(porAgente.length)} accent="amber" />
           </div>
-        </div>
-        <table className="text-xs border-collapse w-full">
-          <thead>
-            <tr>
-              <th className="text-gray-400 text-right pr-2 py-1 font-normal w-10"></th>
-              {days.map(d => (
-                <th key={d} className="text-gray-500 font-medium px-1 py-1 text-center">{d}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {hours.map((h, hi) => (
-              <tr key={h}>
-                <td className="text-gray-400 text-right pr-2 py-0.5">{h}</td>
-                {days.map((d, di) => {
-                  const v = heatData[hi][di]
-                  const bg = v >= 80
-                    ? `rgba(16,185,129,${v / 100})`
-                    : v >= 50
-                    ? `rgba(59,130,246,${v / 100})`
-                    : `rgba(229,231,235,0.6)`
-                  return (
-                    <td key={d} className="px-0.5 py-0.5">
+
+          {/* Faixas de horário — barras */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">🔥 Taxa de conversão por faixa de horário</h3>
+            <div className="flex gap-3 items-end h-40">
+              {faixas.map((f, i) => {
+                const cor = f.pct >= 20 ? 'bg-emerald-500' : f.pct >= 10 ? 'bg-blue-500' : f.pct >= 5 ? 'bg-amber-400' : 'bg-gray-200'
+                const maxPct = Math.max(...faixas.map(x => x.pct), 1)
+                const altura = Math.max(4, Math.round((f.pct / maxPct) * 100))
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <span className="text-xs font-bold font-mono text-gray-700">{f.pct > 0 ? `${f.pct}%` : '—'}</span>
+                    <div className="w-full flex items-end" style={{ height: '80px' }}>
                       <div
-                        className="w-9 h-6 rounded text-center leading-6 font-mono font-bold text-white"
-                        style={{ background: bg, fontSize: '9px', color: v >= 40 ? 'white' : '#9ca3af' }}
-                      >
-                        {v > 0 ? `${v}%` : ''}
-                      </div>
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                        className={`w-full rounded-t-lg transition-all ${cor}`}
+                        style={{ height: `${altura}%` }}
+                        title={`${f.total} ligações · ${f.sucesso} conversões`}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 text-center leading-tight">{f.label}</span>
+                    <span className="text-2xs text-gray-400">{f.total} lig.</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500 inline-block"/>≥20%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500 inline-block"/>10–20%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-400 inline-block"/>5–10%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-200 inline-block"/>&lt;5%</span>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Sugestões da IA</h3>
-          <div className="space-y-2">
-            {suggestions.map((s, i) => (
-              <div key={i} className={`flex items-center gap-2 p-2 rounded-lg ${s.active ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-50'}`}>
-                <CheckCircle size={14} className={s.active ? 'text-emerald-500' : 'text-gray-300'} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-800">{s.time}</p>
-                  <p className="text-xs text-gray-500">{s.day}</p>
+          {/* Sugestões + por agente */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">💡 Sugestões da IA — Ajuste de horários</h3>
+              <div className="space-y-2">
+                {faixas
+                  .filter(f => f.total > 0)
+                  .sort((a, b) => b.pct - a.pct)
+                  .slice(0, 3)
+                  .map((f, i) => (
+                    <div key={i} className={`flex items-center gap-2 p-2.5 rounded-lg border ${i === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100'}`}>
+                      <span className="text-base">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-800">{f.label}</p>
+                        <p className="text-xs text-gray-500">{f.total} ligações · {f.sucesso} conversões</p>
+                      </div>
+                      <span className={`text-xs font-bold font-mono ${i === 0 ? 'text-emerald-600' : 'text-gray-600'}`}>{f.pct}%</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Melhor horário por agente</h3>
+              {porAgente.length === 0 ? (
+                <p className="text-xs text-gray-400">Sem dados por agente ainda.</p>
+              ) : (
+                <div className="space-y-2">
+                  {porAgente.map((a, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs py-2 border-b border-gray-50 last:border-0">
+                      <span className="font-semibold text-gray-800">{a.nome}</span>
+                      <div className="text-right">
+                        <span className="font-mono text-gray-700">{a.melhorFaixa}</span>
+                        {a.pctMelhor > 0 && <span className="ml-2 text-emerald-600 font-bold">{a.pctMelhor}%</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <span className="text-xs text-emerald-600 font-semibold">{s.impact}</span>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Config atual por agente</h3>
-          <div className="space-y-2">
-            {[
-              { name: 'Ana', window: '09h–12h e 14h–17h' },
-              { name: 'Carlos', window: '10h–12h e 15h–17h' },
-              { name: 'Julia', window: '08h–11h e 13h–16h' },
-            ].map((a, i) => (
-              <div key={i} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:pb-0 last:border-0">
-                <span className="font-semibold text-gray-800">{a.name}</span>
-                <span className="text-gray-500 font-mono">{a.window}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   )
 }
@@ -1749,32 +1748,31 @@ function TabSimulador({ simuladorVersoes: _simuladorVersoes }: { simuladorVersoe
 
 function TabICP() {
   const navigate = useNavigate()
-  const sectors = [
-    { label: 'Tecnologia', pct: 61, sub: '312 ligações · 29 agendados · 15 fechamentos' },
-    { label: 'Agronegócio', pct: 54, sub: '198 ligações · 24 agendados · 12 fechamentos' },
-    { label: 'Indústria', pct: 42, sub: '421 ligações · 38 agendados · 18 fechamentos' },
-    { label: 'Varejo', pct: 38, sub: '287 ligações · 26 agendados · 11 fechamentos' },
-    { label: 'Saúde', pct: 34, sub: '201 ligações · 19 agendados · 8 fechamentos' },
-    { label: 'Serviços', pct: 29, sub: '423 ligações · 31 agendados · 12 fechamentos' },
-  ]
-  const portes = [
-    { label: '10–50 func.', pct: 24 },
-    { label: '50–200 func.', pct: 42 },
-    { label: '200–500 func.', pct: 31 },
-    { label: '500+ func.', pct: 18 },
-  ]
-  const interiorSP = [
-    { label: 'Campinas', pct: 14.1 },
-    { label: 'Ribeirão Preto', pct: 10.8 },
-    { label: 'Sorocaba', pct: 9.4 },
-    { label: 'S. José dos Campos', pct: 8.2 },
-  ]
-  const cargos = [
-    { label: 'Dir. Operações', pct: 68, color: 'text-blue-600' },
-    { label: 'CEO/Sócio', pct: 54, color: 'text-emerald-600' },
-    { label: 'Ger. Comercial', pct: 41, color: 'text-purple-600' },
-    { label: 'CFO/Financeiro', pct: 28, color: 'text-amber-600' },
-  ]
+  const { data: perfil, isLoading } = useQuery({
+    queryKey: ['icp-perfil'],
+    queryFn: () => inteligenciaApi.getIcpPerfil().then(r => r.data as {
+      total: number; atualizado: string;
+      top: { setor: string; cargo: string; estado: string };
+      setores: { label: string; total: number; sucesso: number; pct: number }[];
+      cargos:  { label: string; total: number; sucesso: number; pct: number }[];
+      estados: { label: string; total: number; sucesso: number; pct: number }[];
+    }),
+    staleTime: 60000,
+  })
+
+  const setores  = perfil?.setores  ?? []
+  const cargos   = perfil?.cargos   ?? []
+  const estados  = perfil?.estados  ?? []
+  const semDados = perfil?.total === 0
+
+  function exportarCSV() {
+    const rows = setores.map(s => `${s.label},${s.total},${s.sucesso},${s.pct}`)
+    const csv  = 'Setor,Total,Conversões,Taxa%\n' + rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a'); a.href = url; a.download = 'icp-export.csv'; a.click()
+  }
+
   return (
     <div className="space-y-4">
       <div
@@ -1783,119 +1781,135 @@ function TabICP() {
       >
         <div>
           <h2 className="text-lg font-semibold">🎯 Perfil de Cliente Ideal — ICP</h2>
-          <p className="text-sm text-white/70 mt-0.5">Baseado em 1.842 ligações realizadas</p>
+          <p className="text-sm text-white/70 mt-0.5">
+            {perfil ? `Calculado com base em ${perfil.total.toLocaleString('pt-BR')} ligações reais` : 'Calculando com base nas suas ligações reais...'}
+          </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-white/60">Atualizado</p>
-          <p className="text-sm font-semibold">Hoje 09:14</p>
+        <div className="text-right text-xs text-white/60">
+          {perfil?.atualizado && <p>Atualizado agora</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-3">
-        {[
-          { label: 'Setor', value: 'Indústria' },
-          { label: 'Porte', value: '50–200' },
-          { label: 'Região', value: 'Interior SP' },
-          { label: 'Cargo', value: 'Dir. Operações' },
-          { label: 'Tentativas', value: '2.1' },
-        ].map((k, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-3 text-center">
-            <p className="text-xs text-gray-400 mb-1">{k.label}</p>
-            <p className="text-sm font-bold text-gray-900">{k.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Conversão por setor</h3>
-          <div className="space-y-3">
-            {sectors.map((s, i) => (
-              <div key={i}>
-                <div className="flex justify-between text-xs mb-0.5">
-                  <span className="text-gray-700 font-medium">{s.label}</span>
-                  <span className="font-mono font-bold text-gray-900">{s.pct}%</span>
-                </div>
-                <Bar pct={s.pct} color={i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-amber-400' : 'bg-blue-500'} />
-                <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12 gap-2 text-gray-400 text-sm">
+          <Loader2 size={18} className="animate-spin" /> Analisando ligações...
+        </div>
+      ) : semDados ? (
+        <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
+          <p className="text-3xl mb-3">🎯</p>
+          <p className="text-gray-600 font-semibold text-sm mb-1">Nenhuma ligação analisada ainda</p>
+          <p className="text-gray-400 text-xs">O ICP é calculado automaticamente após as primeiras ligações realizadas.</p>
+        </div>
+      ) : (
+        <>
+          {/* Top picks */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Setor top', value: perfil?.top.setor ?? '—', icon: '🏆', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+              { label: 'Cargo decisor', value: perfil?.top.cargo ?? '—', icon: '👤', color: 'text-blue-600 bg-blue-50 border-blue-100' },
+              { label: 'Estado top', value: perfil?.top.estado ?? '—', icon: '📍', color: 'text-purple-600 bg-purple-50 border-purple-100' },
+            ].map((k, i) => (
+              <div key={i} className={`border rounded-xl p-4 text-center ${k.color}`}>
+                <p className="text-xl mb-1">{k.icon}</p>
+                <p className="text-xs font-medium opacity-70 mb-0.5">{k.label}</p>
+                <p className="text-base font-bold">{k.value}</p>
               </div>
             ))}
           </div>
-        </div>
-        <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Por porte</h3>
-            <div className="space-y-2">
-              {portes.map((p, i) => (
-                <div key={i}>
-                  <div className="flex justify-between text-xs mb-0.5">
-                    <span className="text-gray-600">{p.label}</span>
-                    <span className="font-mono text-gray-900">{p.pct}%</span>
-                  </div>
-                  <Bar pct={p.pct} color="bg-purple-500" />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">Interior SP — subcidades</h3>
-            <p className="text-xs text-gray-400 mb-2">% de conversão sobre total Interior SP</p>
-            <div className="space-y-2">
-              {interiorSP.map((r, i) => (
-                <div key={i}>
-                  <div className="flex justify-between text-xs mb-0.5">
-                    <span className="text-gray-600">{r.label}</span>
-                    <span className="font-mono text-gray-900">{r.pct}%</span>
-                  </div>
-                  <Bar pct={r.pct * 6} color="bg-amber-400" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Quem aceita a reunião — por cargo</h3>
-        <div className="grid grid-cols-4 gap-3">
-          {cargos.map((c, i) => (
-            <div key={i} className="text-center border border-gray-100 rounded-xl p-3">
-              <p className={`text-2xl font-mono font-bold ${c.color}`}>{c.pct}%</p>
-              <p className="text-xs text-gray-600 mt-0.5">{c.label}</p>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Conversão por setor */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Conversão por setor</h3>
+                <button onClick={exportarCSV} className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                  <Download size={11}/> Exportar
+                </button>
+              </div>
+              <div className="space-y-3">
+                {setores.length === 0 ? (
+                  <p className="text-xs text-gray-400">Sem dados de segmento nos contatos.</p>
+                ) : setores.map((s, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-0.5">
+                      <span className="text-gray-700 font-medium flex items-center gap-1">
+                        {i === 0 && <span className="text-amber-500 text-xs">TOP</span>}
+                        {s.label}
+                      </span>
+                      <span className="font-mono font-bold text-gray-900">{s.pct}%</span>
+                    </div>
+                    <Bar pct={s.pct} color={i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-amber-400' : 'bg-blue-400'} />
+                    <p className="text-xs text-gray-400 mt-0.5">{s.total} ligações · {s.sucesso} conversões</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#1a56e8,#2d1b69)' }}
-      >
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-white/60 mb-1">RECOMENDAÇÃO ESTRATÉGICA</p>
-            <p className="text-sm font-semibold mb-0.5">Concentrar esforços em Indústrias 50–200 func. no Interior SP</p>
-            <p className="text-xs text-white/70">contato: Dir. Operações ou Sócios. Janela ideal: 10h–11h30 Ter/Qua</p>
+            <div className="space-y-4">
+              {/* Por cargo */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Por cargo do decisor</h3>
+                {cargos.length === 0 ? (
+                  <p className="text-xs text-gray-400">Sem dados de cargo nos contatos.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {cargos.slice(0, 5).map((c, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between text-xs mb-0.5">
+                          <span className="text-gray-600 truncate max-w-[140px]">{c.label}</span>
+                          <span className="font-mono text-gray-900">{c.pct}%</span>
+                        </div>
+                        <Bar pct={c.pct} color="bg-purple-500" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Por estado */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Por estado / região</h3>
+                {estados.length === 0 ? (
+                  <p className="text-xs text-gray-400">Sem dados de estado nos contatos.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {estados.slice(0, 4).map((e, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between text-xs mb-0.5">
+                          <span className="text-gray-600">{e.label}</span>
+                          <span className="font-mono text-gray-900">{e.pct}%</span>
+                        </div>
+                        <Bar pct={e.pct} color="bg-amber-400" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2 shrink-0 ml-4">
-            <button
-              className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-              onClick={() => navigate('/campanhas')}
-            >Criar campanha</button>
-            <button
-              className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors flex items-center gap-1"
-              onClick={() => {
-                const csv = 'Segmento,Score\n' + sectors.map(d => `${d.label},${d.pct}`).join('\n')
-                const blob = new Blob([csv], { type: 'text/csv' })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a'); a.href = url; a.download = 'icp-export.csv'; a.click()
-              }}
-            >
-              <Download size={12} /> Exportar
-            </button>
-          </div>
-        </div>
-      </div>
+
+          {/* Recomendação estratégica */}
+          {perfil && perfil.total > 0 && (
+            <div className="rounded-xl p-5 text-white" style={{ background: 'linear-gradient(135deg,#1a56e8,#2d1b69)' }}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-white/60 mb-1 uppercase tracking-wide">Recomendação estratégica</p>
+                  <p className="text-sm font-semibold mb-0.5">
+                    Foque em <strong>{perfil.top.setor}</strong> no estado <strong>{perfil.top.estado}</strong>
+                  </p>
+                  <p className="text-xs text-white/70">
+                    Decisor ideal: <strong>{perfil.top.cargo}</strong> · {setores[0]?.pct ?? 0}% de conversão nesse perfil
+                  </p>
+                </div>
+                <button
+                  className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors shrink-0 ml-4"
+                  onClick={() => navigate('/campanhas')}
+                >Criar campanha →</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -2362,7 +2376,10 @@ function TabCampanhas() {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function InteligenciaPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('testes')
+  // Lê ?tab= da URL para abrir aba diretamente (ex: vindo do card de campanha)
+  const searchParams = new URLSearchParams(window.location.search)
+  const tabFromUrl = (searchParams.get('tab') as TabId) || 'testes'
+  const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl)
   const [scoreIA, setScoreIA] = useState<number | null>(null)
   const [calculando, setCalculando] = useState(false)
   const queryClient = useQueryClient()

@@ -192,9 +192,13 @@ export default function CampanhaCard({ campanha, onPausar, onIniciar, onImportar
                 <span className="text-xs text-gray-400">{campanha.estado}</span>
               )}
               {campanha.icp_ativo && (
-                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-purple-50 border-purple-300 text-purple-700">
+                <button
+                  onClick={() => navigate('/inteligencia?tab=icp')}
+                  className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 transition-colors"
+                  title="Ver análise ICP no Centro de Inteligência"
+                >
                   <Target size={10} /> ICP ativo · {campanha.icp_threshold}+
-                </span>
+                </button>
               )}
             </div>
           </div>

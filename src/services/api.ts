@@ -107,6 +107,8 @@ export const inteligenciaApi = {
   getQualidade: () => api.get('/inteligencia/qualidade'),
   getCross: () => api.get('/inteligencia/cross'),
   detectarPadroes: () => api.post('/inteligencia/detectar-padroes', {}),
+  getIcpPerfil: () => api.get('/inteligencia/icp/perfil'),
+  getHorariosAnalise: () => api.get('/inteligencia/horarios/analise'),
 }
 
 // WhatsApp

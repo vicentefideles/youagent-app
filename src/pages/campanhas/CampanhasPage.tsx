@@ -647,7 +647,7 @@ export default function CampanhasPage() {
               <p className="text-xs text-gray-500 mt-0.5">Configure quando cada agente pode ligar. O motor de IA respeita essas janelas automaticamente.</p>
             </div>
             <button
-              onClick={() => navigate('/inteligencia')}
+              onClick={() => navigate('/inteligencia?tab=horarios')}
               className="btn-secondary text-xs gap-2 whitespace-nowrap"
             >
               <BarChart2 size={13} /> Ver inteligência de horários →
