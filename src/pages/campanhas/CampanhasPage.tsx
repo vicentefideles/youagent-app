@@ -87,7 +87,6 @@ interface ConfigIAModalState {
 interface ConfigIAState {
   icpMin: number
   sensibilidade: number
-  maxTentativas: number
   gatilhos: Record<string, boolean>
   aguardarConfirmacao: boolean
   gravarLigacoes: boolean
@@ -100,7 +99,7 @@ interface ConfigIAState {
 
 function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose: () => void }) {
   const [cfg, setCfg] = useState<ConfigIAState>({
-    icpMin: 65, sensibilidade: 70, maxTentativas: 3,
+    icpMin: 65, sensibilidade: 70,
     gatilhos: { urgencia: true, preco: true, proposta: true, decisor: true, interesse: true, demo: false, concorrente: false },
     aguardarConfirmacao: true, gravarLigacoes: true, notificarGerente: true,
     tom: 'Consultivo', horarioInicio: '09:00', horarioFim: '18:00', pausarFds: true,
@@ -135,27 +134,44 @@ function ModalConfigIA({ modal, onClose }: { modal: ConfigIAModalState; onClose:
         <div className="p-6 flex flex-col gap-6">
           {/* Thresholds */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Thresholds</h3>
-            <div className="flex flex-col gap-4">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm text-gray-700">ICP mínimo para transferir</label>
-                  <span className="text-sm font-bold text-brand-600 font-mono w-8 text-right">{cfg.icpMin}</span>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Thresholds de qualificação</h3>
+            <p className="text-xs text-gray-400 mb-4">Defina o nível de exigência da IA antes de transferir uma ligação para o vendedor.</p>
+            <div className="flex flex-col gap-5">
+              {/* ICP */}
+              <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-gray-800">ICP mínimo para transferir</span>
+                  <span className="text-base font-bold text-brand-600 font-mono">{cfg.icpMin}</span>
                 </div>
+                <p className="text-xs text-gray-400 mb-3">
+                  ICP (Ideal Customer Profile) é a pontuação de propensão de compra que a IA calcula durante a ligação — com base em cargo, segmento, porte e sinais detectados na conversa.
+                  O agente só transfere para o vendedor se a pontuação atingir esse mínimo.
+                  <span className="block mt-1 font-medium text-gray-500">
+                    {cfg.icpMin < 40 ? '⚠️ Abaixo de 40 — muitas transferências com baixa qualificação.' : cfg.icpMin > 80 ? '🎯 Acima de 80 — transferências muito seletivas, menor volume.' : '✅ Entre 40-80 — equilíbrio recomendado.'}
+                  </span>
+                </p>
                 <input type="range" min={0} max={100} value={cfg.icpMin} onChange={e => setCfg(p => ({ ...p, icpMin: Number(e.target.value) }))} className="w-full accent-brand" />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm text-gray-700">Sensibilidade de gatilhos</label>
-                  <span className="text-sm font-bold text-brand-600 font-mono w-8 text-right">{cfg.sensibilidade}</span>
+                <div className="flex justify-between text-2xs text-gray-300 mt-1">
+                  <span>0 — transfere todos</span><span>100 — muito restrito</span>
                 </div>
-                <input type="range" min={0} max={100} value={cfg.sensibilidade} onChange={e => setCfg(p => ({ ...p, sensibilidade: Number(e.target.value) }))} className="w-full accent-brand" />
               </div>
-              <div>
-                <label className="text-sm text-gray-700 block mb-1.5">Máximo de tentativas por lead</label>
-                <select value={cfg.maxTentativas} onChange={e => setCfg(p => ({ ...p, maxTentativas: Number(e.target.value) }))} className="input">
-                  {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+              {/* Sensibilidade */}
+              <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-gray-800">Sensibilidade de gatilhos</span>
+                  <span className="text-base font-bold text-brand-600 font-mono">{cfg.sensibilidade}</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-3">
+                  Controla o quanto a IA precisa ter "certeza" antes de considerar que o lead disparou um gatilho de compra (urgência, preço, proposta, etc).
+                  Mais alto = mais exigente, menos falsos positivos. Mais baixo = detecta mais sinais, mas pode transferir cedo demais.
+                  <span className="block mt-1 font-medium text-gray-500">
+                    {cfg.sensibilidade < 40 ? '⚠️ Muito sensível — risco de transferências precipitadas.' : cfg.sensibilidade > 80 ? '🔍 Muito restrito — pode perder gatilhos sutis.' : '✅ Entre 40-80 — configuração ideal para a maioria dos segmentos.'}
+                  </span>
+                </p>
+                <input type="range" min={0} max={100} value={cfg.sensibilidade} onChange={e => setCfg(p => ({ ...p, sensibilidade: Number(e.target.value) }))} className="w-full accent-brand" />
+                <div className="flex justify-between text-2xs text-gray-300 mt-1">
+                  <span>0 — muito sensível</span><span>100 — muito restrito</span>
+                </div>
               </div>
             </div>
           </div>
