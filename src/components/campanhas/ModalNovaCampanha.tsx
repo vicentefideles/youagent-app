@@ -421,10 +421,16 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
             <div className="grid grid-cols-3 gap-3 mb-3">
               {([
                 {v:'online',    icon:'💻', t:'Somente Online',        sub:'Agente agenda via Google Meet'},
-                {v:'presencial',icon:'🤝', t:'Somente Presencial',    sub:'Agente confirma endereço, sem link'},
-                {v:'hibrido',   icon:'🔀', t:'Online e Presencial',   sub:'Agente pergunta a preferência'},
+                {v:'presencial',icon:'🤝', t:'Somente Presencial',    sub:'Agente confirma endereço com o cliente'},
+                {v:'hibrido',   icon:'🔀', t:'Online e Presencial',   sub:'Agente se adapta à preferência'},
               ] as const).map(m => (
-                <label key={m.v} onClick={() => s('modalidade', m.v)}
+                <label key={m.v} onClick={() => {
+                  s('modalidade', m.v)
+                  // reset tipo_local para default da modalidade
+                  if (m.v === 'online') s('tipo_local', 'online')
+                  else if (m.v === 'presencial') s('tipo_local', 'cliente')
+                  else s('tipo_local', 'cliente')
+                }}
                   className={clsx('flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
                     form.modalidade === m.v ? 'border-brand bg-brand-50' : 'border-gray-100 hover:border-gray-200')}>
                   <span className="text-lg flex-shrink-0">{m.icon}</span>
@@ -434,6 +440,12 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
                   </div>
                 </label>
               ))}
+            </div>
+
+            {/* Invite automático — todas as modalidades */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg mb-3">
+              <span className="text-xs text-emerald-700 font-medium">✅ Em todas as modalidades:</span>
+              <span className="text-xs text-emerald-600">invite enviado via <strong>E-mail</strong> · <strong>WhatsApp</strong> · <strong>Google Calendar</strong></span>
             </div>
 
             {/* Detalhes da reunião */}
@@ -451,27 +463,53 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
                     <option value="120">120 min — imersão / workshop</option>
                   </select>
                 </div>
+
+                {/* Tipo de local — filtrado por modalidade */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-gray-600">Tipo de local</label>
-                  <select className="input" value={form.tipo_local} onChange={e => s('tipo_local', e.target.value)}>
-                    <option value="online">🔗 Link automático (Google Meet)</option>
-                    <option value="endereco_fixo">📍 Endereço fixo</option>
-                    <option value="endereco_variavel">🗺️ Endereço variável (por produto)</option>
-                    <option value="cliente">🏢 Na empresa do cliente</option>
-                  </select>
+                  {form.modalidade === 'online' ? (
+                    <div className="input bg-gray-100 text-gray-500 cursor-not-allowed flex items-center gap-2">
+                      <span>🔗</span> Link automático (Google Meet)
+                    </div>
+                  ) : (
+                    <select className="input" value={form.tipo_local} onChange={e => s('tipo_local', e.target.value)}>
+                      <option value="endereco_variavel">🗺️ Endereço variável (por produto)</option>
+                      <option value="cliente">🏢 Na empresa do cliente</option>
+                    </select>
+                  )}
                 </div>
               </div>
 
-              {form.tipo_local === 'endereco_fixo' && (
-                <div className="mt-3 flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-gray-600">Endereço para reuniões presenciais</label>
-                  <input className="input" placeholder="Ex: Av. Paulista, 1000 — São Paulo/SP · Sala 304" value={form.endereco_fixo} onChange={e => s('endereco_fixo', e.target.value)} />
+              {/* Online: nota Google Meet */}
+              {form.modalidade === 'online' && (
+                <div className="mt-3 flex items-start gap-2 p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+                  <span className="flex-shrink-0">💻</span>
+                  <span>O agente gera automaticamente um link Google Meet e envia ao cliente via e-mail e WhatsApp após o agendamento.</span>
                 </div>
               )}
+
+              {/* Presencial: nota endereço */}
+              {form.modalidade === 'presencial' && (
+                <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700">
+                  <span className="flex-shrink-0">🤝</span>
+                  {form.tipo_local === 'endereco_variavel'
+                    ? <span>O agente identifica o endereço correto com base no produto da campanha e envia ao cliente via e-mail e WhatsApp.</span>
+                    : <span>O agente confirma o endereço na empresa do cliente e envia o convite via e-mail e WhatsApp.</span>
+                  }
+                </div>
+              )}
+
+              {/* Hibrido: frase gerada pelo CI */}
               {form.modalidade === 'hibrido' && (
-                <div className="mt-3 flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-gray-600">Frase para perguntar formato preferido</label>
-                  <input className="input" value={form.pergunta_formato} onChange={e => s('pergunta_formato', e.target.value)} />
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="flex items-start gap-2 p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-xs text-purple-700">
+                    <span className="flex-shrink-0">🔀</span>
+                    <span>O agente pergunta a preferência do cliente. A frase usada é <strong>gerada automaticamente pelo Centro de Inteligência</strong> com base nos padrões desta campanha — você pode sobrescrever abaixo.</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-gray-600">Frase de pergunta (override manual)</label>
+                    <input className="input text-xs" value={form.pergunta_formato} onChange={e => s('pergunta_formato', e.target.value)} />
+                  </div>
                 </div>
               )}
             </div>
