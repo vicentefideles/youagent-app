@@ -161,7 +161,7 @@ type ContextualAction = { label: string; icon: React.ReactNode } | null
 const CONTEXTUAL_ACTIONS: Record<string, ContextualAction> = {
   '/dashboard':  { label: 'Nova Campanha',       icon: <Megaphone size={15} /> },
   '/discadora':  { label: 'Importar Lista',       icon: <Upload size={15} /> },
-  '/campanhas':  { label: 'Nova Campanha',        icon: <Megaphone size={15} /> },
+  '/campanhas':  null,
   '/email':      { label: 'Nova Campanha Email',  icon: <Mail size={15} /> },
 }
 
