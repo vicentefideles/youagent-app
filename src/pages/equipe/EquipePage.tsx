@@ -1,14 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { equipeApi } from '@/services/api'
 import {
-  Users,
-  BarChart2,
-  Target,
-  Pencil,
-  X,
-  UserPlus,
-  CheckCircle2,
+  Users, BarChart2, Target, Pencil, X, UserPlus, CheckCircle2,
+  MessageCircle, Wifi, WifiOff, RefreshCw,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -46,6 +41,12 @@ interface NovoVendedor {
   email: string
   cargo: 'Closer' | 'SDR' | 'Gerente'
   telefone: string
+  whatsapp: string
+}
+
+interface ModalWhatsAppProps {
+  vendedor: { id: string; nome: string }
+  onClose: () => void
 }
 
 type Tab = 'vendedores' | 'desempenho' | 'metas'
@@ -240,6 +241,17 @@ function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp pessoal</label>
+            <input
+              type="tel"
+              value={form.whatsapp || ''}
+              onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+              placeholder="(11) 99000-0000"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-2xs text-gray-400 mt-1">Número que receberá notificações de agendamento</p>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
@@ -257,6 +269,105 @@ function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
             Salvar
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalWhatsApp({ vendedor, onClose }: ModalWhatsAppProps) {
+  const [qr, setQr] = useState<string | null>(null)
+  const [status, setStatus] = useState<'aguardando' | 'conectando' | 'conectado' | 'erro'>('aguardando')
+  const [erro, setErro] = useState('')
+  const qc = useQueryClient()
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  async function iniciarConexao() {
+    setStatus('conectando')
+    setErro('')
+    try {
+      const r = await fetch(`https://app.etztech.com/api/v1/equipe/${vendedor.id}/whatsapp/conectar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || 'Erro ao gerar QR Code')
+      setQr(data.qr)
+      // Polling de status a cada 3s
+      pollRef.current = setInterval(async () => {
+        const sr = await fetch(`https://app.etztech.com/api/v1/equipe/${vendedor.id}/whatsapp/status`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
+        })
+        const sd = await sr.json()
+        if (sd.conectado || sd.whatsapp_status === 'conectado') {
+          clearInterval(pollRef.current!)
+          setStatus('conectado')
+          qc.invalidateQueries({ queryKey: ['equipe'] })
+        }
+      }, 3000)
+    } catch (e: unknown) {
+      setStatus('erro')
+      setErro((e as Error).message)
+    }
+  }
+
+  useEffect(() => { iniciarConexao(); return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [])
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <MessageCircle size={18} className="text-green-600" />
+            <h2 className="font-semibold text-gray-900">Conectar WhatsApp</h2>
+          </div>
+          <button onClick={onClose}><X size={18} className="text-gray-400" /></button>
+        </div>
+
+        {status === 'conectando' && qr && (
+          <>
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              Abra o WhatsApp de <strong>{vendedor.nome}</strong> → <em>Dispositivos conectados</em> → <em>Conectar dispositivo</em> e escaneie:
+            </p>
+            <div className="flex justify-center mb-4">
+              <img src={qr} alt="QR Code WhatsApp" className="w-48 h-48 rounded-xl border border-gray-200" />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
+              <RefreshCw size={12} className="animate-spin" /> Aguardando leitura do QR Code...
+            </div>
+          </>
+        )}
+
+        {status === 'conectando' && !qr && (
+          <div className="flex flex-col items-center py-6 gap-3">
+            <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-500">Gerando QR Code...</p>
+          </div>
+        )}
+
+        {status === 'conectado' && (
+          <div className="flex flex-col items-center py-6 gap-3">
+            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+              <Wifi size={24} className="text-green-600" />
+            </div>
+            <p className="font-semibold text-gray-900">WhatsApp conectado!</p>
+            <p className="text-sm text-gray-500 text-center">
+              {vendedor.nome} agora receberá notificações e os clientes receberão mensagens do número pessoal dele.
+            </p>
+            <button onClick={onClose} className="mt-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+              Fechar
+            </button>
+          </div>
+        )}
+
+        {status === 'erro' && (
+          <div className="flex flex-col items-center py-4 gap-3">
+            <WifiOff size={28} className="text-red-500" />
+            <p className="text-sm text-red-600 text-center">{erro || 'Erro ao conectar WhatsApp.'}</p>
+            <button onClick={iniciarConexao} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">
+              Tentar novamente
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -336,6 +447,7 @@ interface TabVendedoresProps {
 function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVendedor }: TabVendedoresProps) {
   const [showModal, setShowModal] = useState(false)
   const [editando, setEditando] = useState<Vendedor | null>(null)
+  const [whatsappModal, setWhatsappModal] = useState<{ id: string; nome: string } | null>(null)
 
   const totalAtivos = vendedores.filter((v) => v.status === 'Ativo').length
   const totalAgentes = vendedores.reduce((acc, v) => acc + v.agentesAtivos, 0)
@@ -428,6 +540,14 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
                         Editar
                       </button>
                       <button
+                        onClick={() => setWhatsappModal({ id: v.id, nome: v.nome })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                        title="Conectar WhatsApp pessoal"
+                      >
+                        <MessageCircle size={12} />
+                        WhatsApp
+                      </button>
+                      <button
                         onClick={() => onToggleStatus(v.id, v.status === 'Ativo')}
                         className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                           v.status === 'Ativo'
@@ -458,6 +578,13 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
             onEditVendedor(editando.id, form)
             setEditando(null)
           }}
+        />
+      )}
+
+      {whatsappModal && (
+        <ModalWhatsApp
+          vendedor={whatsappModal}
+          onClose={() => setWhatsappModal(null)}
         />
       )}
     </div>

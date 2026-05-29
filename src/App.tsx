@@ -34,6 +34,7 @@ import AdminCustosPage from '@/pages/admin/AdminCustosPage'
 import AdminDevPage from '@/pages/admin/AdminDevPage'
 import AdminTelnyxPage from '@/pages/admin/AdminTelnyxPage'
 import DocumentosPage from '@/pages/documentos/DocumentosPage'
+import RemarcarPage from '@/pages/public/RemarcarPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/checkout"   element={<CheckoutPage />} />
           <Route path="/documentos" element={<DocumentosPage />} />
           <Route path="/contrato"   element={<ContratoPage />} />
+          <Route path="/r/:token"   element={<RemarcarPage />} />
           <Route path="/aguardando" element={<AguardandoPage />} />
           <Route path="/boas-vindas" element={<BoasVindasPage />} />
 
