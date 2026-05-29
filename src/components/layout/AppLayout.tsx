@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { agentesApi, equipeApi } from '@/services/api'
 import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Phone, BarChart2, Brain, Mail,
@@ -234,6 +236,24 @@ function AppLayoutInner() {
   const [showNovaCampanha, setShowNovaCampanha] = useState(false)
   const [showImportarLista, setShowImportarLista] = useState(false)
 
+  const { data: agentesLayout = [] } = useQuery({
+    queryKey: ['agentes'],
+    queryFn: () => agentesApi.list().then((r) => r.data),
+    enabled: showNovaCampanha,
+  })
+  const { data: equipeLayout = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then((r) => r.data),
+    enabled: showNovaCampanha,
+  })
+  const vendedoresLayout = (equipeLayout as Array<{ id: string; nome: string; iniciais?: string; modalidade?: string; cargo?: string; funcao?: string }>).map(m => ({
+    id: m.id,
+    nome: m.nome,
+    iniciais: m.iniciais ?? m.nome.split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase(),
+    modalidade: m.modalidade ?? 'hibrido',
+    funcao: m.funcao ?? m.cargo ?? 'Vendedor',
+  }))
+
   // Sincroniza o perfil local com o role do JWT ao montar
   useEffect(() => {
     if (user?.role === 'platform_admin') {
@@ -430,7 +450,8 @@ function AppLayoutInner() {
 
       {showNovaCampanha && (
         <ModalNovaCampanha
-          agentes={[]}
+          agentes={agentesLayout}
+          vendedores={vendedoresLayout}
           onSalvar={async () => { setShowNovaCampanha(false) }}
           onFechar={() => setShowNovaCampanha(false)}
         />
