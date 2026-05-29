@@ -7,7 +7,7 @@
  * - currentProfile.nome é usado como filtro automático
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { reunioesApi, emailsApi, calendarApi, equipeApi } from '@/services/api'
@@ -25,19 +25,28 @@ import {
   Lightbulb,
   Mail,
   MapPin,
+  MessageCircle,
   MessageSquare,
   Pencil,
   Phone,
+  RefreshCw,
   Send,
   User,
   Video,
+  Wifi,
+  WifiOff,
   X,
 } from 'lucide-react'
 import { useProfile } from '@/context/ProfileContext'
 
+const API = import.meta.env.VITE_API_URL || 'https://app.etztech.com/api/v1'
+function authHeader() {
+  return { Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type VTab = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens'
+type VTab = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens' | 'whatsapp'
 type MsgSubTab = 'recebidas' | 'enviadas'
 type TipoResultado = 'realizada' | 'nao_compareceu' | 'remarcou' | 'perdeu'
 
@@ -1688,6 +1697,102 @@ function TabMensagens({
   )
 }
 
+// ─── TabWhatsApp ──────────────────────────────────────────────────────────────
+
+function TabWhatsApp() {
+  const [tela, setTela] = useState<'carregando' | 'conectado' | 'desconectado' | 'conectando' | 'erro'>('carregando')
+  const [qr, setQr] = useState<string | null>(null)
+  const [erro, setErro] = useState('')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  async function verificarStatus() {
+    try {
+      const r = await fetch(`${API}/equipe/meu-perfil/whatsapp/status`, { headers: authHeader() })
+      if (r.status === 404) { setTela('desconectado'); return }
+      const data = await r.json()
+      if (data.conectado || data.whatsapp_status === 'conectado') setTela('conectado')
+      else setTela('desconectado')
+    } catch { setTela('desconectado') }
+  }
+
+  async function conectar() {
+    setTela('conectando'); setErro(''); setQr(null)
+    try {
+      const r = await fetch(`${API}/equipe/meu-perfil/whatsapp/conectar`, { method: 'POST', headers: authHeader() })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || 'Erro ao gerar QR Code')
+      setQr(data.qr)
+      pollRef.current = setInterval(async () => {
+        const sr = await fetch(`${API}/equipe/meu-perfil/whatsapp/status`, { headers: authHeader() })
+        const sd = await sr.json()
+        if (sd.conectado || sd.whatsapp_status === 'conectado') { clearInterval(pollRef.current!); setTela('conectado') }
+      }, 3000)
+    } catch (e: unknown) { setErro((e as Error).message); setTela('erro') }
+  }
+
+  useEffect(() => { verificarStatus(); return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [])
+
+  return (
+    <div className="max-w-md mx-auto py-8">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+        <div className="flex items-center gap-2 mb-6">
+          <MessageCircle size={20} className="text-green-600" />
+          <h2 className="font-semibold text-gray-900 text-base">Meu WhatsApp</h2>
+        </div>
+        {tela === 'carregando' && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-500">Verificando status...</p>
+          </div>
+        )}
+        {tela === 'conectado' && (
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <Wifi size={28} className="text-green-600" />
+            </div>
+            <p className="font-semibold text-gray-900">WhatsApp conectado!</p>
+            <p className="text-sm text-gray-500 text-center">Você receberá notificações de agendamentos e os clientes receberão mensagens do seu número pessoal.</p>
+            <button onClick={conectar} className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline">Reconectar com outro número</button>
+          </div>
+        )}
+        {tela === 'desconectado' && (
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+              <WifiOff size={28} className="text-gray-400" />
+            </div>
+            <p className="font-semibold text-gray-700">WhatsApp não conectado</p>
+            <p className="text-sm text-gray-500 text-center">Conecte seu WhatsApp pessoal para receber notificações de reuniões e enviar confirmações para clientes.</p>
+            <button onClick={conectar} className="mt-2 px-6 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2">
+              <MessageCircle size={16} />Conectar meu WhatsApp
+            </button>
+          </div>
+        )}
+        {tela === 'conectando' && (
+          !qr ? (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">Gerando QR Code...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-sm text-gray-600 text-center">Abra o WhatsApp → <em>Dispositivos conectados</em> → <em>Conectar dispositivo</em> e escaneie:</p>
+              <img src={qr} alt="QR Code" className="w-56 h-56 rounded-xl border border-gray-200" />
+              <div className="flex items-center gap-2 text-xs text-gray-400"><RefreshCw size={12} className="animate-spin" />Aguardando leitura...</div>
+            </div>
+          )
+        )}
+        {tela === 'erro' && (
+          <div className="flex flex-col items-center gap-4 py-4">
+            <WifiOff size={28} className="text-red-500" />
+            <p className="text-sm text-red-600 text-center">{erro}</p>
+            <button onClick={conectar} className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">Tentar novamente</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VendedorPageRestrita() {
@@ -1790,6 +1895,7 @@ export default function VendedorPageRestrita() {
     { id: 'email', label: 'E-mail', icon: <Mail size={14} />, badge: emailsPendentes > 0 ? emailsPendentes : undefined, badgeId: 'vtab-email-badge' },
     { id: 'gcal', label: 'Google Cal', icon: <CalendarDays size={14} /> },
     { id: 'mensagens', label: 'Mensagens', icon: <MessageSquare size={14} />, badge: msgNaoLidas > 0 ? msgNaoLidas : undefined, badgeId: 'vtab-mensagens-badge' },
+    { id: 'whatsapp', label: 'Meu WhatsApp', icon: <MessageCircle size={14} /> },
   ]
 
   return (
@@ -1880,6 +1986,7 @@ export default function VendedorPageRestrita() {
         {tab === 'mensagens' && (
           <TabMensagens mensagens={mensagens} setMensagens={setMensagens} />
         )}
+        {tab === 'whatsapp' && <TabWhatsApp />}
       </div>
     </div>
   )
