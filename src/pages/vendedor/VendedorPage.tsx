@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, Calendar, CheckCircle, ChevronDown, MessageCircle, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { reunioesApi } from '@/services/api'
+import { useProfile } from '@/context/ProfileContext'
 
 const API = import.meta.env.VITE_API_URL || 'https://app.etztech.com/api/v1'
 function authHeader() {
@@ -910,12 +911,17 @@ const tabs: { id: TabId; label: string; badge?: string; badgeColor?: string }[] 
   { id: 'email', label: '✉️ E-mails', badge: '2', badgeColor: 'bg-amber-500' },
   { id: 'gcal', label: '📆 Meu Google Calendar' },
   { id: 'mensagens', label: '💬 Mensagens', badge: '2', badgeColor: 'bg-blue-600' },
+]
+
+const tabsVendedor: { id: TabId; label: string }[] = [
   { id: 'whatsapp', label: '📱 Meu WhatsApp' },
 ]
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VendedorPage() {
+  const { currentRole } = useProfile()
+  const isVendedor = currentRole === 'vendedor'
   const [activeTab, setActiveTab] = useState<TabId>('agenda')
   const [vendedor, setVendedor] = useState('todos')
   const [fichaData, setFichaData] = useState<Reuniao | null>(null)
@@ -988,7 +994,7 @@ export default function VendedorPage() {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <div className="flex gap-0 overflow-x-auto">
-          {tabs.map((tab) => (
+          {[...tabs, ...(isVendedor ? tabsVendedor : [])].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
