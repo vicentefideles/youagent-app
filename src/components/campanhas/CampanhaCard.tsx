@@ -4,7 +4,7 @@ import {
   Play, Pause, Users, Phone, Calendar, BarChart2,
   Brain, MoreHorizontal, Zap, Target,
   TrendingUp, Clock, CheckCircle2, AlertTriangle,
-  Sparkles, Loader2, X, List, RefreshCw
+  Sparkles, Loader2, X, List, RefreshCw, Settings2
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { Campanha } from '@/types/campanha'
@@ -163,42 +163,14 @@ export default function CampanhaCard({
     )}>
 
       {/* ── HEADER ── */}
-      <div className="p-4 pb-3">
+      <div className="p-4 pb-3 space-y-2.5">
 
-        {/* Linha 1: controles */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Status */}
-            <span className={clsx(
-              'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
-              ativa ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
-            )}>
-              {ativa ? '● Ativa' : '⏸ Pausada'}
-            </span>
-            {/* Tipo */}
-            <span className="text-xs text-gray-400 font-medium">
-              {TIPO_LABELS[campanha.tipo] ?? campanha.tipo}
-            </span>
-            {/* Separador */}
-            <span className="text-gray-200">·</span>
-            {/* Modalidade + Estado */}
-            <span className={clsx('text-xs font-medium', modal.color)}>
-              {modal.icon} {modal.label}
-            </span>
-            {campanha.estado && (
-              <span className="text-xs text-gray-400">{campanha.estado}</span>
-            )}
-          </div>
-
-          {/* Ações rápidas */}
+        {/* Linha 1: nome + botões */}
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-sm font-bold text-gray-900 leading-snug flex-1 min-w-0 truncate pt-0.5">
+            {campanha.nome}
+          </h3>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => onAgressividade && onAgressividade(campanha)}
-              className={clsx('flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors', agress.color, agress.bg, 'hover:opacity-80')}
-              title="Alterar agressividade"
-            >
-              <Zap size={10} /> {agress.label}
-            </button>
             <button
               disabled={pausandoOuIniciando}
               onClick={async () => {
@@ -228,7 +200,6 @@ export default function CampanhaCard({
                 <div className="absolute right-0 top-8 z-20 bg-white border border-gray-100 rounded-xl shadow-popup py-1 w-44 animate-fade-in">
                   {[
                     { label: 'Editar campanha', action: () => onEditar && onEditar(campanha) },
-                    { label: 'Config IA', action: () => onEditar && onEditar(campanha) },
                     { label: 'Duplicar', action: () => campanhasApi.create({ ...campanha, nome: campanha.nome + ' (cópia)', status: 'pausada' }).then(() => window.location.reload()) },
                     { label: 'Arquivar', action: () => campanhasApi.update(campanha.id, { status: 'arquivada' }).then(() => window.location.reload()) },
                     { label: 'Excluir', action: () => confirm('Excluir ' + campanha.nome + '?') && campanhasApi.update(campanha.id, { status: 'excluida' }).then(() => window.location.reload()) },
@@ -246,13 +217,24 @@ export default function CampanhaCard({
           </div>
         </div>
 
-        {/* Linha 2: nome */}
-        <h3 className="text-sm font-bold text-gray-900 leading-snug mb-2">
-          {campanha.nome}
-        </h3>
+        {/* Linha 2: chips de status / tipo / modalidade */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={clsx(
+            'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full',
+            ativa ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+          )}>
+            {ativa ? '● Ativa' : '⏸ Pausada'}
+          </span>
+          <span className="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-100">
+            {TIPO_LABELS[campanha.tipo] ?? campanha.tipo}
+          </span>
+          <span className={clsx('inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100', modal.color)}>
+            {modal.icon} {modal.label}{campanha.estado ? ` · ${campanha.estado}` : ''}
+          </span>
+        </div>
 
-        {/* Linha 3: ICP badge */}
-        <div className="flex items-center gap-2">
+        {/* Linha 3: ICP + Agressividade */}
+        <div className="flex items-center gap-2 flex-wrap">
           {campanha.icp_ativo ? (
             <button
               onClick={() => navigate('/inteligencia?tab=icp')}
@@ -268,7 +250,6 @@ export default function CampanhaCard({
               >
                 <Target size={10} /> ICP desativado
               </button>
-              {/* Popup de confirmação inline */}
               {icpConfirm && (
                 <div className="absolute left-0 top-8 z-10 bg-white border border-purple-200 rounded-xl shadow-lg p-3 w-56 animate-fade-in">
                   <p className="text-xs font-semibold text-gray-800 mb-1">🎯 Ativar ICP nesta campanha?</p>
@@ -295,10 +276,17 @@ export default function CampanhaCard({
               )}
             </div>
           )}
+          <button
+            onClick={() => onAgressividade && onAgressividade(campanha)}
+            className={clsx('flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors', agress.color, agress.bg, 'border-transparent hover:opacity-80')}
+            title="Alterar agressividade de discagem"
+          >
+            <Zap size={10} /> {agress.label}
+          </button>
         </div>
 
         {/* Barra de consumo */}
-        <div className="mt-3">
+        <div>
           <div className="flex justify-between items-center mb-1">
             <span className="text-xs text-gray-400">Consumo da lista</span>
             <span className="text-xs font-semibold text-gray-600">{consumoPct}%</span>
@@ -309,7 +297,7 @@ export default function CampanhaCard({
         </div>
       </div>
 
-      {/* ── MÉTRICAS (4 em 2x2) ── */}
+      {/* ── MÉTRICAS (4 colunas) ── */}
       <div className="grid grid-cols-4 divide-x divide-gray-100 border-t border-gray-100">
         {[
           { icon: <Users size={12} />,      label: 'Total',     value: total.toLocaleString('pt-BR'),     color: 'text-gray-800' },
@@ -346,8 +334,8 @@ export default function CampanhaCard({
         </div>
       </div>
 
-      {/* ── AÇÕES ── */}
-      <div className="px-4 pb-4 grid grid-cols-4 gap-1.5">
+      {/* ── AÇÕES (5 botões) ── */}
+      <div className="px-4 pb-4 grid grid-cols-5 gap-1.5">
         <button
           onClick={() => navigate('/discadora?campanha=' + campanha.id + '&tab=fila')}
           className="btn-secondary text-xs py-2 gap-1 justify-center flex-col"
@@ -355,6 +343,14 @@ export default function CampanhaCard({
         >
           <BarChart2 size={13} />
           <span>Fila</span>
+        </button>
+        <button
+          onClick={() => onEditar && onEditar(campanha)}
+          className="btn-secondary text-xs py-2 gap-1 justify-center flex-col text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100"
+          title="Configurações de IA desta campanha"
+        >
+          <Settings2 size={13} />
+          <span>Config IA</span>
         </button>
         <button
           onClick={() => setIaAberta(v => !v)}
@@ -378,7 +374,7 @@ export default function CampanhaCard({
           title="Reprocessar contatos não alcançados"
         >
           <RefreshCw size={13} />
-          <span>Reprocessar</span>
+          <span>Repro.</span>
         </button>
       </div>
 
