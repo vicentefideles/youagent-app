@@ -32,11 +32,24 @@ export default function ProfileSwitcher() {
     navigate('/login')
   }
 
+  function handleSelectProfile(profile: typeof PROFILES[0]) {
+    setCurrentProfile(profile)
+    setOpen(false)
+    // Navega para a rota inicial correta do perfil selecionado
+    if (profile.role === 'vendedor' || profile.role === 'colaborador') {
+      navigate('/vendedor-restrito')
+    } else if (profile.role === 'platform_admin') {
+      navigate('/admin/dashboard')
+    } else {
+      navigate('/dashboard')
+    }
+  }
+
   function renderProfileButton(profile: typeof PROFILES[0]) {
     return (
       <button
         key={profile.id}
-        onClick={() => { setCurrentProfile(profile); setOpen(false) }}
+        onClick={() => handleSelectProfile(profile)}
         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50
                    transition-colors text-left"
       >
