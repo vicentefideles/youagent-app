@@ -6,7 +6,7 @@ import {
   Upload, Shield, X, AlertTriangle, Zap, Loader2, Clock, BarChart2,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { campanhasApi, agentesApi } from '@/services/api'
+import { campanhasApi, agentesApi, equipeApi } from '@/services/api'
 import CampanhaCard from '@/components/campanhas/CampanhaCard'
 import ModalNovaCampanha from '@/components/campanhas/ModalNovaCampanha'
 import ModalImportarLista from '@/components/campanhas/ModalImportarLista'
@@ -420,6 +420,18 @@ export default function CampanhasPage() {
     queryFn: () => agentesApi.list().then((r) => r.data),
   })
 
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then((r) => r.data),
+  })
+  const vendedores = (equipeRaw as Array<{ id: string; nome: string; iniciais?: string; modalidade?: string; cargo?: string; funcao?: string }>).map(m => ({
+    id: m.id,
+    nome: m.nome,
+    iniciais: m.iniciais ?? m.nome.split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase(),
+    modalidade: m.modalidade ?? 'hibrido',
+    funcao: m.funcao ?? m.cargo ?? 'Vendedor',
+  }))
+
   // ── Mutations ──
   const criarMutation = useMutation({
     mutationFn: (form: NovaCampanhaForm) => campanhasApi.create({
@@ -816,6 +828,7 @@ export default function CampanhasPage() {
       {modalNova && (
         <ModalNovaCampanha
           agentes={agentes}
+          vendedores={vendedores}
           onSalvar={(form) => criarMutation.mutateAsync(form).then(() => undefined)}
           onFechar={() => setModalNova(false)}
         />

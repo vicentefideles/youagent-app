@@ -480,30 +480,100 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
           {/* ── VENDEDORES ── */}
           {vendedores.length > 0 && (
             <Section title="Vendedores para esta campanha">
-              <p className="text-xs text-gray-500 mb-3">As reuniões agendadas pela IA serão distribuídas entre os vendedores selecionados.</p>
+              <p className="text-xs text-gray-500 mb-3">As reuniões agendadas pela IA serão distribuídas entre os vendedores selecionados abaixo.</p>
               <div className="flex flex-col gap-2 mb-3">
-                {vendedores.map(v => (
-                  <label key={v.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl cursor-pointer hover:border-brand/30 transition-colors">
-                    <input
-                      type="checkbox"
-                      className="accent-brand"
-                      checked={form.vendedoresSelecionados?.includes(v.id)}
-                      onChange={e => {
-                        const sel = form.vendedoresSelecionados || []
-                        s('vendedoresSelecionados', e.target.checked ? [...sel, v.id] : sel.filter(x => x !== v.id))
-                      }}
-                    />
-                    <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{v.iniciais}</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{v.nome}</p>
-                      <p className="text-xs text-gray-400">{v.funcao}</p>
-                    </div>
-                    <span className="badge badge-brand text-2xs">{v.modalidade}</span>
-                  </label>
-                ))}
+                {vendedores.map(v => {
+                  const campMod = form.modalidade // 'online' | 'presencial' | 'hibrido'
+                  const vMod = v.modalidade        // 'online' | 'presencial' | 'hibrido' | 'ambos'
+                  // compatível se vendedor aceita a modalidade da campanha
+                  const compativel = vMod === 'hibrido' || vMod === 'ambos' || vMod === campMod || campMod === 'hibrido'
+                  const isSelected = form.vendedoresSelecionados?.includes(v.id)
+                  return (
+                    <label
+                      key={v.id}
+                      className={clsx(
+                        'flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors',
+                        isSelected
+                          ? compativel ? 'border-brand/40 bg-brand-50/40' : 'border-amber-300 bg-amber-50/40'
+                          : compativel ? 'border-gray-100 hover:border-brand/30' : 'border-gray-100 opacity-60 hover:border-gray-200'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-brand"
+                        checked={isSelected}
+                        onChange={e => {
+                          const sel = form.vendedoresSelecionados || []
+                          s('vendedoresSelecionados', e.target.checked ? [...sel, v.id] : sel.filter(x => x !== v.id))
+                        }}
+                      />
+                      <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{v.iniciais}</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{v.nome}</p>
+                        <p className="text-xs text-gray-400">{v.funcao}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {!compativel && (
+                          <span className="text-2xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">⚠ modalidade incompatível</span>
+                        )}
+                        <span className={clsx(
+                          'text-2xs font-medium rounded px-1.5 py-0.5 border',
+                          (vMod === 'hibrido' || vMod === 'ambos') ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          vMod === 'online'     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                 'bg-orange-50 text-orange-700 border-orange-200'
+                        )}>
+                          {vMod === 'online' ? '💻 Online' : vMod === 'presencial' ? '🤝 Presencial' : '🔀 Ambos'}
+                        </span>
+                      </div>
+                    </label>
+                  )
+                })}
               </div>
+
+              {/* Painel matching automático */}
+              {(() => {
+                const campMod = form.modalidade
+                const compativeis = vendedores.filter(v => {
+                  const vm = v.modalidade
+                  return vm === 'hibrido' || vm === 'ambos' || vm === campMod || campMod === 'hibrido'
+                })
+                const incompativeis = vendedores.filter(v => {
+                  const vm = v.modalidade
+                  return !(vm === 'hibrido' || vm === 'ambos' || vm === campMod || campMod === 'hibrido')
+                })
+                if (incompativeis.length === 0) return null
+                return (
+                  <div className="mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-2xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔗 Matching automático — modalidade</p>
+                    <p className="text-xs text-gray-500 mb-2.5">
+                      O agente agenda reuniões somente para vendedores compatíveis com a <strong>modalidade</strong> desta campanha.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {compativeis.map(v => (
+                        <span key={v.id} className="inline-flex items-center gap-1 text-2xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ● {v.nome} · {v.modalidade === 'online' ? 'Online' : v.modalidade === 'presencial' ? 'Presencial' : 'Ambos'} ✓
+                        </span>
+                      ))}
+                      {incompativeis.map(v => (
+                        <span key={v.id} className="inline-flex items-center gap-1 text-2xs px-2 py-1 rounded-full bg-gray-100 text-gray-400 border border-gray-200 line-through decoration-gray-300">
+                          {v.nome} · {v.modalidade === 'online' ? 'Online' : 'Presencial'} · ✗ incompatível
+                        </span>
+                      ))}
+                    </div>
+                    {incompativeis.some(v => form.vendedoresSelecionados?.includes(v.id)) && (
+                      <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        <span className="flex-shrink-0">⚠️</span>
+                        <span>
+                          {incompativeis.filter(v => form.vendedoresSelecionados?.includes(v.id)).map(v => v.nome).join(', ')} {incompativeis.filter(v => form.vendedoresSelecionados?.includes(v.id)).length === 1 ? 'não receberá' : 'não receberão'} agendamentos desta campanha por incompatibilidade de modalidade.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-600">Distribuição de reuniões</span>
+                <span className="text-xs text-gray-600">Distribuição de reuniões entre vendedores selecionados</span>
                 <select className="input w-auto text-xs py-1.5" value={form.distribuicao} onChange={e => s('distribuicao', e.target.value)}>
                   <option value="round_robin">Distribuição igualitária (round-robin)</option>
                   <option value="menor_carga">Por menor carga (menos reuniões no dia)</option>
