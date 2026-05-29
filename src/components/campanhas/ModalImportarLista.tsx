@@ -356,10 +356,23 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                     <div className="flex-1">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">Enriquecimento inteligente de contatos</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-gray-900">Enriquecimento inteligente de contatos</p>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                              🔜 Em expansão
+                            </span>
+                          </div>
                           <p className="text-xs text-gray-500 mt-0.5">
                             Completamos automaticamente os dados faltantes para aumentar a taxa de qualificação do agente.
                           </p>
+                          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                            <span className="flex items-center gap-1 text-xs text-emerald-700 font-medium">
+                              ✅ Receita Federal (CNPJ) — ativo
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                              🔜 Oportunidados — em breve
+                            </span>
+                          </div>
                         </div>
                         <button
                           onClick={() => setEnriquecimento(v => !v)}
@@ -378,7 +391,7 @@ export default function ModalImportarLista({ campanha, onConcluido, onFechar }: 
                         <div className="flex items-start gap-1.5 mt-3 p-2.5 rounded-lg bg-brand-100">
                           <Info size={12} className="text-brand mt-0.5 flex-shrink-0" />
                           <p className="text-xs text-brand-700">
-                            O custo por contato enriquecido será consolidado no seu fechamento mensal junto com a minutagem e demais serviços.
+                            Dados da Receita Federal preenchidos automaticamente por CNPJ. Integração com Oportunidados chegando em breve para ampliar o enriquecimento.
                           </p>
                         </div>
                       )}
