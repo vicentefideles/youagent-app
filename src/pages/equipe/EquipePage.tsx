@@ -41,7 +41,7 @@ interface NovoVendedor {
   email: string
   cargo: 'Closer' | 'SDR' | 'Gerente'
   telefone: string
-  whatsapp: string
+  whatsapp?: string
 }
 
 interface ModalWhatsAppProps {
