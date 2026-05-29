@@ -176,18 +176,9 @@ function TabTestes() {
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-2">Aprendizado cross-setor</h3>
-          <ul className="space-y-1.5">
-            {[
-              'Supermercados do interior SP respondem melhor às 10h',
-              'Menção a concorrente X aumenta conversão em 18%',
-              'Tom consultivo reduz objeção de preço em 24%',
-            ].map((insight, i) => (
-              <li key={i} className="flex gap-2 text-xs text-gray-600">
-                <CheckCircle size={13} className="text-emerald-500 mt-0.5 shrink-0" />
-                {insight}
-              </li>
-            ))}
-          </ul>
+          <p className="text-xs text-gray-400 italic">
+            Padrões cross-setor aparecerão aqui após ligações suficientes serem processadas.
+          </p>
         </div>
       </div>
 

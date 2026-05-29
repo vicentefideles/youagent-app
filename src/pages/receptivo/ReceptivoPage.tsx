@@ -260,8 +260,8 @@ function FilaTab() {
   const kpis = [
     { label: 'Aguardando',              value: leads.filter(l => l.status === 'Aguardando').length.toString(),     icon: Clock,        color: 'text-yellow-600 bg-yellow-50' },
     { label: 'Atendidos hoje',          value: atendidosHoje > 0 ? String(atendidosHoje) : '0',                    icon: CheckCircle2, color: 'text-green-600 bg-green-50'   },
-    { label: 'Tempo médio de resposta', value: '4m32s',                                                             icon: Clock,        color: 'text-blue-600 bg-blue-50'     },
-    { label: 'Satisfação',              value: '4.7★',                                                              icon: ThumbsUp,     color: 'text-purple-600 bg-purple-50' },
+    { label: 'Tempo médio de resposta', value: atendidosHoje > 0 ? '—' : '—',                                       icon: Clock,        color: 'text-blue-600 bg-blue-50'     },
+    { label: 'Satisfação',              value: atendidosHoje > 0 ? '—' : '—',                                       icon: ThumbsUp,     color: 'text-purple-600 bg-purple-50' },
   ]
 
   return (

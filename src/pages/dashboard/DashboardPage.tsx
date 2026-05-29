@@ -586,7 +586,7 @@ export default function DashboardPage() {
     { label: 'Ligações hoje',   value: dash?.kpis?.ligacoes_hoje ?? '—',                    icon: <Phone size={18} className="text-emerald-600" />,   bg: 'bg-emerald-50', text: 'text-emerald-600', delta: '—', deltaPositive: true },
     { label: 'Taxa de acerto',  value: dash?.kpis?.taxa_acerto != null ? `${dash.kpis.taxa_acerto}%` : '—', icon: <TrendingUp size={18} className="text-amber-600" />, bg: 'bg-amber-50',   text: 'text-amber-600',   delta: '—', deltaPositive: false },
     { label: 'Reuniões agend.', value: dash?.kpis?.reunioes_agendadas ?? '—',               icon: <Calendar size={18} className="text-brand" />,      bg: 'bg-brand-50',   text: 'text-brand-600',   delta: '—', deltaPositive: true },
-    { label: 'Score CI',        value: dash?.kpis?.score_ci ?? '—',                          icon: <Brain size={18} className="text-purple-600" />,    bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '—', deltaPositive: true },
+    { label: 'Score CI',        value: dash?.kpis?.score_ci ?? 0,                            icon: <Brain size={18} className="text-purple-600" />,    bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '—', deltaPositive: true },
   ]
 
   const reunioesFila: ReuniaoFila[] = dash?.proximas_reunioes?.map((r: { id: number; vendedor: string; inicio: string }) => ({
@@ -603,7 +603,7 @@ export default function DashboardPage() {
   // Bar chart — use real data when available, otherwise fall back to mock
   const barData: BarDay[] = (dash?.por_dia && dash.por_dia.length > 0)
     ? (dash.por_dia as any[]).map((d: any) => ({
-        label: new Date(d.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        label: d.label ?? '',
         ligacoes: d.ligacoes ?? 0,
         reunioes: d.reunioes ?? 0,
       }))
@@ -638,7 +638,7 @@ export default function DashboardPage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-          Bom dia, {user?.nome?.split(' ')[0]} 👋
+          Bom dia, {user?.nome} 👋
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Aqui está o resumo da operação em tempo real.
