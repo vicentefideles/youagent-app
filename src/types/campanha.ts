@@ -66,4 +66,11 @@ export interface NovaCampanhaForm {
   dias_operacao: string[]
   icp_ativo: boolean
   duracao_reuniao: string
+  // Reunião
+  tipo_local?: string
+  endereco_fixo?: string
+  pergunta_formato?: string
+  // Vendedores
+  vendedoresSelecionados?: string[]
+  distribuicao?: string
 }
