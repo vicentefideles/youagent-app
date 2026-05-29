@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { equipeApi } from '@/services/api'
 import {
   Users, BarChart2, Target, Pencil, X, UserPlus, CheckCircle2,
-  MessageCircle, Wifi, WifiOff, RefreshCw,
+  MessageCircle, Wifi, WifiOff, RefreshCw, Link2,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ interface ApiVendedor {
   meta_mensal: number
   ativo: boolean
   criado_em: string
+  whatsapp_status?: string
 }
 
 interface Vendedor {
@@ -34,6 +35,7 @@ interface Vendedor {
   meta: number
   realizado: number
   avatar: string
+  whatsappStatus: string
 }
 
 interface NovoVendedor {
@@ -448,6 +450,22 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
   const [showModal, setShowModal] = useState(false)
   const [editando, setEditando] = useState<Vendedor | null>(null)
   const [whatsappModal, setWhatsappModal] = useState<{ id: string; nome: string } | null>(null)
+  const [linkCopiado, setLinkCopiado] = useState<string | null>(null)
+
+  async function gerarLinkWhatsApp(vendedorId: string) {
+    try {
+      const r = await fetch(`https://app.etztech.com/api/v1/equipe/${vendedorId}/whatsapp/gerar-link`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error)
+      await navigator.clipboard.writeText(data.link)
+      setLinkCopiado(vendedorId)
+      setTimeout(() => setLinkCopiado(null), 3000)
+    } catch {
+      alert('Erro ao gerar link. Tente novamente.')
+    }
+  }
 
   const totalAtivos = vendedores.filter((v) => v.status === 'Ativo').length
   const totalAgentes = vendedores.reduce((acc, v) => acc + v.agentesAtivos, 0)
@@ -539,13 +557,32 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
                         <Pencil size={12} />
                         Editar
                       </button>
+                      {v.whatsappStatus === 'conectado' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-lg">
+                          <Wifi size={12} />
+                          Conectado
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setWhatsappModal({ id: v.id, nome: v.nome })}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                          title="Conectar WhatsApp pessoal"
+                        >
+                          <MessageCircle size={12} />
+                          WhatsApp
+                        </button>
+                      )}
                       <button
-                        onClick={() => setWhatsappModal({ id: v.id, nome: v.nome })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-                        title="Conectar WhatsApp pessoal"
+                        onClick={() => gerarLinkWhatsApp(v.id)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          linkCopiado === v.id
+                            ? 'text-emerald-700 bg-emerald-50'
+                            : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                        }`}
+                        title="Copiar link para o vendedor conectar o próprio WhatsApp"
                       >
-                        <MessageCircle size={12} />
-                        WhatsApp
+                        <Link2 size={12} />
+                        {linkCopiado === v.id ? 'Copiado!' : 'Link WA'}
                       </button>
                       <button
                         onClick={() => onToggleStatus(v.id, v.status === 'Ativo')}
@@ -858,6 +895,7 @@ export default function EquipePage() {
           meta: v.meta_mensal ?? 0,
           realizado: 0,
           avatar: getInitials(v.nome),
+          whatsappStatus: v.whatsapp_status || 'desconectado',
         }
       })
 
