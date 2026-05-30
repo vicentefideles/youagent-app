@@ -317,7 +317,7 @@ export default function MensagensPage() {
                   <div className="flex items-center justify-between mt-0.5">
                     <p className={clsx('text-xs truncate', c.nao_lidas > 0 ? 'text-gray-700 font-medium' : 'text-gray-400')}>
                       {c.direcao === 'enviada' && <CheckCheck size={11} className="inline mr-0.5 text-emerald-500"/>}
-                      {c.ultima_mensagem}
+                      {c.ultima_mensagem || <span className="italic text-gray-300">Sem prévia</span>}
                     </p>
                     {c.nao_lidas > 0 && (
                       <span className="ml-1 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white text-2xs font-bold flex items-center justify-center">
