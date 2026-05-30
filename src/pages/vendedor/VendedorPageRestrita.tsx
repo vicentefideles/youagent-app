@@ -8,13 +8,14 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { reunioesApi, emailsApi, calendarApi, equipeApi } from '@/services/api'
+import { reunioesApi, emailsApi, calendarApi, equipeApi, whatsappVendedorApi } from '@/services/api'
 import {
   Calendar,
   CalendarDays,
   Check,
+  CheckCheck,
   CheckCircle,
   ClipboardCheck,
   Clock,
@@ -30,7 +31,9 @@ import {
   Pencil,
   Phone,
   RefreshCw,
+  Search,
   Send,
+  Trash2,
   User,
   Video,
   Wifi,
@@ -1721,18 +1724,70 @@ function TabMensagens({
 
 // ─── TabWhatsApp ──────────────────────────────────────────────────────────────
 
+interface WaConversa {
+  telefone: string; ultima_mensagem: string; ultima_data: string
+  direcao: 'enviada' | 'recebida'; nao_lidas: number; nome?: string; empresa?: string
+}
+interface WaMensagem {
+  id: string; telefone: string; mensagem: string
+  direcao: 'enviada' | 'recebida'; criado_em: string
+}
+
 function TabWhatsApp() {
-  const [tela, setTela] = useState<'carregando' | 'conectado' | 'desconectado' | 'conectando' | 'erro'>('carregando')
+  const qc = useQueryClient()
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const [tela, setTela] = useState<'carregando' | 'inbox' | 'desconectado' | 'conectando' | 'erro'>('carregando')
   const [qr, setQr] = useState<string | null>(null)
   const [erro, setErro] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // inbox states
+  const [conversa, setConversa]           = useState<WaConversa | null>(null)
+  const [busca, setBusca]                 = useState('')
+  const [texto, setTexto]                 = useState('')
+  const [enviando, setEnviando]           = useState(false)
+  const [toastWa, setToastWa]             = useState<string | null>(null)
+  const [confirmApagar, setConfirmApagar] = useState<WaConversa | null>(null)
+  const [apagando, setApagando]           = useState(false)
+  const [hoverTel, setHoverTel]           = useState<string | null>(null)
+
+  function toastWaMsg(m: string) { setToastWa(m); setTimeout(() => setToastWa(null), 4000) }
+
+  // Polling conversas — só quando inbox está aberto
+  const { data: conversas = [] } = useQuery({
+    queryKey: ['wa-vendedor-conversas'],
+    queryFn:  () => whatsappVendedorApi.conversas().then(r => r.data as WaConversa[]),
+    enabled:  tela === 'inbox',
+    refetchInterval: 5000,
+  })
+
+  // Histórico conversa ativa
+  const { data: mensagens = [] } = useQuery({
+    queryKey: ['wa-vendedor-historico', conversa?.telefone],
+    queryFn:  () => conversa
+      ? whatsappVendedorApi.historico(conversa.telefone).then(r => r.data as WaMensagem[])
+      : Promise.resolve([]),
+    enabled:  !!conversa && tela === 'inbox',
+    refetchInterval: 3000,
+  })
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensagens.length])
+
+  // Marca como lida ao abrir
+  useEffect(() => {
+    if (!conversa) return
+    whatsappVendedorApi.marcarLida(conversa.telefone)
+      .then(() => qc.invalidateQueries({ queryKey: ['wa-vendedor-conversas'] }))
+      .catch(() => {})
+  }, [conversa?.telefone]) // eslint-disable-line
 
   async function verificarStatus() {
     try {
       const r = await fetch(`${API}/equipe/meu-perfil/whatsapp/status`, { headers: authHeader() })
       if (r.status === 404) { setTela('desconectado'); return }
       const data = await r.json()
-      if (data.conectado || data.whatsapp_status === 'conectado') setTela('conectado')
+      if (data.conectado || data.whatsapp_status === 'conectado') setTela('inbox')
       else setTela('desconectado')
     } catch { setTela('desconectado') }
   }
@@ -1747,14 +1802,60 @@ function TabWhatsApp() {
       pollRef.current = setInterval(async () => {
         const sr = await fetch(`${API}/equipe/meu-perfil/whatsapp/status`, { headers: authHeader() })
         const sd = await sr.json()
-        if (sd.conectado || sd.whatsapp_status === 'conectado') { clearInterval(pollRef.current!); setTela('conectado') }
+        if (sd.conectado || sd.whatsapp_status === 'conectado') { clearInterval(pollRef.current!); setTela('inbox') }
       }, 3000)
     } catch (e: unknown) { setErro((e as Error).message); setTela('erro') }
   }
 
+  async function enviar() {
+    if (!conversa || !texto.trim()) return
+    setEnviando(true)
+    try {
+      await whatsappVendedorApi.enviar({ telefone: conversa.telefone, mensagem: texto.trim() })
+      setTexto('')
+      qc.invalidateQueries({ queryKey: ['wa-vendedor-historico', conversa.telefone] })
+      qc.invalidateQueries({ queryKey: ['wa-vendedor-conversas'] })
+    } catch (e: any) {
+      toastWaMsg('Erro: ' + (e?.response?.data?.error ?? e.message))
+    } finally { setEnviando(false) }
+  }
+
+  async function apagarConversa(c: WaConversa) {
+    setApagando(true)
+    try {
+      await whatsappVendedorApi.apagarConversa(c.telefone)
+      if (conversa?.telefone === c.telefone) setConversa(null)
+      qc.invalidateQueries({ queryKey: ['wa-vendedor-conversas'] })
+      qc.removeQueries({ queryKey: ['wa-vendedor-historico', c.telefone] })
+      toastWaMsg('Conversa apagada')
+    } catch { toastWaMsg('Erro ao apagar') }
+    finally { setApagando(false); setConfirmApagar(null) }
+  }
+
   useEffect(() => { verificarStatus(); return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [])
 
-  return (
+  const conversasFiltradas = conversas.filter(c => {
+    if (!busca.trim()) return true
+    const q = busca.toLowerCase()
+    return c.telefone.includes(q) || c.nome?.toLowerCase().includes(q) || c.empresa?.toLowerCase().includes(q)
+  })
+
+  const totalNaoLidas = conversas.reduce((a, c) => a + c.nao_lidas, 0)
+
+  function nomeExibido(c: WaConversa) { return c.nome ?? c.empresa ?? c.telefone }
+  function iniciais(c: WaConversa) {
+    const n = c.nome ?? c.empresa ?? ''
+    return n.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?'
+  }
+  function formatData(iso: string) {
+    const d = new Date(iso), hoje = new Date()
+    if (d.toDateString() === hoje.toDateString())
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  }
+
+  // ── Telas de conexão ──────────────────────────────────────────────────────────
+  if (tela !== 'inbox') return (
     <div className="max-w-md mx-auto py-8">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
         <div className="flex items-center gap-2 mb-6">
@@ -1767,23 +1868,13 @@ function TabWhatsApp() {
             <p className="text-sm text-gray-500">Verificando status...</p>
           </div>
         )}
-        {tela === 'conectado' && (
-          <div className="flex flex-col items-center gap-4 py-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <Wifi size={28} className="text-green-600" />
-            </div>
-            <p className="font-semibold text-gray-900">WhatsApp conectado!</p>
-            <p className="text-sm text-gray-500 text-center">Você receberá notificações de agendamentos e os clientes receberão mensagens do seu número pessoal.</p>
-            <button onClick={conectar} className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline">Reconectar com outro número</button>
-          </div>
-        )}
         {tela === 'desconectado' && (
           <div className="flex flex-col items-center gap-4 py-4">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
               <WifiOff size={28} className="text-gray-400" />
             </div>
             <p className="font-semibold text-gray-700">WhatsApp não conectado</p>
-            <p className="text-sm text-gray-500 text-center">Conecte seu WhatsApp pessoal para receber notificações de reuniões e enviar confirmações para clientes.</p>
+            <p className="text-sm text-gray-500 text-center">Conecte seu WhatsApp pessoal para receber confirmações de agendamento e conversar com clientes.</p>
             <button onClick={conectar} className="mt-2 px-6 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2">
               <MessageCircle size={16} />Conectar meu WhatsApp
             </button>
@@ -1811,6 +1902,235 @@ function TabWhatsApp() {
           </div>
         )}
       </div>
+    </div>
+  )
+
+  // ── Inbox (conectado) ─────────────────────────────────────────────────────────
+  return (
+    <div className="flex flex-col h-[calc(100vh-160px)]">
+      {/* Header inbox */}
+      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <MessageCircle size={16} className="text-green-600"/>
+          <span className="text-sm font-semibold text-gray-900">Mensagens WhatsApp</span>
+          {totalNaoLidas > 0 && (
+            <span className="w-5 h-5 rounded-full bg-green-500 text-white text-2xs font-bold flex items-center justify-center">
+              {totalNaoLidas > 9 ? '9+' : totalNaoLidas}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-full font-medium">
+            <Wifi size={11}/> Conectado
+          </span>
+          <button onClick={conectar} className="text-2xs text-gray-400 hover:text-gray-600 underline">
+            Trocar número
+          </button>
+        </div>
+      </div>
+
+      {/* Corpo */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Lista de conversas */}
+        <div className="w-72 flex-shrink-0 border-r border-gray-100 flex flex-col bg-white">
+          <div className="p-2.5 border-b border-gray-100">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+              <input className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-green-400"
+                placeholder="Buscar contato..." value={busca} onChange={e => setBusca(e.target.value)}/>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {conversas.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <MessageCircle size={24} className="text-gray-300 mb-2"/>
+                <p className="text-xs font-medium text-gray-500">Nenhuma conversa</p>
+                <p className="text-2xs text-gray-400 mt-1">Confirmações de reuniões agendadas aparecerão aqui</p>
+              </div>
+            )}
+            {conversasFiltradas.map(c => (
+              <div key={c.telefone} className="relative group"
+                onMouseEnter={() => setHoverTel(c.telefone)}
+                onMouseLeave={() => setHoverTel(null)}
+              >
+                <button onClick={() => setConversa(c)}
+                  className={`w-full flex items-start gap-2.5 px-3 py-2.5 border-b border-gray-50 text-left transition-colors ${
+                    conversa?.telefone === c.telefone ? 'bg-green-50 border-l-2 border-l-green-500' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                    c.nao_lidas > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>{iniciais(c)}</div>
+                  <div className="flex-1 min-w-0 pr-5">
+                    <div className="flex items-baseline justify-between">
+                      <span className={`text-xs truncate ${c.nao_lidas > 0 ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        {nomeExibido(c)}
+                      </span>
+                      <span className="text-2xs text-gray-400 flex-shrink-0 ml-1">{formatData(c.ultima_data)}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className={`text-2xs truncate ${c.nao_lidas > 0 ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
+                        {c.direcao === 'enviada' && <CheckCheck size={10} className="inline mr-0.5 text-green-500"/>}
+                        {c.ultima_mensagem || <span className="italic text-gray-300">Sem prévia</span>}
+                      </p>
+                      {c.nao_lidas > 0 && (
+                        <span className="ml-1 w-4 h-4 rounded-full bg-green-500 text-white text-2xs font-bold flex items-center justify-center flex-shrink-0">
+                          {c.nao_lidas}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                {hoverTel === c.telefone && (
+                  <button onClick={e => { e.stopPropagation(); setConfirmApagar(c) }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 z-10">
+                    <Trash2 size={12}/>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Chat */}
+        <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
+          {!conversa ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-8">
+              <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-3">
+                <MessageCircle size={24} className="text-green-400"/>
+              </div>
+              <p className="text-sm font-semibold text-gray-700">Selecione uma conversa</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-xs">
+                As confirmações de reunião enviadas pelo agente aparecem aqui, junto com respostas dos clientes.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Header conversa */}
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-100 flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center">
+                  {iniciais(conversa)}
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-gray-900">{nomeExibido(conversa)}</div>
+                  <div className="text-2xs text-gray-400 flex items-center gap-1">
+                    <Phone size={9}/> {conversa.telefone}
+                    {conversa.empresa && conversa.nome && <span> · {conversa.empresa}</span>}
+                  </div>
+                </div>
+                <button onClick={() => setConfirmApagar(conversa)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                  <Trash2 size={13}/>
+                </button>
+              </div>
+
+              {/* Mensagens */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-1.5">
+                {mensagens.length === 0 && (
+                  <div className="flex items-center justify-center py-8 text-gray-400 text-xs">
+                    <Clock size={12} className="mr-1.5"/> Nenhuma mensagem
+                  </div>
+                )}
+                {mensagens.map((m, i) => {
+                  const enviada = m.direcao === 'enviada'
+                  const showDate = i === 0 || new Date(m.criado_em).toDateString() !== new Date(mensagens[i-1].criado_em).toDateString()
+                  return (
+                    <div key={m.id ?? i}>
+                      {showDate && (
+                        <div className="flex items-center gap-2 my-2">
+                          <div className="flex-1 h-px bg-gray-200"/>
+                          <span className="text-2xs text-gray-400">
+                            {new Date(m.criado_em).toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'short' })}
+                          </span>
+                          <div className="flex-1 h-px bg-gray-200"/>
+                        </div>
+                      )}
+                      <div className={`flex ${enviada ? 'justify-end' : 'justify-start'}`}>
+                        {!enviada && (
+                          <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center mr-1.5 flex-shrink-0 self-end">
+                            <User size={10} className="text-gray-500"/>
+                          </div>
+                        )}
+                        <div className={`max-w-[65%] rounded-2xl px-3 py-2 shadow-sm ${
+                          enviada ? 'bg-green-600 text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
+                        }`}>
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.mensagem}</p>
+                          <div className={`flex items-center justify-end gap-1 mt-0.5 ${enviada ? 'text-green-200' : 'text-gray-400'}`}>
+                            <span className="text-2xs">
+                              {new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
+                            </span>
+                            {enviada && <CheckCheck size={10}/>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={bottomRef}/>
+              </div>
+
+              {/* Campo envio */}
+              <div className="flex-shrink-0 bg-white border-t border-gray-100 px-4 py-2.5">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs resize-none min-h-[38px] max-h-24 focus:outline-none focus:border-green-400"
+                    placeholder="Digite uma mensagem..."
+                    value={texto}
+                    onChange={e => setTexto(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() } }}
+                  />
+                  <button onClick={enviar} disabled={enviando || !texto.trim()}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                    style={{ backgroundColor: '#25d366', color: 'white' }}>
+                    {enviando ? <RefreshCw size={14} className="animate-spin"/> : <Send size={14}/>}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Modal apagar */}
+      {confirmApagar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-5 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={15} className="text-red-600"/>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Apagar conversa?</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Todas as mensagens com{' '}
+                  <span className="font-medium text-gray-700">
+                    {confirmApagar.nome ?? confirmApagar.empresa ?? confirmApagar.telefone}
+                  </span>{' '}
+                  serão removidas.
+                </p>
+              </div>
+              <button onClick={() => setConfirmApagar(null)} className="text-gray-400 hover:text-gray-600"><X size={14}/></button>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmApagar(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200">
+                Cancelar
+              </button>
+              <button onClick={() => apagarConversa(confirmApagar)} disabled={apagando}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 flex items-center gap-1.5">
+                {apagando ? <RefreshCw size={11} className="animate-spin"/> : <Trash2 size={11}/>} Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toastWa && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium bg-gray-900 text-white">
+          {toastWa}
+        </div>
+      )}
     </div>
   )
 }

@@ -152,6 +152,19 @@ export const whatsappUsuarioApi = {
     api.delete(`/whatsapp/eu/conversa/${encodeURIComponent(telefone)}`),
 }
 
+// WhatsApp inbox do vendedor (isolado por instância vendedor_{id})
+export const whatsappVendedorApi = {
+  conversas:      () => api.get('/equipe/meu-perfil/whatsapp/conversas'),
+  historico:      (telefone: string) =>
+    api.get(`/equipe/meu-perfil/whatsapp/historico/${encodeURIComponent(telefone)}`),
+  enviar:         (data: { telefone: string; mensagem: string }) =>
+    api.post('/equipe/meu-perfil/whatsapp/enviar', data),
+  marcarLida:     (telefone: string) =>
+    api.patch(`/equipe/meu-perfil/whatsapp/lida/${encodeURIComponent(telefone)}`, {}),
+  apagarConversa: (telefone: string) =>
+    api.delete(`/equipe/meu-perfil/whatsapp/conversa/${encodeURIComponent(telefone)}`),
+}
+
 // Planos
 export const planosApi = {
   list:     () => api.get('/planos'),
