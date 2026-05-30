@@ -473,6 +473,8 @@ export default function CampanhasPage() {
       orq_gk_callback:       form.orq_gk_callback,
       orq_gk_abertura:       form.orq_gk_abertura,
       orq_tent_redir:        Number(form.tent_redir) || 3,
+      // Proteção de dados
+      blacklist:             form.blacklist || '',
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campanhas'] }),
   })

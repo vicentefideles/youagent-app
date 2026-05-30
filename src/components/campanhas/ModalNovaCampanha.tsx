@@ -1096,32 +1096,62 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
 
           {/* ── PROTEÇÃO DE DADOS ── */}
           <Section title="🛡️ Proteção de dados e compliance" defaultOpen={false}>
-            <div className="grid grid-cols-2 gap-5">
+            <div className="flex flex-col gap-4">
+
+              {/* Blacklist */}
               <div>
-                <p className="text-xs font-semibold text-gray-700 mb-2">Blacklist da campanha</p>
-                <textarea className="input resize-none" rows={4} value={form.blacklist}
+                <p className="text-xs font-semibold text-gray-700 mb-0.5">Blacklist desta campanha</p>
+                <p className="text-2xs text-gray-500 mb-2">
+                  Liste aqui empresas ou domínios que o agente <strong>nunca deve ligar</strong>, mesmo que estejam na lista de contatos.
+                  Use um por linha. Exemplos: CNPJ do concorrente, ex-cliente com contrato cancelado, domínio corporativo bloqueado.
+                </p>
+                <textarea
+                  className="input resize-none font-mono text-xs"
+                  rows={3}
+                  value={form.blacklist}
                   onChange={e => s('blacklist', e.target.value)}
-                  placeholder={'CNPJs ou domínios para nunca ligar\nEx: 12.345.678/0001-90\nEx: empresa-concorrente.com.br'} />
-                <p className="text-2xs text-gray-400 mt-1">Um por linha. Leads com esses dados são removidos automaticamente da fila.</p>
+                  placeholder={'12.345.678/0001-90\nempresa-concorrente.com.br\n98.765.432/0001-11'}
+                />
+                <p className="text-2xs text-gray-400 mt-1">Os contatos que baterem com esses dados são removidos automaticamente da fila antes de qualquer ligação.</p>
               </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-2">Configurações LGPD</p>
-                <div className="flex flex-col gap-3">
+
+              {/* Proteções automáticas ETZ */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold text-emerald-800 mb-3">✅ Proteções LGPD ativas automaticamente em todas as campanhas</p>
+                <div className="grid grid-cols-2 gap-3">
                   {[
-                    { key:'lgpd_opt_out'  as const, label:'Registrar opt-out automaticamente ao detectar recusa' },
-                    { key:'lgpd_excluir'  as const, label:'Excluir dados do lead após opt-out (72h)' },
-                    { key:'lgpd_nao_ligar'as const, label:'Nunca ligar para opt-outs em campanhas futuras' },
-                    { key:'lgpd_log'      as const, label:'Gravar log de consentimento em cada contato' },
+                    {
+                      icon: '🚫',
+                      title: 'Opt-out imediato ao detectar recusa',
+                      desc: 'Quando o lead pede para não ser mais contatado, o agente registra o opt-out na hora — configurável na seção Orquestração.',
+                    },
+                    {
+                      icon: '🔒',
+                      title: 'Nunca religar para opt-outs',
+                      desc: 'Contatos com opt-out registrado são bloqueados permanentemente em todas as campanhas da sua conta.',
+                    },
+                    {
+                      icon: '📋',
+                      title: 'Log de consentimento por contato',
+                      desc: 'Cada interação (atendeu, recusou, agendou) é registrada com data e hora para auditoria.',
+                    },
+                    {
+                      icon: '⏰',
+                      title: 'Respeito ao horário da ANATEL',
+                      desc: 'O agente só liga dentro da janela permitida (8h–21h seg–sáb). Configurável na seção Janela de Operação.',
+                    },
                   ].map(item => (
-                    <label key={item.key} className="flex items-start gap-2 cursor-pointer">
-                      <input type="checkbox" checked={form[item.key] as boolean}
-                        onChange={e => s(item.key, e.target.checked)}
-                        className="mt-0.5 accent-brand" />
-                      <span className="text-xs text-gray-700 leading-relaxed">{item.label}</span>
-                    </label>
+                    <div key={item.title} className="flex gap-2">
+                      <span className="text-base flex-shrink-0 mt-0.5">{item.icon}</span>
+                      <div>
+                        <p className="text-xs font-medium text-emerald-800">{item.title}</p>
+                        <p className="text-2xs text-emerald-700 leading-relaxed mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
+
             </div>
           </Section>
 
