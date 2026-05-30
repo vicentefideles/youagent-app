@@ -847,138 +847,206 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
 
           {/* ── ORQUESTRAÇÃO MULTI-CANAL ── */}
           <Section title="🔀 Orquestração multi-canal" defaultOpen={false}>
-            <p className="text-xs text-gray-500 mb-4">O que acontece após cada resultado de ligação. Executado automaticamente sem intervenção manual.</p>
+            <p className="text-xs text-gray-500 mb-1">Configure o que acontece automaticamente após cada resultado de ligação — sem nenhuma intervenção manual.</p>
+
+            {/* Preview do fluxo */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+              {[
+                { label: 'Ligação', color: 'bg-gray-300 text-gray-700' },
+                { label: '→' , color: '' },
+                { label: form.orq_nao_atendeu_on ? `Não atende → ${form.orq_nao_atendeu_canal === 'whatsapp' ? 'WA' : form.orq_nao_atendeu_canal === 'email' ? 'Email' : 'WA+Email'} após ${form.orq_nao_atendeu_delay}` : 'Não atende → retry', color: 'bg-blue-100 text-blue-700' },
+                { label: '|', color: '' },
+                { label: form.orq_recusou_on ? 'Recusa → ' + (form.orq_recusou_acao === 'email_nutricao' ? 'nutrir' : form.orq_recusou_acao === 'reprocessar_60d' ? '60d' : 'arquivar') : 'Recusa → arquivar', color: 'bg-red-100 text-red-700' },
+                { label: '|', color: '' },
+                { label: form.orq_agendou_on ? `Agenda → WA+Email+Lembrete ${form.orq_agendou_lembrete}` : 'Agenda → confirmação', color: 'bg-emerald-100 text-emerald-700' },
+                { label: '|', color: '' },
+                { label: form.orq_gatekeeper_on ? `GK → callback ${form.orq_gk_callback === 'horario_sugerido' ? 'sugerido' : form.orq_gk_callback}` : 'GK → retry', color: 'bg-amber-100 text-amber-700' },
+              ].map((item, i) => item.label === '→' || item.label === '|'
+                ? <span key={i} className="text-gray-300 text-xs font-bold">{item.label}</span>
+                : <span key={i} className={clsx('text-2xs font-semibold px-2 py-0.5 rounded-full', item.color)}>{item.label}</span>
+              )}
+            </div>
+
             <div className="flex flex-col gap-3">
 
-              {/* Não atendeu */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                  <span className="text-sm font-semibold text-gray-800">📵 Se não atender</span>
+              {/* ── Bloco: Não atendeu ── */}
+              <div className={clsx('rounded-xl border-2 overflow-hidden transition-all', form.orq_nao_atendeu_on ? 'border-blue-200' : 'border-gray-100')}>
+                <div className={clsx('flex items-start justify-between px-4 py-3 border-b', form.orq_nao_atendeu_on ? 'bg-blue-50 border-blue-100' : 'bg-gray-50 border-gray-100')}>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">📵 Ninguém atendeu</p>
+                    <p className="text-2xs text-gray-500 mt-0.5 leading-tight">Lead não atende após N ligações → agente muda de canal automaticamente</p>
+                  </div>
                   <Toggle checked={form.orq_nao_atendeu_on} onChange={v => s('orq_nao_atendeu_on', v)} />
                 </div>
                 {form.orq_nao_atendeu_on && (
-                  <div className="p-4 grid grid-cols-3 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Após N tentativas</label>
-                      <select className="input" value={form.orq_nao_atendeu_tent} onChange={e => s('orq_nao_atendeu_tent', e.target.value)}>
-                        <option value="1">1 tentativa</option><option value="2">2 tentativas</option><option value="3">3 tentativas</option>
-                      </select>
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Acionar após</label>
+                        <select className="input" value={form.orq_nao_atendeu_tent} onChange={e => s('orq_nao_atendeu_tent', e.target.value)}>
+                          <option value="1">1ª tentativa sem resposta</option>
+                          <option value="2">2ª tentativa sem resposta</option>
+                          <option value="3">3ª tentativa sem resposta</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Canal de contato</label>
+                        <select className="input" value={form.orq_nao_atendeu_canal} onChange={e => s('orq_nao_atendeu_canal', e.target.value)}>
+                          <option value="whatsapp">💬 WhatsApp</option>
+                          <option value="email">📧 E-mail</option>
+                          <option value="email_wz">💬+📧 WhatsApp e e-mail</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Enviar depois de</label>
+                        <select className="input" value={form.orq_nao_atendeu_delay} onChange={e => s('orq_nao_atendeu_delay', e.target.value)}>
+                          <option value="1h">1 hora após a tentativa</option>
+                          <option value="24h">24 horas após a tentativa</option>
+                          <option value="48h">48 horas após a tentativa</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Próximo canal</label>
-                      <select className="input" value={form.orq_nao_atendeu_canal} onChange={e => s('orq_nao_atendeu_canal', e.target.value)}>
-                        <option value="email">📧 E-mail de follow-up</option>
-                        <option value="whatsapp">💬 WhatsApp personalizado</option>
-                        <option value="email_wz">📧+💬 E-mail + WhatsApp</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Depois de</label>
-                      <select className="input" value={form.orq_nao_atendeu_delay} onChange={e => s('orq_nao_atendeu_delay', e.target.value)}>
-                        <option value="1h">1 hora</option><option value="24h">24 horas</option><option value="48h">48 horas</option>
-                      </select>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
+                      <span className="text-sm flex-shrink-0">💡</span>
+                      <p className="text-xs text-blue-700 leading-relaxed">
+                        Após a {form.orq_nao_atendeu_tent}ª tentativa sem resposta, o agente envia uma mensagem via {form.orq_nao_atendeu_canal === 'whatsapp' ? 'WhatsApp' : form.orq_nao_atendeu_canal === 'email' ? 'e-mail' : 'WhatsApp e e-mail'} em até {form.orq_nao_atendeu_delay} — e continua tentando ligar normalmente.
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Recusou */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                  <span className="text-sm font-semibold text-gray-800">🚫 Se recusar (sem interesse)</span>
+              {/* ── Bloco: Recusou ── */}
+              <div className={clsx('rounded-xl border-2 overflow-hidden transition-all', form.orq_recusou_on ? 'border-red-200' : 'border-gray-100')}>
+                <div className={clsx('flex items-start justify-between px-4 py-3 border-b', form.orq_recusou_on ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100')}>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">🚫 Lead recusou — sem interesse</p>
+                    <p className="text-2xs text-gray-500 mt-0.5 leading-tight">Agente detectou recusa explícita → protege o lead de novas ligações e define próximo passo</p>
+                  </div>
                   <Toggle checked={form.orq_recusou_on} onChange={v => s('orq_recusou_on', v)} />
                 </div>
                 {form.orq_recusou_on && (
-                  <div className="p-4 grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Ação</label>
-                      <select className="input" value={form.orq_recusou_acao} onChange={e => s('orq_recusou_acao', e.target.value)}>
-                        <option value="email_nutricao">📧 E-mail de nutrição (30 dias)</option>
-                        <option value="arquivar">📦 Arquivar silenciosamente</option>
-                        <option value="reprocessar_60d">🔄 Reprocessar em 60 dias</option>
-                      </select>
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">O que fazer com o lead</label>
+                        <select className="input" value={form.orq_recusou_acao} onChange={e => s('orq_recusou_acao', e.target.value)}>
+                          <option value="email_nutricao">📧 Enviar e-mail de nutrição em 30 dias</option>
+                          <option value="arquivar">📦 Arquivar — não contatar mais</option>
+                          <option value="reprocessar_60d">🔄 Tentar novamente em 60 dias</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Proteção LGPD</label>
+                        <select className="input" value={form.orq_recusou_lgpd} onChange={e => s('orq_recusou_lgpd', e.target.value)}>
+                          <option value="registrar">🔒 Registrar opt-out automaticamente</option>
+                          <option value="perguntar">❓ Perguntar ao lead antes de registrar</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">LGPD — Opt-out</label>
-                      <select className="input" value={form.orq_recusou_lgpd} onChange={e => s('orq_recusou_lgpd', e.target.value)}>
-                        <option value="registrar">Registrar opt-out automaticamente</option>
-                        <option value="perguntar">Perguntar ao lead se deseja opt-out</option>
-                      </select>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg border border-red-100">
+                      <span className="text-sm flex-shrink-0">🛡️</span>
+                      <p className="text-xs text-red-700 leading-relaxed">
+                        {form.orq_recusou_lgpd === 'registrar'
+                          ? 'Opt-out registrado automaticamente — lead não receberá novas ligações desta empresa em nenhuma campanha.'
+                          : 'Agente pergunta ao lead se deseja ser removido da lista antes de registrar opt-out.'}
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Agendou */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                  <span className="text-sm font-semibold text-gray-800">✅ Se agendar reunião</span>
+              {/* ── Bloco: Agendou ── */}
+              <div className={clsx('rounded-xl border-2 overflow-hidden transition-all', form.orq_agendou_on ? 'border-emerald-200' : 'border-gray-100')}>
+                <div className={clsx('flex items-start justify-between px-4 py-3 border-b', form.orq_agendou_on ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100')}>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">✅ Reunião agendada</p>
+                    <p className="text-2xs text-gray-500 mt-0.5 leading-tight">Agente fechou o agendamento → confirma para cliente e vendedor + programa lembretes automáticos</p>
+                  </div>
                   <Toggle checked={form.orq_agendou_on} onChange={v => s('orq_agendou_on', v)} />
                 </div>
                 {form.orq_agendou_on && (
-                  <div className="p-4 grid grid-cols-3 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">E-mail de confirmação</label>
-                      <select className="input" value={form.orq_agendou_email} onChange={e => s('orq_agendou_email', e.target.value)}>
-                        <option value="imediato">📧 Imediatamente</option>
-                        <option value="5min">Após 5 minutos</option>
-                        <option value="nao">Não enviar</option>
-                      </select>
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Confirmação por e-mail</label>
+                        <select className="input" value={form.orq_agendou_email} onChange={e => s('orq_agendou_email', e.target.value)}>
+                          <option value="imediato">📧 Imediatamente</option>
+                          <option value="nao">Não enviar</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Confirmação por WhatsApp</label>
+                        <select className="input" value={form.orq_agendou_wz} onChange={e => s('orq_agendou_wz', e.target.value)}>
+                          <option value="imediato">💬 Imediatamente</option>
+                          <option value="nao">Não enviar</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Lembrete automático</label>
+                        <select className="input" value={form.orq_agendou_lembrete} onChange={e => s('orq_agendou_lembrete', e.target.value)}>
+                          <option value="1h">1 hora antes</option>
+                          <option value="24h">24 horas antes</option>
+                          <option value="ambos">24h + 1h antes (recomendado)</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">WhatsApp de confirmação</label>
-                      <select className="input" value={form.orq_agendou_wz} onChange={e => s('orq_agendou_wz', e.target.value)}>
-                        <option value="imediato">💬 Imediatamente</option>
-                        <option value="nao">Não enviar</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Lembrete antes da reunião</label>
-                      <select className="input" value={form.orq_agendou_lembrete} onChange={e => s('orq_agendou_lembrete', e.target.value)}>
-                        <option value="1h">1 hora antes</option>
-                        <option value="24h">24 horas antes</option>
-                        <option value="ambos">24h + 1h</option>
-                      </select>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <span className="text-sm flex-shrink-0">🎯</span>
+                      <p className="text-xs text-emerald-700 leading-relaxed">
+                        Confirmação enviada {form.orq_agendou_email !== 'nao' && form.orq_agendou_wz !== 'nao' ? 'por e-mail e WhatsApp' : form.orq_agendou_email !== 'nao' ? 'por e-mail' : 'por WhatsApp'} imediatamente.
+                        {' '}Lembrete automático {form.orq_agendou_lembrete === 'ambos' ? '24h e 1h antes da reunião' : form.orq_agendou_lembrete + ' antes'} — o vendedor também é notificado.
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Gatekeeper */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                  <span className="text-sm font-semibold text-gray-800">👤 Se decisor não está (gatekeeper)</span>
+              {/* ── Bloco: Gatekeeper ── */}
+              <div className={clsx('rounded-xl border-2 overflow-hidden transition-all', form.orq_gatekeeper_on ? 'border-amber-200' : 'border-gray-100')}>
+                <div className={clsx('flex items-start justify-between px-4 py-3 border-b', form.orq_gatekeeper_on ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100')}>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">👤 Atendeu mas não é o decisor</p>
+                    <p className="text-2xs text-gray-500 mt-0.5 leading-tight">Agente identificou intermediário (recepcionista, assistente) → agenda callback para falar com quem decide</p>
+                  </div>
                   <Toggle checked={form.orq_gatekeeper_on} onChange={v => s('orq_gatekeeper_on', v)} />
                 </div>
                 {form.orq_gatekeeper_on && (
-                  <div className="p-4 grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Callback automático</label>
-                      <select className="input" value={form.orq_gk_callback} onChange={e => s('orq_gk_callback', e.target.value)}>
-                        <option value="horario_sugerido">No horário sugerido pelo gatekeeper</option>
-                        <option value="2h">2 horas depois</option>
-                        <option value="amanha">Próximo dia útil</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-gray-600">Abertura na próxima ligação</label>
-                      <select className="input" value={form.orq_gk_abertura} onChange={e => s('orq_gk_abertura', e.target.value)}>
-                        <option value="personalizada">Personalizada — "Falei com [nome] que me indicou ligar agora"</option>
-                        <option value="padrao">Script padrão</option>
-                      </select>
-                    </div>
-                    <div className="col-span-2 flex items-center gap-3 pt-1 border-t border-gray-100">
-                      <div className="flex flex-col gap-1.5 flex-1">
-                        <label className="text-xs font-medium text-gray-600">Máx. tentativas ao decisor real</label>
-                        <select className="input" value={form.tent_redir} onChange={e => s('tent_redir', e.target.value)}>
-                          <option value="2">2 tentativas</option>
-                          <option value="3">3 tentativas (rec.)</option>
-                          <option value="4">4 tentativas</option>
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Quando ligar de volta</label>
+                        <select className="input" value={form.orq_gk_callback} onChange={e => s('orq_gk_callback', e.target.value)}>
+                          <option value="horario_sugerido">🕐 No horário indicado pelo intermediário</option>
+                          <option value="2h">⏱ 2 horas depois</option>
+                          <option value="amanha">📅 Próximo dia útil</option>
                         </select>
                       </div>
-                      <p className="text-xs text-gray-400 flex-1 leading-relaxed">
-                        Contagem separada das tentativas normais — retorno ao decisor real <strong>não</strong> consome o limite da agressividade.
-                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-gray-600">Abertura na próxima ligação</label>
+                        <select className="input" value={form.orq_gk_abertura} onChange={e => s('orq_gk_abertura', e.target.value)}>
+                          <option value="personalizada">✨ "Falei com [nome] que me indicou ligar"</option>
+                          <option value="padrao">Script padrão de abertura</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <label className="text-xs font-medium text-gray-600">Tentativas ao decisor real</label>
+                        <select className="input" value={form.tent_redir} onChange={e => s('tent_redir', e.target.value)}>
+                          <option value="2">Até 2 tentativas</option>
+                          <option value="3">Até 3 tentativas (recomendado)</option>
+                          <option value="4">Até 4 tentativas</option>
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
+                          <span className="text-sm flex-shrink-0">🔄</span>
+                          <p className="text-xs text-amber-700 leading-relaxed">
+                            Contagem separada — essas tentativas <strong>não</strong> consomem o limite da agressividade da campanha.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
