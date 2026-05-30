@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { whatsappUsuarioApi } from '@/services/api'
-import { MessageSquare, Search, Send, RefreshCw, Phone, User, CheckCheck, Clock, Wifi, WifiOff } from 'lucide-react'
+import { MessageSquare, Search, Send, RefreshCw, Phone, User, CheckCheck, Clock, Wifi, WifiOff, FlaskConical, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 
 // ─── Templates rápidos ────────────────────────────────────────────────────────
@@ -49,14 +49,23 @@ export default function MensagensPage() {
   const [enviando, setEnviando]     = useState(false)
   const [toastMsg, setToastMsg]     = useState<string | null>(null)
   const [waStatus, setWaStatus]     = useState<'conectado' | 'desconectado' | 'verificando'>('verificando')
+  const [webhookOk, setWebhookOk]   = useState<boolean | null>(null)
+  const [testeTelefone, setTesteTelefone] = useState('')
+  const [testeAberto, setTesteAberto]     = useState(false)
+  const [testeEnviando, setTesteEnviando] = useState(false)
 
   function toast(m: string) { setToastMsg(m); setTimeout(() => setToastMsg(null), 4000) }
 
-  // Status WA ao montar
+  // Status WA + configurar webhook ao montar
   useEffect(() => {
     whatsappUsuarioApi.status()
       .then(r => setWaStatus((r.data as any).conectado ? 'conectado' : 'desconectado'))
       .catch(() => setWaStatus('desconectado'))
+
+    // Garante que o webhook está configurado na instância existente
+    whatsappUsuarioApi.configurarWebhook()
+      .then(r => setWebhookOk((r.data as any).ok === true))
+      .catch(() => setWebhookOk(false))
   }, [])
 
   // Lista de conversas — polling a cada 5s
@@ -168,6 +177,69 @@ export default function MensagensPage() {
               : <><WifiOff size={12}/> Desconectado</>
           }
         </div>
+      </div>
+
+      {/* Painel de teste */}
+      <div className="mx-6 mt-3 flex-shrink-0">
+        <button onClick={() => setTesteAberto(v => !v)}
+          className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors">
+          <FlaskConical size={13} className="text-brand-500"/>
+          Testar recebimento de mensagens
+          {testeAberto ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
+          {webhookOk === true && <span className="ml-1 text-emerald-600 font-semibold">✓ Webhook ativo</span>}
+          {webhookOk === false && <span className="ml-1 text-amber-600 font-semibold">⚠ Webhook não configurado</span>}
+        </button>
+
+        {testeAberto && (
+          <div className="mt-2 bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-gray-800">Guia de teste em 3 passos:</p>
+            <ol className="text-xs text-gray-600 space-y-2 list-none">
+              <li className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center flex-shrink-0 text-2xs">1</span>
+                <span>Envie uma mensagem de teste para o número abaixo e veja se aparece na lista</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center flex-shrink-0 text-2xs">2</span>
+                <span>Digite seu próprio número e clique em Enviar — você receberá no celular</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center flex-shrink-0 text-2xs">3</span>
+                <span>Responda do celular — a resposta deve aparecer no chat em até 5 segundos</span>
+              </li>
+            </ol>
+
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-2xs font-medium text-gray-600 block mb-1">Seu número (para teste)</label>
+                <input className="input text-sm font-mono py-1.5" placeholder="(11) 99999-9999" type="tel"
+                  value={testeTelefone} onChange={e => setTesteTelefone(e.target.value)}/>
+              </div>
+              <button
+                disabled={!testeTelefone.trim() || testeEnviando || waStatus !== 'conectado'}
+                onClick={async () => {
+                  setTesteEnviando(true)
+                  try {
+                    await whatsappUsuarioApi.enviar({
+                      telefone: testeTelefone,
+                      mensagem: '✅ Teste ETZ — Mensagens funcionando! Responda esta mensagem para testar o recebimento.'
+                    })
+                    toast('✓ Mensagem de teste enviada! Responda do celular para testar o recebimento.')
+                    qc.invalidateQueries({ queryKey: ['wa-conversas'] })
+                    setTesteAberto(false)
+                  } catch (e: any) {
+                    toast('Erro: ' + (e?.response?.data?.error ?? e.message))
+                  } finally {
+                    setTesteEnviando(false)
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: '#25d366' }}>
+                {testeEnviando ? <RefreshCw size={13} className="animate-spin"/> : <Send size={13}/>}
+                Enviar teste
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Aviso WA desconectado */}

@@ -145,6 +145,8 @@ export const whatsappUsuarioApi = {
     api.patch(`/whatsapp/eu/lida/${encodeURIComponent(telefone)}`, {}),
   /** Total de mensagens não lidas (badge sidebar) */
   naoLidas:    () => api.get('/whatsapp/eu/nao-lidas'),
+  /** Configura webhook na instância existente (chamado ao abrir a página) */
+  configurarWebhook: () => api.post('/whatsapp/eu/configurar-webhook', {}),
 }
 
 // Planos
