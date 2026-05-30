@@ -8,7 +8,7 @@ import {
   User, Building2, MapPin, MessageSquare, X,
   Play, Pause, CheckCircle2, XCircle, RotateCcw,
   Volume2, Video,
-  RefreshCw, Archive, ArrowUpDown, ChevronDown,
+  RefreshCw, Archive, ArrowUpDown,
   Copy, PhoneForwarded, FileText, Zap
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -38,7 +38,6 @@ interface Agendamento {
 
 // ─── TIPOS ADICIONAIS ────────────────────────────────────────────────────────
 
-type MotorMode = 'simulado' | 'hibrido' | 'real'
 
 interface LatencyState {
   telnyx: number
@@ -114,40 +113,6 @@ function StatusBadge({ status }: { status: StatusLigacao }) {
 
 // ─── COMPONENTES AUXILIARES DA FILA ──────────────────────────────────────────
 
-function MotorModePill({ agentId: _agentId }: { agentId: string }) {
-  const [mode, setMode] = useState<MotorMode>('simulado')
-  const [open, setOpen] = useState(false)
-  const modes: { value: MotorMode; label: string; cls: string }[] = [
-    { value: 'simulado', label: 'Simulado', cls: 'bg-gray-100 text-gray-600 border-gray-300' },
-    { value: 'hibrido',  label: 'Híbrido',  cls: 'bg-amber-50 text-amber-700 border-amber-300' },
-    { value: 'real',     label: 'Real',     cls: 'bg-emerald-50 text-emerald-700 border-emerald-300' },
-  ]
-  const current = modes.find(m => m.value === mode)!
-  return (
-    <div className="relative" onClick={e => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className={clsx('flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full border transition-colors', current.cls)}
-      >
-        {current.label}
-        <ChevronDown size={9} />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden w-28">
-          {modes.map(m => (
-            <button
-              key={m.value}
-              onClick={() => { setMode(m.value); setOpen(false) }}
-              className={clsx('w-full text-left text-2xs font-semibold px-3 py-2 transition-colors hover:bg-gray-50', m.value === mode ? 'bg-gray-50 font-bold' : '')}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function BriefingHandoffCard({ item, onTransfer }: { item: EntradaFila; onTransfer: () => void }) {
   const [copiado, setCopiado] = useState(false)
@@ -539,10 +504,6 @@ function TabFila() {
                 </div>
                 <div className="text-xs font-medium text-gray-700 mb-1">{item.campanha}</div>
                 <div className="text-2xs text-gray-400 mb-1.5">{item.segmento}</div>
-                {/* Motor mode pill */}
-                <div onClick={e => e.stopPropagation()}>
-                  <MotorModePill agentId={item.id} />
-                </div>
               </div>
 
               {/* Status */}
