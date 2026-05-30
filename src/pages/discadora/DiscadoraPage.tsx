@@ -1077,8 +1077,8 @@ function TabAgendados() {
       <div className="grid grid-cols-5 gap-3">
         {[
           { id:'kpi-total-fechados', label:'Fechamentos',       value: String(fechamentos),                 color:'text-emerald-600', top:'border-t-emerald-500', sub: `${taxaConversao}% taxa` },
-          { id:'kpi-noshows',        label:'No-show',           value: String(noShows),                     color:'text-amber-600',   top:'border-t-amber-500',   sub:'reminders ativos' },
-          { id:'kpi-perdidos',       label:'Perdidos',          value: String(perdidos),                    color:'text-red-600',     top:'border-t-red-500',     sub:'em nurturing' },
+          { id:'kpi-noshows',        label:'No-show',           value: String(noShows),                     color:'text-amber-600',   top:'border-t-amber-500',   sub: noShows > 0 ? 'lembrete automático ativo' : 'nenhum registrado' },
+          { id:'kpi-perdidos',       label:'Perdidos',          value: String(perdidos),                    color:'text-red-600',     top:'border-t-red-500',     sub: perdidos > 0 ? 'follow-up via IA' : 'nenhum registrado' },
           { id:'kpi-em-andamento',   label:'Em andamento',      value: String(emAndamento), color:'text-brand-600', top:'border-t-brand-500', sub:'aguardando resultado' },
           { id:'kpi-conv-receita',   label:'Taxa reunião→venda', value: `${taxaConversao}%`,                color:'text-purple-600',  top:'border-t-purple-500',  sub:'meta: 25%' },
         ].map(k => (
@@ -1336,7 +1336,6 @@ function TabAgendados() {
                     {ETAPAS_JORNADA.map((etapa, i) => {
                       const passada = i < etapaIdx
                       const atual   = i === etapaIdx
-                      void (i > etapaIdx) // futura — reserved for future styling
                       return (
                         <div key={etapa.id} className="flex items-center flex-1 min-w-0">
                           <div className="flex flex-col items-center flex-1 min-w-0">
@@ -1401,7 +1400,7 @@ function TabAgendados() {
                       {modalJornada.meetLink && (
                         <div>
                           <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Link Meet</div>
-                          <a href="#" className="text-xs text-brand-500 hover:underline">{modalJornada.meetLink}</a>
+                          <a href={modalJornada.meetLink.startsWith('http') ? modalJornada.meetLink : `https://${modalJornada.meetLink}`} target="_blank" rel="noreferrer" className="text-xs text-brand-500 hover:underline break-all">{modalJornada.meetLink}</a>
                         </div>
                       )}
                     </div>
