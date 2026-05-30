@@ -187,8 +187,8 @@ const defaultForm: FormState = {
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={() => onChange(!checked)}
-      className={clsx('w-10 h-5 rounded-full transition-colors relative flex-shrink-0', checked ? 'bg-brand' : 'bg-gray-200')}>
-      <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform', checked ? 'translate-x-5' : 'translate-x-0.5')} />
+      className={clsx('relative inline-flex w-11 h-6 rounded-full flex-shrink-0 cursor-pointer transition-colors duration-200 ease-in-out focus:outline-none', checked ? 'bg-brand' : 'bg-gray-200')}>
+      <span className={clsx('pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out mt-0.5', checked ? 'translate-x-[22px]' : 'translate-x-0.5')} />
     </button>
   )
 }
