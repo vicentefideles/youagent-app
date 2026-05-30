@@ -1748,8 +1748,7 @@ function TabManual() {
   const [toastCtrl, setToastCtrl]       = useState<string | null>(null)
   // Card de detalhes da chamada
   const [callCard, setCallCard]         = useState<any | null>(null)
-  const [ciEnviando, setCiEnviando]     = useState(false)
-  const [ciEnviados, setCiEnviados]     = useState<Set<string>>(new Set())
+  // ciEnviando/ciEnviados removidos — CI é automático via backend
 
   function toastControl(m: string) { setToastCtrl(m); setTimeout(() => setToastCtrl(null), 3000) }
 
@@ -1874,17 +1873,6 @@ function TabManual() {
     const labelMap: Record<string,string> = { reagendou:'Reagendou', confirmou:'Confirmou presença', nao_atendeu:'Não atendeu', encerrada:'Encerrada', agendada:'Agendou' }
     const cls = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
     const dur = h.duracao_segundos ? `${Math.floor(h.duracao_segundos/60)}m${String(h.duracao_segundos%60).padStart(2,'0')}s` : '—'
-    const jaEnviado = ciEnviados.has(h.id) || h.ci_analisada
-
-    async function enviarCI() {
-      setCiEnviando(true)
-      try {
-        await ligacoesApi.analisarCI(h.id)
-        setCiEnviados(prev => new Set([...prev, h.id]))
-      } catch { /* silencia */ }
-      finally { setCiEnviando(false) }
-    }
-
     async function enviarWaDoCard() {
       const tel = h.numero_destino
       const texto = waMsgTexto.trim()
@@ -1959,28 +1947,17 @@ function TabManual() {
               </div>
             )}
 
-            {/* Centro de Inteligência */}
-            <div className={clsx(
-              'rounded-xl p-3 border flex items-center gap-3',
-              jaEnviado ? 'bg-brand-50 border-brand-200' : 'bg-gray-50 border-gray-200'
-            )}>
-              <div className={clsx('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', jaEnviado ? 'bg-brand-500' : 'bg-gray-200')}>
-                <Sparkles size={14} className={jaEnviado ? 'text-white' : 'text-gray-400'}/>
+            {/* Centro de Inteligência — automático */}
+            <div className="rounded-xl p-3 border bg-brand-50 border-brand-200 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center flex-shrink-0">
+                <Sparkles size={14} className="text-white"/>
               </div>
-              <div className="flex-1">
-                <p className={clsx('text-xs font-semibold', jaEnviado ? 'text-brand-800' : 'text-gray-700')}>
-                  {jaEnviado ? 'Analisada pelo Centro de Inteligência' : 'Enviar ao Centro de Inteligência'}
-                </p>
-                <p className={clsx('text-2xs', jaEnviado ? 'text-brand-600' : 'text-gray-500')}>
-                  {jaEnviado ? 'As anotações já treinam o agente desta conta' : 'As anotações vão treinar e melhorar o agente'}
+              <div>
+                <p className="text-xs font-semibold text-brand-800">Analisada automaticamente pelo CI</p>
+                <p className="text-2xs text-brand-600">
+                  Anotações e gravação treinam o agente desta conta — transferências a quente também
                 </p>
               </div>
-              {!jaEnviado && (
-                <button onClick={enviarCI} disabled={ciEnviando}
-                  className="text-2xs font-semibold px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 transition-colors flex-shrink-0">
-                  {ciEnviando ? '...' : 'Enviar'}
-                </button>
-              )}
             </div>
 
             {/* Enviar WhatsApp */}
