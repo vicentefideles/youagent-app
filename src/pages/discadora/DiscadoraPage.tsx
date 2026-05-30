@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi } from '@/services/api'
+import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi, whatsappApi } from '@/services/api'
+import { useAuthStore } from '@/store/authStore'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -1721,43 +1722,43 @@ function TabGravacoes() {
 // ─── ABA MANUAL ──────────────────────────────────────────────────────────────
 
 function TabManual() {
-  const [busca, setBusca] = useState('')
-  const [agenteId, setAgenteId] = useState('')
-  const [motivo, setMotivo] = useState('Reagendamento — cliente não entrou na reunião')
-  const [anotacao, setAnotacao] = useState('')
-  const [contato, setContato] = useState<{ id?: string; nome: string; empresa: string; tel: string; email: string } | null>(null)
-  const [numero, setNumero] = useState('')
+  useAuthStore() // mantém store ativo; user disponível se necessário no futuro
+
+  const [busca, setBusca]               = useState('')
+  const [motivo, setMotivo]             = useState('Reagendamento — cliente não entrou na reunião')
+  const [anotacao, setAnotacao]         = useState('')
+  const [notaEmChamada, setNotaEmChamada] = useState('')
+  const [contato, setContato]           = useState<{ id?: string; nome: string; empresa: string; tel: string; email: string } | null>(null)
+  const [numero, setNumero]             = useState('')
   const [chamandoAtiva, setChamandoAtiva] = useState(false)
-  const [callId, setCallId] = useState<string | null>(null)
-  const [resultado, setResultado] = useState<string | null>(null)
-  const [timer, setTimer] = useState(0)
+  const [ligacaoId, setLigacaoId]       = useState<string | null>(null)   // ID da row ligacoes (para PATCH)
+  const [callId, setCallId]             = useState<string | null>(null)   // call_control_id (Telnyx)
+  const [resultado, setResultado]       = useState<string | null>(null)
+  const [salvando, setSalvando]         = useState(false)
+  const [timer, setTimer]               = useState(0)
+  const [waLoading, setWaLoading]       = useState(false)
+  const [waMsg, setWaMsg]               = useState<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Agentes reais
-  const { data: agentesRaw = [] } = useQuery({
-    queryKey: ['agentes'],
-    queryFn: () => agentesApi.list().then(r => r.data as any[]),
-  })
-
-  // Busca de contatos via API (debounce simples)
+  // Busca de contatos via API
   const { data: sugestoesRaw = [] } = useQuery({
     queryKey: ['contatos-busca', busca],
     queryFn: () => contatosApi.search(busca).then(r => (r.data as any).data ?? r.data ?? []),
     enabled: busca.length > 1,
   })
   const sugestoes = (sugestoesRaw as any[]).map((c: any) => ({
-    id: c.id,
-    nome: c.nome ?? '—',
+    id:      c.id,
+    nome:    c.nome    ?? '—',
     empresa: c.razao_social ?? c.empresa ?? '—',
-    tel: c.telefone ?? '',
-    email: c.email ?? '',
+    tel:     c.telefone ?? '',
+    email:   c.email   ?? '',
   }))
 
   // Histórico de chamadas manuais
-  const { data: historicoRaw = [] } = useQuery({
+  const { data: historicoRaw = [], refetch: refetchHistorico } = useQuery({
     queryKey: ['ligacoes-manual'],
-    queryFn: () => ligacoesApi.list({ status: 'encerrada' }).then(r =>
-      (r.data as any[]).filter(l => l.tipo_ligacao === 'manual' || l.origem === 'manual').slice(0, 10)
+    queryFn:  () => ligacoesApi.list({ status: 'encerrada' }).then(r =>
+      (r.data as any[]).filter(l => l.tipo_ligacao === 'manual').slice(0, 10)
     ),
     refetchInterval: 15000,
   })
@@ -1767,38 +1768,98 @@ function TabManual() {
     if (!tel) return
     setChamandoAtiva(true)
     setResultado(null)
+    setNotaEmChamada('')
     setTimer(0)
     intervalRef.current = setInterval(() => setTimer(t => t + 1), 1000)
     try {
       const res = await ligacoesApi.create({
         numero_destino: tel,
-        agente_id: agenteId || undefined,
-        contato_id: contato?.id || undefined,
-        iniciar_agora: true,
-        tipo_ligacao: 'manual',
+        contato_id:     contato?.id  || undefined,
+        iniciar_agora:  true,
+        tipo_ligacao:   'manual',
         motivo,
-        anotacao_pre: anotacao,
+        anotacao_pre:   anotacao || undefined,
       })
-      setCallId((res.data as any)?.call_control_id ?? null)
+      const d = res.data as any
+      setCallId(d?.call_control_id ?? null)
+      setLigacaoId(d?.id ?? null)
     } catch (err) {
       console.error('Erro ao iniciar chamada manual:', err)
+      setChamandoAtiva(false)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }
 
   async function registrarResultado(res: string) {
-    setResultado(res)
-    setChamandoAtiva(false)
+    setSalvando(true)
     if (intervalRef.current) clearInterval(intervalRef.current)
+
+    // 1. Salva nota em-chamada via /anotacao (CI ingestion) se houver
+    if (callId && notaEmChamada.trim()) {
+      try { await ligacoesApi.anotacao(callId, notaEmChamada) } catch (_) {}
+    }
+
+    // 2. Persiste resultado + nota na row ligacoes
+    if (ligacaoId) {
+      try {
+        await ligacoesApi.update(ligacaoId, {
+          resultado:        res,
+          nota_pos_chamada: notaEmChamada || undefined,
+          status:           'encerrada',
+        })
+      } catch (_) {}
+    }
+
+    // 3. Encerra chamada no Telnyx
     if (callId) {
       try { await ligacoesApi.encerrar(callId) } catch (_) {}
+    }
+
+    setResultado(res)
+    setChamandoAtiva(false)
+    setSalvando(false)
+    refetchHistorico()
+  }
+
+  async function enviarWhatsApp() {
+    const tel = contato?.tel || numero
+    if (!tel) return
+    setWaLoading(true)
+    setWaMsg(null)
+    // Escolhe template pelo motivo selecionado
+    const template = motivo.toLowerCase().includes('não atendeu') || motivo.toLowerCase().includes('nao atendeu')
+      ? 'nao_atendeu' as const
+      : 'follow_up' as const
+    try {
+      await whatsappApi.enviar({
+        telefone: tel,
+        template,
+        dados: {
+          nome:     contato?.nome ?? '',
+          mensagem: motivo,
+        },
+      })
+      setWaMsg('✓ Mensagem enviada pelo WhatsApp do sistema')
+    } catch {
+      setWaMsg('Erro ao enviar — verifique se o WhatsApp está conectado em Configurações')
+    } finally {
+      setWaLoading(false)
+      setTimeout(() => setWaMsg(null), 5000)
     }
   }
 
   const formatTimer = (s: number) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
 
+  const resultadoMap: Record<string, string> = {
+    reagendou:    'Reagendamento confirmado',
+    confirmou:    'Presença confirmada',
+    nao_atendeu:  'Não atendeu — cadência iniciada',
+    encerrar:     'Chamada encerrada',
+  }
+
   return (
     <div className="grid grid-cols-[400px_1fr] gap-4">
-      {/* Painel esquerdo */}
+      {/* ── Painel esquerdo ── */}
       <div className="flex flex-col gap-3">
         <div className="card">
           <div className="p-4 border-b border-gray-100">
@@ -1811,7 +1872,7 @@ function TabManual() {
               <span>Use para reagendamentos, follow-up pós-reunião ou quando o cliente não entrou na reunião. A ligação sai pelo sistema com o mesmo número configurado.</span>
             </div>
 
-            {/* Busca */}
+            {/* Busca de contato */}
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Buscar contato</label>
               <div className="relative">
@@ -1819,9 +1880,10 @@ function TabManual() {
                 <input className="input pl-9" placeholder="Nome, empresa ou telefone..." value={busca} onChange={e => setBusca(e.target.value)}/>
               </div>
               {sugestoes.length > 0 && (
-                <div className="border border-brand-300 rounded-lg overflow-hidden mt-1">
+                <div className="border border-brand-300 rounded-lg overflow-hidden mt-1 shadow-sm">
                   {sugestoes.map(s => (
-                    <div key={s.nome} className="p-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0" onClick={() => { setContato(s); setBusca('') }}>
+                    <div key={s.id} className="p-2.5 hover:bg-brand-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
+                      onClick={() => { setContato(s); setBusca('') }}>
                       <div className="text-sm font-medium text-gray-900">{s.nome}</div>
                       <div className="text-xs text-gray-500">{s.empresa} · {s.tel}</div>
                     </div>
@@ -1832,36 +1894,36 @@ function TabManual() {
 
             {/* Contato selecionado */}
             {contato && (
-              <div className="bg-gray-50 rounded-lg p-3">
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-full bg-brand-50 text-brand-600 text-sm font-bold flex items-center justify-center">
-                    {contato.nome.split(' ').map(n => n[0]).join('').slice(0,2)}
+                  <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 text-sm font-bold flex items-center justify-center">
+                    {contato.nome.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-semibold text-gray-900">{contato.nome}</div>
                     <div className="text-xs text-gray-500">{contato.empresa}</div>
                   </div>
-                  <button onClick={() => setContato(null)}><XCircle size={16} className="text-gray-400 hover:text-gray-600"/></button>
+                  <button onClick={() => setContato(null)} className="p-1 rounded-lg hover:bg-gray-200 transition-colors">
+                    <XCircle size={15} className="text-gray-400"/>
+                  </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">Telefone</span><span className="font-mono">{contato.tel}</span></div>
-                  <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">E-mail</span><span className="text-brand-600">{contato.email}</span></div>
-                  <div className="col-span-2"><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">Motivo</span><span className="text-amber-600 font-medium">{motivo}</span></div>
+                  <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">E-mail</span><span className="text-brand-600 truncate block">{contato.email}</span></div>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200"/><span className="text-xs text-gray-400">ou digitar número</span><div className="flex-1 h-px bg-gray-200"/></div>
-
-            <input className="input font-mono text-sm tracking-widest" placeholder="(11) 99999-9999" type="tel" value={numero} onChange={e => setNumero(e.target.value)}/>
-
-            <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5">Agente que realizará a ligação</label>
-              <select className="input" value={agenteId} onChange={e => setAgenteId(e.target.value)}>
-                <option value="">Selecionar agente...</option>
-                {(agentesRaw as any[]).map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}
-              </select>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200"/>
+              <span className="text-xs text-gray-400">ou digitar número</span>
+              <div className="flex-1 h-px bg-gray-200"/>
             </div>
+
+            <input className="input font-mono text-sm tracking-widest" placeholder="(11) 99999-9999"
+              type="tel" value={numero} onChange={e => setNumero(e.target.value)}/>
+
+            {/* Motivo */}
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Motivo da ligação</label>
               <select className="input" value={motivo} onChange={e => setMotivo(e.target.value)}>
@@ -1873,24 +1935,43 @@ function TabManual() {
                 <option>Outro</option>
               </select>
             </div>
+
+            {/* Anotação pré-ligação */}
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Anotação pré-ligação</label>
-              <textarea className="input min-h-[64px] resize-none" value={anotacao} onChange={e => setAnotacao(e.target.value)} placeholder="Ex: Cliente não atendeu o Google Meet de 14/05 às 14h. Tentar reagendar..." />
+              <textarea className="input min-h-[64px] resize-none" value={anotacao}
+                onChange={e => setAnotacao(e.target.value)}
+                placeholder="Ex: Cliente não atendeu o Google Meet de 14/05 às 14h. Tentar reagendar..." />
             </div>
 
-            <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero)} className="btn-primary w-full justify-center gap-2 py-3 text-sm disabled:opacity-60">
-              <Phone size={15}/> {chamandoAtiva ? 'Em ligação...' : '📞 Ligar agora'}
+            {/* Botão Ligar */}
+            <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero)}
+              className="btn-primary w-full justify-center gap-2 py-3 text-sm disabled:opacity-60">
+              <Phone size={15}/>
+              {chamandoAtiva ? '📞 Em ligação...' : '📞 Ligar agora'}
             </button>
-            <button className="btn-secondary w-full justify-center gap-2 text-sm" style={{ color:'#128c7e', borderColor:'#25d366' }}>
-              <MessageSquare size={14}/> Enviar WhatsApp
-            </button>
+
+            {/* Botão WhatsApp */}
+            <div>
+              <button onClick={enviarWhatsApp}
+                disabled={waLoading || (!contato && !numero)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-sm font-semibold transition-colors disabled:opacity-50"
+                style={{ color: '#128c7e', borderColor: '#25d366', backgroundColor: waLoading ? '#f0fdf4' : 'white' }}>
+                <MessageSquare size={14}/>
+                {waLoading ? 'Enviando...' : 'Enviar WhatsApp'}
+              </button>
+              {waMsg && (
+                <p className={clsx('text-xs mt-1.5 font-medium', waMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
+                  {waMsg}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Painel direito */}
+      {/* ── Painel direito ── */}
       <div className="flex flex-col gap-4">
-        {/* Painel de chamada ativa */}
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900">Chamada em andamento</h3>
@@ -1908,7 +1989,6 @@ function TabManual() {
 
           {chamandoAtiva && (
             <div className="p-6">
-              {/* Ring animado */}
               <div className="flex flex-col items-center mb-6">
                 <div className="relative w-20 h-20 mb-4">
                   <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-60"/>
@@ -1920,24 +2000,32 @@ function TabManual() {
                 <div className="text-sm text-gray-500">{contato?.empresa ?? 'Contato manual'}</div>
                 <div className="text-2xl font-mono font-bold text-gray-900 mt-2">{formatTimer(timer)}</div>
                 <span className="badge badge-success mt-2 animate-pulse">● Em ligação</span>
+                {motivo && <span className="text-xs text-amber-600 font-medium mt-1">{motivo}</span>}
               </div>
 
-              {/* Nota ao vivo */}
+              {/* Nota em-chamada — salva via /anotacao ao encerrar */}
               <div className="mb-4">
-                <label className="text-xs font-medium text-gray-700 block mb-1.5">Anotações durante a chamada</label>
-                <textarea className="input min-h-[80px] resize-none" placeholder="Anote pontos importantes durante a chamada..."/>
+                <label className="text-xs font-medium text-gray-700 block mb-1.5">
+                  Anotações durante a chamada
+                  <span className="text-gray-400 font-normal ml-1">(salvas automaticamente ao encerrar)</span>
+                </label>
+                <textarea
+                  className="input min-h-[80px] resize-none"
+                  value={notaEmChamada}
+                  onChange={e => setNotaEmChamada(e.target.value)}
+                  placeholder="Anote pontos importantes — objeções, interesse, próximos passos..."/>
               </div>
 
               {/* Botões de resultado */}
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id:'reagendou', label:'📅 Reagendou', cls:'border-brand-300 text-brand-700 hover:bg-brand-50' },
-                  { id:'confirmou', label:'✓ Confirmou presença', cls:'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                  { id:'nao_atendeu', label:'📵 Não atendeu', cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                  { id:'encerrar', label:'⏹ Encerrar', cls:'border-gray-300 text-gray-600 hover:bg-gray-50' },
+                  { id:'reagendou',   label:'📅 Reagendou',         cls:'border-brand-300 text-brand-700 hover:bg-brand-50' },
+                  { id:'confirmou',   label:'✓ Confirmou presença', cls:'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
+                  { id:'nao_atendeu', label:'📵 Não atendeu',       cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
+                  { id:'encerrar',    label:'⏹ Encerrar',           cls:'border-gray-300 text-gray-600 hover:bg-gray-50' },
                 ].map(btn => (
-                  <button key={btn.id} onClick={() => registrarResultado(btn.id)}
-                    className={clsx('text-sm font-semibold py-2.5 px-3 rounded-xl border bg-white transition-colors', btn.cls)}>
+                  <button key={btn.id} onClick={() => registrarResultado(btn.id)} disabled={salvando}
+                    className={clsx('text-sm font-semibold py-2.5 px-3 rounded-xl border bg-white transition-colors disabled:opacity-50', btn.cls)}>
                     {btn.label}
                   </button>
                 ))}
@@ -1949,37 +2037,44 @@ function TabManual() {
             <div className="flex flex-col items-center justify-center py-12 text-center px-8">
               <CheckCircle2 size={40} className="text-emerald-500 mb-3"/>
               <div className="text-base font-bold text-gray-900">Resultado registrado</div>
-              <div className="text-sm text-gray-500 mt-1">
-                {{ reagendou:'Reagendamento confirmado', confirmou:'Presença confirmada', nao_atendeu:'Não atendeu — cadência iniciada', encerrar:'Chamada encerrada' }[resultado]}
-              </div>
-              <button onClick={() => setResultado(null)} className="btn-secondary mt-4 text-sm gap-2"><RotateCcw size={13}/> Nova chamada</button>
+              <div className="text-sm text-gray-500 mt-1">{resultadoMap[resultado] ?? resultado}</div>
+              {notaEmChamada && (
+                <div className="mt-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 max-w-xs text-left">
+                  <span className="font-semibold text-gray-700 block mb-1">Nota salva:</span>
+                  {notaEmChamada}
+                </div>
+              )}
+              <button onClick={() => { setResultado(null); setNotaEmChamada(''); setAnotacao(''); setContato(null); setNumero('') }}
+                className="btn-secondary mt-4 text-sm gap-2">
+                <RotateCcw size={13}/> Nova chamada
+              </button>
             </div>
           )}
         </div>
 
-        {/* Histórico de chamadas manuais */}
+        {/* Histórico */}
         <div className="card p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Últimas chamadas manuais</h3>
           {historicoRaw.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-4">Nenhuma chamada manual registrada.</p>
+            <p className="text-xs text-gray-400 text-center py-4">Nenhuma chamada manual registrada ainda.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {(historicoRaw as any[]).map((h: any, i: number) => {
-                const res = (h.resultado ?? 'encerrada') as string
-                const labelMap: Record<string, string> = { agendada:'Agendou', nao_atendida:'Não atendeu', encerrada:'Encerrada', atendida:'Atendida' }
-                const cls = res === 'agendada' ? 'badge-success' : res === 'nao_atendida' ? 'badge-amber' : 'badge-neutral'
-                const label = labelMap[res] ?? res
-                const data = h.encerrada_em ? new Date(h.encerrada_em).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
+                const res   = (h.resultado ?? 'encerrada') as string
+                const labelMap: Record<string, string> = { reagendou:'Reagendou', confirmou:'Confirmou', nao_atendeu:'Não atendeu', encerrada:'Encerrada', agendada:'Agendou' }
+                const cls   = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
+                const data  = h.encerrada_em ? new Date(h.encerrada_em).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
                 return (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                  <div key={h.id ?? i} className="flex items-start gap-3 p-2.5 rounded-lg bg-gray-50">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <User size={14} className="text-gray-500"/>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium text-gray-900">{h.contatos?.empresa ?? h.numero_destino ?? '—'} · {h.contatos?.nome ?? '—'}</div>
+                      {h.motivo && <div className="text-2xs text-gray-400 mt-0.5">{h.motivo}</div>}
                       <div className="text-2xs text-gray-400">{data}</div>
                     </div>
-                    <span className={clsx('badge text-2xs', cls)}>{label}</span>
+                    <span className={clsx('badge text-2xs flex-shrink-0', cls)}>{labelMap[res] ?? res}</span>
                   </div>
                 )
               })}

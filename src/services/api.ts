@@ -89,7 +89,11 @@ export const ligacoesApi = {
     return api.get(`/ligacoes${qs}`)
   },
   create:   (data: unknown) => api.post('/ligacoes', data),
+  update:   (id: string, data: { resultado?: string; nota_pos_chamada?: string; status?: string }) =>
+    api.patch(`/ligacoes/${id}`, data),
   encerrar: (callControlId: string) => api.delete(`/ligacoes/${callControlId}/encerrar`),
+  anotacao: (callControlId: string, anotacao: string) =>
+    api.post(`/ligacoes/${callControlId}/anotacao`, { anotacao }),
   transferir: (callControlId: string, data: { numero_destino: string; vendedor_nome?: string }) =>
     api.post(`/ligacoes/${callControlId}/transferir`, data),
   falar: (callControlId: string, data: { texto: string; voz?: string }) =>
@@ -118,8 +122,12 @@ export const inteligenciaApi = {
 
 // WhatsApp
 export const whatsappApi = {
-  list:   ()             => api.get('/whatsapp'),
-  send:   (data: unknown) => api.post('/whatsapp', data),
+  list:   () => api.get('/whatsapp'),
+  /** Envia mensagem com template pré-definido */
+  enviar: (data: { telefone: string; template: 'nao_atendeu' | 'reuniao_confirmada' | 'follow_up'; dados?: Record<string, string> }) =>
+    api.post('/whatsapp/enviar', data),
+  /** @deprecated use enviar() */
+  send: (data: unknown) => api.post('/whatsapp/enviar', data),
 }
 
 // Planos
