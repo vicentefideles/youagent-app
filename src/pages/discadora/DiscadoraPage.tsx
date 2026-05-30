@@ -1241,55 +1241,51 @@ function TabAgendados() {
                     </div>
                   )}
 
-                  {/* Ação gestor: aprovar ou reatribuir vendedor (só para pendente) */}
+                  {/* Confirmar reunião — só para pendente/agendada */}
                   {(ag.status === 'pendente' || ag.status === 'agendada') && (
-                    <div className="flex flex-col gap-1.5 mt-auto pt-1">
-                      <button
-                        className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 bg-white transition-colors"
-                        onClick={() => reunioesApi.update(ag.id, { status: 'confirmada' }).then(() => refetchAgendamentos()).catch(console.error)}
-                      >✓ Confirmar reunião</button>
-                      {/* Reatribuir vendedor — picker customizado */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setReatribuirAberto(reatribuirAberto === ag.id ? null : ag.id)}
-                          className="w-full flex items-center justify-between gap-2 text-xs font-semibold py-1.5 px-3 rounded-lg border border-brand-200 text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
-                        >
-                          <span>↔ Reatribuir vendedor</span>
-                          <span className="text-brand-400">{reatribuirAberto === ag.id ? '▲' : '▼'}</span>
-                        </button>
-                        {reatribuirAberto === ag.id && (
-                          <div className="absolute bottom-full left-0 right-0 mb-1 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden z-20">
-                            <div className="px-3 py-2 border-b border-gray-100">
-                              <p className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Selecionar vendedor</p>
-                            </div>
-                            {equipeRaw.map((v: any) => {
-                              const iniciais = (v.nome as string).split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-                              const isAtual = ag.vendedor === v.nome
-                              return (
-                                <button
-                                  key={v.id}
-                                  onClick={() => {
-                                    reunioesApi.update(ag.id, { vendedor_nome: v.nome }).then(() => { refetchAgendamentos(); setReatribuirAberto(null) }).catch(console.error)
-                                  }}
-                                  className={clsx(
-                                    'w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-brand-50',
-                                    isAtual ? 'bg-brand-50/60' : 'bg-white'
-                                  )}
-                                >
-                                  <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 text-2xs font-bold flex items-center justify-center flex-shrink-0">{iniciais}</div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-semibold text-gray-900 truncate">{v.nome}</div>
-                                    {v.modalidade && <div className="text-2xs text-gray-400">{v.modalidade === 'online' ? '💻 Online' : v.modalidade === 'presencial' ? '📍 Presencial' : '🔀 Híbrido'}</div>}
-                                  </div>
-                                  {isAtual && <span className="text-2xs text-brand-500 font-semibold flex-shrink-0">atual</span>}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <button
+                      className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 bg-white transition-colors"
+                      onClick={() => reunioesApi.update(ag.id, { status: 'confirmada' }).then(() => refetchAgendamentos()).catch(console.error)}
+                    >✓ Confirmar reunião</button>
                   )}
+
+                  {/* Reatribuir vendedor — sempre visível */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setReatribuirAberto(reatribuirAberto === ag.id ? null : ag.id)}
+                      className="w-full flex items-center justify-between gap-2 text-xs font-semibold py-1.5 px-3 rounded-lg border border-brand-200 text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
+                    >
+                      <span>↔ Reatribuir vendedor</span>
+                      <span className="text-brand-400">{reatribuirAberto === ag.id ? '▲' : '▼'}</span>
+                    </button>
+                    {reatribuirAberto === ag.id && (
+                      <div className="absolute bottom-full left-0 right-0 mb-1 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden z-20">
+                        <div className="px-3 py-2 border-b border-gray-100">
+                          <p className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Selecionar vendedor</p>
+                        </div>
+                        {equipeRaw.map((v: any) => {
+                          const iniciais = (v.nome as string).split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                          const isAtual = ag.vendedor === v.nome
+                          return (
+                            <button
+                              key={v.id}
+                              onClick={() => {
+                                reunioesApi.update(ag.id, { vendedor_nome: v.nome }).then(() => { refetchAgendamentos(); setReatribuirAberto(null) }).catch(console.error)
+                              }}
+                              className={clsx('w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-brand-50', isAtual ? 'bg-brand-50/60' : 'bg-white')}
+                            >
+                              <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 text-2xs font-bold flex items-center justify-center flex-shrink-0">{iniciais}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-semibold text-gray-900 truncate">{v.nome}</div>
+                                {v.modalidade && <div className="text-2xs text-gray-400">{v.modalidade === 'online' ? '💻 Online' : v.modalidade === 'presencial' ? '📍 Presencial' : '🔀 Híbrido'}</div>}
+                              </div>
+                              {isAtual && <span className="text-2xs text-brand-500 font-semibold flex-shrink-0">atual</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                   <button onClick={() => setModalJornada(ag)} className="text-2xs font-semibold text-brand-600 hover:text-brand-700 mt-auto text-center">📋 Ver jornada completa →</button>
                 </div>
