@@ -131,7 +131,7 @@ export const whatsappApi = {
 
 // WhatsApp pessoal do usuário logado (admin/gestor) — Evolution API
 export const whatsappUsuarioApi = {
-  conectar:    () => api.post('/whatsapp/eu/conectar', {}),
+  conectar:    () => api.post('/whatsapp/eu/conectar', {}, { timeout: 45000 }),
   status:      () => api.get('/whatsapp/eu/status'),
   desconectar: () => api.delete('/whatsapp/eu/desconectar'),
   enviar:      (data: { telefone: string; mensagem: string }) =>
