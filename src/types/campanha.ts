@@ -89,4 +89,6 @@ export interface NovaCampanhaForm {
   orq_gk_callback?: string
   orq_gk_abertura?: string
   tent_redir?: string
+  // Proteção de dados
+  blacklist?: string
 }
