@@ -112,10 +112,7 @@ const DIAS = [{ key:'seg',l:'Seg'},{key:'ter',l:'Ter'},{key:'qua',l:'Qua'},{key:
 interface FormState extends NovaCampanhaForm {
   // Vendedores selecionados
   vendedoresSelecionados: string[]
-  // Rechamada
-  max_tentativas: string
-  intervalo_tentativas: string
-  ao_esgotar: string
+  // Rechamada — decisor real (gatekeeper)
   tent_redir: string
   // Orquestração
   orq_nao_atendeu_on: boolean
@@ -169,7 +166,7 @@ const defaultForm: FormState = {
   hora_inicio: '09:00', hora_fim: '18:00', limite_diario: '200',
   pausa_almoco: true, pausa_almoco_val: '12-13',
   dias_operacao: ['seg','ter','qua','qui','sex'], icp_ativo: true, duracao_reuniao: '30',
-  max_tentativas: '3', intervalo_tentativas: '24h', ao_esgotar: 'descartar', tent_redir: '3',
+  tent_redir: '3',
   orq_nao_atendeu_on: true, orq_nao_atendeu_tent: '2', orq_nao_atendeu_canal: 'whatsapp', orq_nao_atendeu_delay: '24h',
   orq_recusou_on: true, orq_recusou_acao: 'email_nutricao', orq_recusou_lgpd: 'registrar',
   orq_agendou_on: true, orq_agendou_email: 'imediato', orq_agendou_wz: 'imediato', orq_agendou_lembrete: '1h',
@@ -795,55 +792,6 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
             </Section>
           )}
 
-          {/* ── REGRAS DE RECHAMADA ── */}
-          <Section title="⚙️ Regras de rechamada" defaultOpen={false}>
-            <p className="text-xs text-gray-500 mb-4">Quantas vezes o agente vai tentar ligar antes de descartar para reprocessamento manual.</p>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Máx. tentativas por contato</label>
-                <select className="input" value={form.max_tentativas} onChange={e => s('max_tentativas', e.target.value)}>
-                  <option value="2">2 tentativas</option>
-                  <option value="3">3 tentativas (rec.)</option>
-                  <option value="4">4 tentativas</option>
-                  <option value="5">5 tentativas</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Intervalo entre tentativas</label>
-                <select className="input" value={form.intervalo_tentativas} onChange={e => s('intervalo_tentativas', e.target.value)}>
-                  <option value="1h">1 hora</option>
-                  <option value="4h">4 horas</option>
-                  <option value="24h">24 horas (rec.)</option>
-                  <option value="48h">48 horas</option>
-                  <option value="7d">1 semana</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Ao esgotar tentativas</label>
-                <select className="input" value={form.ao_esgotar} onChange={e => s('ao_esgotar', e.target.value)}>
-                  <option value="descartar">Descartar → reprocessamento manual</option>
-                  <option value="arquivar">Arquivar silenciosamente</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Redirecionamento */}
-            <div className="p-3 bg-brand-50 rounded-lg border border-brand-100">
-              <p className="text-xs font-bold text-brand-700 mb-2">Regra para redirecionamento (pessoa errada)</p>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1.5 flex-1">
-                  <label className="text-xs font-medium text-gray-600">Máx. tentativas ao decisor real</label>
-                  <select className="input" value={form.tent_redir} onChange={e => s('tent_redir', e.target.value)}>
-                    <option value="2">2 tentativas ao decisor real</option>
-                    <option value="3">3 tentativas ao decisor real (rec.)</option>
-                    <option value="4">4 tentativas ao decisor real</option>
-                  </select>
-                </div>
-                <p className="text-xs text-gray-500 flex-1">Retorno com decisor real <strong>não conta</strong> como tentativa de conversão — conta separado.</p>
-              </div>
-            </div>
-          </Section>
-
           {/* ── JANELA DE OPERAÇÃO ── */}
           <Section title="🕐 Janela de operação" defaultOpen={false}>
             <p className="text-xs text-gray-500 mb-4">Horários em que o agente vai disparar ligações. O sistema respeita automaticamente os limites da ANATEL por UF.</p>
@@ -1018,6 +966,19 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
                         <option value="personalizada">Personalizada — "Falei com [nome] que me indicou ligar agora"</option>
                         <option value="padrao">Script padrão</option>
                       </select>
+                    </div>
+                    <div className="col-span-2 flex items-center gap-3 pt-1 border-t border-gray-100">
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <label className="text-xs font-medium text-gray-600">Máx. tentativas ao decisor real</label>
+                        <select className="input" value={form.tent_redir} onChange={e => s('tent_redir', e.target.value)}>
+                          <option value="2">2 tentativas</option>
+                          <option value="3">3 tentativas (rec.)</option>
+                          <option value="4">4 tentativas</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-gray-400 flex-1 leading-relaxed">
+                        Contagem separada das tentativas normais — retorno ao decisor real <strong>não</strong> consome o limite da agressividade.
+                      </p>
                     </div>
                   </div>
                 )}
