@@ -211,7 +211,7 @@ function TabFila() {
   const [expandido, setExpandido] = useState<string | null>('1')
   const [scriptInput, setScriptInput] = useState<Record<string, string>>({})
   const [scriptFeedback, setScriptFeedback] = useState<Record<string, string>>({})
-  const [slotConfirmado, setSlotConfirmado] = useState<Record<string, string>>({})
+  const [_slotConfirmado, _setSlotConfirmado] = useState<Record<string, string>>({})
   const [transcricaoAberta, setTranscricaoAberta] = useState<Record<string, boolean>>({ '1': true })
   const [transferidoPara, setTransferidoPara] = useState<Record<string, string>>({})
 
@@ -342,9 +342,6 @@ function TabFila() {
       alert('Erro ao iniciar escuta. Verifique se o ramal SIP está configurado.')
     }
   }
-  function confirmarSlot(id: string, slot: string) {
-    setSlotConfirmado(prev => ({ ...prev, [id]: slot }))
-  }
   function toggleTranscricao(id: string) {
     setTranscricaoAberta(prev => ({ ...prev, [id]: !prev[id] }))
   }
@@ -364,7 +361,6 @@ function TabFila() {
     setTransferidoPara(prev => ({ ...prev, [agentId]: vendedor }))
   }
 
-  const SLOTS = ['14:00', '15:00', '15:30', '16:00']
 
   return (
     <div className="flex flex-col gap-4">
@@ -750,24 +746,40 @@ function TabFila() {
                       )}
                     </div>
 
-                    {/* Slots inline */}
+                    {/* Anotação do supervisor */}
                     <div>
-                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">📅 Reservar slot agora</div>
-                      <div className="text-2xs text-gray-500 mb-2 leading-relaxed">Confirme um horário na agenda do vendedor agora, durante a ligação — o agente de IA agenda na mesma chamada.</div>
-                      {slotConfirmado[item.id] ? (
-                        <div className="bg-emerald-900/30 border border-emerald-700 rounded-lg p-2 text-2xs text-emerald-400 font-semibold">✓ Slot {slotConfirmado[item.id]} reservado!</div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {SLOTS.map(slot => (
-                            <button
-                              key={slot}
-                              onClick={() => confirmarSlot(item.id, slot)}
-                              className="text-2xs font-semibold py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:border-brand-500 hover:text-brand-400 transition-colors font-mono"
-                            >
-                              {slot}
-                            </button>
-                          ))}
-                        </div>
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">📝 Anotação do supervisor</div>
+                      <div className="text-2xs text-gray-500 mb-2 leading-relaxed">Anote insights enquanto acompanha — o agente de IA agenda automaticamente durante a ligação.</div>
+                      <textarea
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-2xs text-white placeholder-gray-500 outline-none focus:border-brand-500 resize-none"
+                        rows={4}
+                        placeholder="Ex: Cliente citou o concorrente X... mencionou budget para Q3... pedir follow-up sobre decisão..."
+                        value={scriptInput[`nota_${item.id}`] ?? ''}
+                        onChange={e => setScriptInput(prev => ({ ...prev, [`nota_${item.id}`]: e.target.value }))}
+                      />
+                      <button
+                        onClick={async () => {
+                          const nota = scriptInput[`nota_${item.id}`]
+                          if (!nota) return
+                          const ccid = (item as any)._callControlId
+                          if (ccid) {
+                            try {
+                              await fetch(`/api/v1/ligacoes/${ccid}/anotacao`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+                                body: JSON.stringify({ anotacao: nota }),
+                              })
+                            } catch (_) {}
+                          }
+                          setScriptFeedback(prev => ({ ...prev, [`nota_${item.id}`]: '✓ Anotação salva' }))
+                          setTimeout(() => setScriptFeedback(prev => ({ ...prev, [`nota_${item.id}`]: '' })), 2500)
+                        }}
+                        className="mt-1.5 text-2xs font-semibold px-3 py-1 rounded-lg bg-gray-700 border border-gray-600 text-gray-300 hover:bg-gray-600 transition-colors"
+                      >
+                        Salvar anotação
+                      </button>
+                      {scriptFeedback[`nota_${item.id}`] && (
+                        <div className="text-2xs text-emerald-400 mt-1">{scriptFeedback[`nota_${item.id}`]}</div>
                       )}
                     </div>
                   </div>
