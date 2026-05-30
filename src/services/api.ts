@@ -131,18 +131,20 @@ export const whatsappApi = {
 
 // WhatsApp pessoal do usuário logado (admin/gestor) — Evolution API
 export const whatsappUsuarioApi = {
-  /** Gera QR Code para conectar o WhatsApp pessoal */
-  conectar:     () => api.post('/whatsapp/eu/conectar', {}),
-  /** Polling de status da conexão */
-  status:       () => api.get('/whatsapp/eu/status'),
-  /** Desconecta o WhatsApp */
-  desconectar:  () => api.delete('/whatsapp/eu/desconectar'),
-  /** Envia mensagem pelo WA do usuário logado + salva histórico */
-  enviar:       (data: { telefone: string; mensagem: string }) =>
+  conectar:    () => api.post('/whatsapp/eu/conectar', {}),
+  status:      () => api.get('/whatsapp/eu/status'),
+  desconectar: () => api.delete('/whatsapp/eu/desconectar'),
+  enviar:      (data: { telefone: string; mensagem: string }) =>
     api.post('/whatsapp/eu/enviar', data),
-  /** Histórico de conversa com um telefone */
-  historico:    (telefone: string) =>
+  historico:   (telefone: string) =>
     api.get(`/whatsapp/eu/historico/${encodeURIComponent(telefone)}`),
+  /** Lista todas as conversas (inbox) agrupadas por telefone */
+  conversas:   () => api.get('/whatsapp/eu/conversas'),
+  /** Marca conversa como lida */
+  marcarLida:  (telefone: string) =>
+    api.patch(`/whatsapp/eu/lida/${encodeURIComponent(telefone)}`, {}),
+  /** Total de mensagens não lidas (badge sidebar) */
+  naoLidas:    () => api.get('/whatsapp/eu/nao-lidas'),
 }
 
 // Planos

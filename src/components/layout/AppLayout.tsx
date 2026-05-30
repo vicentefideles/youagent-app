@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { agentesApi, equipeApi } from '@/services/api'
+import { agentesApi, equipeApi, whatsappUsuarioApi } from '@/services/api'
 import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Phone, BarChart2, Brain, Mail,
   Settings, Users, LogOut, ChevronLeft, Bot,
   Zap, Menu, Megaphone, UserCheck, Shield,
   TrendingUp, PhoneIncoming, CreditCard, LayoutGrid,
-  DollarSign, Code2, Lock, PhoneCall,
+  DollarSign, Code2, Lock, PhoneCall, MessageSquare,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import clsx from 'clsx'
@@ -24,6 +24,7 @@ interface NavItem {
   icon: React.ReactNode
   to: string
   badge?: string
+  badgeCount?: number  // badge numérico dinâmico (ex: mensagens não lidas)
 }
 
 interface SidebarGroup {
@@ -42,6 +43,7 @@ const SIDEBAR_CONFIG: Record<UserRole, SidebarGroup[]> = {
         { label: 'Relatórios',     icon: <BarChart2 size={17} />,       to: '/relatorios' },
         { label: 'Inteligência CI',icon: <Brain size={17} />,           to: '/inteligencia', badge: 'CI' },
         { label: 'E-mail',         icon: <Mail size={17} />,            to: '/email' },
+        { label: 'Mensagens',      icon: <MessageSquare size={17} />,   to: '/mensagens' },
       ],
     },
     {
@@ -72,6 +74,7 @@ const SIDEBAR_CONFIG: Record<UserRole, SidebarGroup[]> = {
         { label: 'Relatórios',     icon: <BarChart2 size={17} />,       to: '/relatorios' },
         { label: 'Inteligência CI',icon: <Brain size={17} />,           to: '/inteligencia', badge: 'CI' },
         { label: 'E-mail',         icon: <Mail size={17} />,            to: '/email' },
+        { label: 'Mensagens',      icon: <MessageSquare size={17} />,   to: '/mensagens' },
       ],
     },
     {
@@ -153,6 +156,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/admin/custos':     'Admin — Custos',
   '/admin/dev':        'Admin — Dev',
   '/admin/telnyx':     'Admin — Telnyx',
+  '/mensagens':        'Mensagens',
   '/vendedor-restrito':'Área do Vendedor',
 }
 
@@ -209,6 +213,13 @@ function NavSection({
                 {item.badge}
               </span>
             )}
+            {!collapsed && item.badgeCount && item.badgeCount > 0 && !bloqueado && (
+              <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full
+                               bg-emerald-500 text-white text-2xs font-bold
+                               flex items-center justify-center">
+                {item.badgeCount > 99 ? '99+' : item.badgeCount}
+              </span>
+            )}
             {!collapsed && bloqueado && (
               <Lock className="w-3 h-3 text-gray-400 ml-auto flex-shrink-0" />
             )}
@@ -235,6 +246,15 @@ function AppLayoutInner() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showNovaCampanha, setShowNovaCampanha] = useState(false)
   const [showImportarLista, setShowImportarLista] = useState(false)
+
+  // Badge de mensagens não lidas — polling a cada 15s
+  const { data: naoLidasData } = useQuery({
+    queryKey: ['wa-nao-lidas'],
+    queryFn:  () => whatsappUsuarioApi.naoLidas().then(r => (r.data as any).total as number),
+    refetchInterval: 15000,
+    enabled: currentRole === 'admin_cliente' || currentRole === 'gerente',
+  })
+  const naoLidas = naoLidasData ?? 0
 
   const { data: agentesLayout = [] } = useQuery({
     queryKey: ['agentes'],
@@ -266,7 +286,16 @@ function AppLayoutInner() {
   const showLock = !contaAtiva
 
   const breadcrumb = BREADCRUMB_MAP[location.pathname] ?? ''
-  const groups = SIDEBAR_CONFIG[currentRole] ?? []
+
+  // Injeta badge de não lidas no item Mensagens
+  const groups = (SIDEBAR_CONFIG[currentRole] ?? []).map(group => ({
+    ...group,
+    items: group.items.map(item =>
+      item.to === '/mensagens' && naoLidas > 0
+        ? { ...item, badgeCount: naoLidas }
+        : item
+    ),
+  }))
 
   const showContextualButton =
     currentRole === 'admin_cliente' || currentRole === 'gerente'

@@ -34,6 +34,7 @@ import AdminCustosPage from '@/pages/admin/AdminCustosPage'
 import AdminDevPage from '@/pages/admin/AdminDevPage'
 import AdminTelnyxPage from '@/pages/admin/AdminTelnyxPage'
 import DocumentosPage from '@/pages/documentos/DocumentosPage'
+import MensagensPage from '@/pages/mensagens/MensagensPage'
 import RemarcarPage from '@/pages/public/RemarcarPage'
 import WhatsAppQRPage from '@/pages/public/WhatsAppQRPage'
 
@@ -134,6 +135,11 @@ export default function App() {
             <Route path="admin/dev"        element={<AdminRoute><AdminDevPage /></AdminRoute>} />
             <Route path="admin/telnyx"     element={<AdminRoute><AdminTelnyxPage /></AdminRoute>} />
 
+            <Route path="mensagens" element={
+              <RouteGuard nomeModulo="Mensagens">
+                <MensagensPage />
+              </RouteGuard>
+            } />
             <Route path="vendedor-restrito" element={<VendedorPageRestrita />} />
           </Route>
 

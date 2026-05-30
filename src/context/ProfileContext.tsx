@@ -14,12 +14,12 @@ export const NAV_RULES: Record<UserRole, NavRoute[]> = {
   admin_cliente: [
     '/dashboard', '/campanhas', '/discadora', '/relatorios',
     '/inteligencia', '/email', '/vendedor', '/pipeline', '/receptivo',
-    '/onboarding', '/equipe', '/config', '/planos',
+    '/onboarding', '/equipe', '/config', '/planos', '/mensagens',
   ],
   gerente: [
     '/dashboard', '/campanhas', '/discadora', '/relatorios',
     '/inteligencia', '/email', '/vendedor', '/pipeline', '/receptivo',
-    '/onboarding', '/equipe', '/config',
+    '/onboarding', '/equipe', '/config', '/mensagens',
   ],
   vendedor: [
     '/vendedor',
