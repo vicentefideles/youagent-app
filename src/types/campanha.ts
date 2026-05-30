@@ -91,4 +91,15 @@ export interface NovaCampanhaForm {
   tent_redir?: string
   // Proteção de dados
   blacklist?: string
+  // Campos específicos por tipo de campanha
+  inbound_fonte?: string
+  inbound_sla?: string
+  ren_produto?: string
+  ren_churn?: string
+  ren_tom?: string
+  b2c_produto?: string
+  b2c_perfil?: string
+  b2c_volume?: string
+  b2c_cta?: string
+  nurt_duracao?: string
 }

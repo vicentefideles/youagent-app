@@ -475,6 +475,17 @@ export default function CampanhasPage() {
       orq_tent_redir:        Number(form.tent_redir) || 3,
       // Proteção de dados
       blacklist:             form.blacklist || '',
+      // Campos específicos por tipo de campanha (usados pelo AI Assistant)
+      inbound_fonte:         form.inbound_fonte || null,
+      inbound_sla:           form.inbound_sla || null,
+      ren_produto:           form.ren_produto || null,
+      ren_churn:             form.ren_churn || null,
+      ren_tom:               form.ren_tom || null,
+      b2c_produto:           form.b2c_produto || null,
+      b2c_perfil:            form.b2c_perfil || null,
+      b2c_volume:            form.b2c_volume || null,
+      b2c_cta:               form.b2c_cta || null,
+      nurt_duracao:          form.nurt_duracao || null,
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campanhas'] }),
   })
