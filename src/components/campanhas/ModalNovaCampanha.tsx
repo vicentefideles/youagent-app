@@ -781,13 +781,52 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
                 )
               })()}
 
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-600">Distribuição de reuniões entre vendedores selecionados</span>
-                <select className="input w-auto text-xs py-1.5" value={form.distribuicao} onChange={e => s('distribuicao', e.target.value)}>
-                  <option value="round_robin">Distribuição igualitária (round-robin)</option>
-                  <option value="menor_carga">Por menor carga (menos reuniões no dia)</option>
-                  <option value="disponiveis">Apenas para vendedores disponíveis</option>
-                </select>
+              <div className="mt-1">
+                <p className="text-xs font-medium text-gray-700 mb-2">Como distribuir as reuniões agendadas pela IA entre os vendedores?</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    {
+                      value: 'round_robin',
+                      label: 'Igualitária',
+                      icon: '⚖️',
+                      desc: 'Cada vendedor recebe a mesma quantidade de reuniões ao longo do tempo. Ideal quando todos têm capacidade igual.',
+                    },
+                    {
+                      value: 'menor_carga',
+                      label: 'Menor carga',
+                      icon: '📊',
+                      desc: 'A próxima reunião vai para quem tem menos reuniões no dia. Útil quando os vendedores têm agendas variáveis.',
+                    },
+                    {
+                      value: 'disponiveis',
+                      label: 'Disponíveis',
+                      icon: '🟢',
+                      desc: 'Envia apenas para vendedores com WhatsApp conectado na plataforma. Garante que a mensagem de confirmação chegue na hora.',
+                    },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => s('distribuicao', opt.value)}
+                      className={`text-left p-3 rounded-lg border-2 transition-all ${
+                        form.distribuicao === opt.value
+                          ? 'border-brand bg-brand/5'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-base">{opt.icon}</span>
+                        <span className={`text-xs font-semibold ${form.distribuicao === opt.value ? 'text-brand' : 'text-gray-800'}`}>{opt.label}</span>
+                        {form.distribuicao === opt.value && (
+                          <span className="ml-auto w-3.5 h-3.5 rounded-full bg-brand flex items-center justify-center flex-shrink-0">
+                            <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-relaxed">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
             </Section>
           )}
