@@ -306,17 +306,41 @@ function TabFila() {
   function toggleAll(checked: boolean) {
     setSelecionados(checked ? filaFiltrada.map(f => f.id) : [])
   }
-  async function injetarScript(id: string) {
-    const texto = scriptInput[id]
+  async function injetarScript(itemId: string) {
+    const texto = scriptInput[itemId]
     if (!texto) return
-    try {
-      await ligacoesApi.falar(id, { texto })
-      setScriptFeedback(prev => ({ ...prev, [id]: '✓ Injetado' }))
-    } catch {
-      setScriptFeedback(prev => ({ ...prev, [id]: 'Erro ao injetar' }))
+    const item = fila.find(f => f.id === itemId) as (EntradaFila & { _callControlId?: string }) | undefined
+    const ccid = item?._callControlId
+    if (!ccid) {
+      setScriptFeedback(prev => ({ ...prev, [itemId]: '⚠ Ligação demo — indisponível' }))
+      setTimeout(() => setScriptFeedback(prev => ({ ...prev, [itemId]: '' })), 3000)
+      return
     }
-    setTimeout(() => setScriptFeedback(prev => ({ ...prev, [id]: '' })), 2500)
-    setScriptInput(prev => ({ ...prev, [id]: '' }))
+    try {
+      await ligacoesApi.falar(ccid, { texto })
+      setScriptFeedback(prev => ({ ...prev, [itemId]: '✓ Frase injetada com sucesso' }))
+    } catch {
+      setScriptFeedback(prev => ({ ...prev, [itemId]: '✗ Erro ao injetar — verifique a ligação' }))
+    }
+    setTimeout(() => setScriptFeedback(prev => ({ ...prev, [itemId]: '' })), 3000)
+    setScriptInput(prev => ({ ...prev, [itemId]: '' }))
+  }
+
+  async function ouvirLigacao(item: EntradaFila & { _callControlId?: string }) {
+    const ccid = item._callControlId
+    if (!ccid) {
+      alert('Ligação demo — escuta não disponível.')
+      return
+    }
+    try {
+      await fetch(`/api/v1/ligacoes/${ccid}/monitorar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+      })
+      alert('Escuta iniciada no seu ramal SIP. Verifique a aba Ramal.')
+    } catch {
+      alert('Erro ao iniciar escuta. Verifique se o ramal SIP está configurado.')
+    }
   }
   function confirmarSlot(id: string, slot: string) {
     setSlotConfirmado(prev => ({ ...prev, [id]: slot }))
@@ -555,13 +579,17 @@ function TabFila() {
 
             {/* PAINEL MONITOR */}
             {expandido === item.id && (
-              <div className="bg-gray-900 border-b border-gray-800">
+              <div className="border-b border-brand-200 bg-gradient-to-b from-brand-950 to-gray-950" style={{ background: 'linear-gradient(180deg, #1e1b4b 0%, #0f0f1f 100%)' }}>
                 {/* Header do monitor */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-wrap gap-2">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-wrap gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-sm font-bold text-white">{item.empresa}</span>
-                    <span className="text-2xs text-gray-400">{item.agente} · {item.campanha}</span>
+                    <span className="text-2xs text-indigo-300 font-medium">{item.agente}</span>
+                    {/* Campanha destacada */}
+                    <span className="text-2xs font-semibold bg-indigo-900/60 border border-indigo-500/40 text-indigo-300 rounded-full px-2 py-0.5">
+                      📋 {item.campanha}
+                    </span>
                     <IcpBadge value={item.icp} />
                   </div>
                   <div className="flex items-center gap-2">
@@ -607,7 +635,11 @@ function TabFila() {
                         >
                           {transcricaoAberta[item.id] ? '▲ Ocultar' : '▼ Ver Transcrição'}
                         </button>
-                        <button className="text-2xs bg-emerald-900/30 border border-emerald-700 text-emerald-400 rounded-full px-2 py-0.5 font-semibold hover:bg-emerald-800/30 transition-colors">🎧 Ouvir</button>
+                        <button
+                          onClick={() => ouvirLigacao(item as EntradaFila & { _callControlId?: string })}
+                          title="Escuta silenciosa em tempo real via ramal SIP. Você ouvirá a ligação sem interferir."
+                          className="text-2xs bg-emerald-900/30 border border-emerald-700 text-emerald-400 rounded-full px-2 py-0.5 font-semibold hover:bg-emerald-800/30 transition-colors"
+                        >🎧 Ouvir ao vivo</button>
                       </div>
                     </div>
                     {/* Monitor IA */}
@@ -711,12 +743,17 @@ function TabFila() {
                         />
                         <button onClick={() => injetarScript(item.id)} className="text-2xs bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-2 py-1.5 font-semibold transition-colors">Enviar</button>
                       </div>
-                      {scriptFeedback[item.id] && <div className="text-2xs text-emerald-400 mt-1">{scriptFeedback[item.id]}</div>}
+                      {scriptFeedback[item.id] && (
+                        <div className={clsx('text-2xs mt-1', scriptFeedback[item.id].startsWith('✓') ? 'text-emerald-400' : 'text-red-400')}>
+                          {scriptFeedback[item.id]}
+                        </div>
+                      )}
                     </div>
 
                     {/* Slots inline */}
                     <div>
-                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-2">📅 Reservar slot agora</div>
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">📅 Reservar slot agora</div>
+                      <div className="text-2xs text-gray-500 mb-2 leading-relaxed">Confirme um horário na agenda do vendedor agora, durante a ligação — o agente de IA agenda na mesma chamada.</div>
                       {slotConfirmado[item.id] ? (
                         <div className="bg-emerald-900/30 border border-emerald-700 rounded-lg p-2 text-2xs text-emerald-400 font-semibold">✓ Slot {slotConfirmado[item.id]} reservado!</div>
                       ) : (
@@ -737,7 +774,8 @@ function TabFila() {
 
                   {/* Col 3: Transferência — candidatos */}
                   <div>
-                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-2">⚡ Vendedores disponíveis</div>
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">⚡ Transferência a quente</div>
+                  <div className="text-2xs text-gray-500 mb-2 leading-relaxed">Transfere a ligação para o vendedor agora — ele entra na chamada com o lead direto, sem perder o contato.</div>
                     <div className="flex flex-col gap-2">
                       {transferCandidates.map(v => (
                         <div
