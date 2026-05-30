@@ -68,6 +68,7 @@ interface Reuniao {
   sinais: string[]
   sugestao: string
   // Dados cadastrais do contato
+  nome?: string
   telefone?: string
   email?: string
   cnpj?: string
