@@ -1721,7 +1721,13 @@ function SectionMeuWhatsApp() {
       setStatus('conectando')
       setPolling(true)
     } catch (e: any) {
-      showToast('Erro ao gerar QR — ' + (e?.response?.data?.error ?? e.message))
+      const msg: string = e?.response?.data?.error ?? e?.message ?? 'Erro desconhecido'
+      const isMongo = msg.toLowerCase().includes('mongo') || msg.toLowerCase().includes('topology')
+      if (isMongo) {
+        showToast('⚠️ Serviço WhatsApp temporariamente indisponível — tente novamente em alguns segundos ou contate o suporte')
+      } else {
+        showToast('Erro ao gerar QR — ' + msg)
+      }
     } finally {
       setLoadingQr(false)
     }
