@@ -437,12 +437,8 @@ export default function CampanhasPage() {
     mutationFn: (form: NovaCampanhaForm) => campanhasApi.create({
       nome:                  form.nome.trim(),
       tipo:                  form.tipo,
-      estado:                form.estado,
-      cidade:                form.cidade,
-      segmento:              form.segmento,
       modalidade:            form.modalidade,
       agente_id:             form.agente_id || null,
-      agressividade:         form.agressividade,
       meta_agendamentos:     form.meta_agendamentos ? Number(form.meta_agendamentos) : null,
       hora_inicio:           form.hora_inicio,
       hora_fim:              form.hora_fim,

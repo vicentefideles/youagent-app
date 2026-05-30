@@ -497,47 +497,96 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
 
           {/* ── DADOS GERAIS ── */}
           <Section title="Informações gerais">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 flex flex-col gap-1.5">
+            <div className="flex flex-col gap-4">
+
+              {/* Nome */}
+              <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-gray-600">Nome da campanha *</label>
-                <input className="input" placeholder="Ex: SP — Indústria Junho 2026" value={form.nome} onChange={e => s('nome', e.target.value)} />
+                <input className="input" placeholder="Ex: Outbound Indústria — Junho 2026" value={form.nome} onChange={e => s('nome', e.target.value)} />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Estado alvo</label>
-                <select className="input" value={form.estado} onChange={e => s('estado', e.target.value)}>
-                  <option value="">Selecione...</option>
-                  {ESTADOS.map(uf => <option key={uf} value={uf}>{uf === 'NACIONAL' ? '🇧🇷 Nacional' : uf}</option>)}
-                </select>
+
+              {/* Agente de IA */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-600">Agente de IA responsável</label>
+                  <span className="text-2xs text-purple-600 font-semibold flex items-center gap-1">
+                    🧠 CI otimiza automaticamente
+                  </span>
+                </div>
+                {agentes.length === 0 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                    Nenhum agente cadastrado. Crie um agente primeiro em Configurações.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Opção "Sem agente fixo — CI decide" */}
+                    <button type="button" onClick={() => s('agente_id', '')}
+                      className={clsx('flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all text-left',
+                        form.agente_id === '' ? 'border-purple-400 bg-purple-50' : 'border-gray-100 hover:border-gray-200 bg-white')}>
+                      <span className="text-lg flex-shrink-0">🧠</span>
+                      <div className="min-w-0">
+                        <p className={clsx('text-xs font-bold truncate', form.agente_id === '' ? 'text-purple-700' : 'text-gray-800')}>Automático</p>
+                        <p className="text-2xs text-gray-400 leading-tight">CI escolhe o melhor agente</p>
+                      </div>
+                    </button>
+                    {agentes.map(a => (
+                      <button key={a.id} type="button" onClick={() => s('agente_id', a.id)}
+                        className={clsx('flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all text-left',
+                          form.agente_id === a.id ? 'border-brand bg-brand-50' : 'border-gray-100 hover:border-gray-200 bg-white')}>
+                        <span className={clsx('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                          form.agente_id === a.id ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600')}>
+                          {a.nome.slice(0, 2).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className={clsx('text-xs font-bold truncate', form.agente_id === a.id ? 'text-brand-700' : 'text-gray-800')}>{a.nome}</p>
+                          <p className="text-2xs text-gray-400 leading-tight">Agente ativo</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="text-2xs text-gray-400 leading-relaxed">
+                  O Centro de Inteligência monitora qual agente converte mais por segmento, horário e região — e recomenda ajustes automaticamente.
+                </p>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Cidade / Região alvo</label>
-                <input className="input" placeholder="Ex: Interior SP, Grande BH..." value={form.cidade} onChange={e => s('cidade', e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Segmento</label>
-                <select className="input" value={form.segmento} onChange={e => s('segmento', e.target.value)}>
-                  <option value="">Selecione...</option>
-                  {SEGMENTOS.map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Agente de IA responsável</label>
-                <select className="input" value={form.agente_id} onChange={e => s('agente_id', e.target.value)}>
-                  <option value="">— selecione um agente —</option>
-                  {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Agressividade inicial</label>
-                <select className="input" value={form.agressividade} onChange={e => s('agressividade', e.target.value as never)}>
-                  <option value="baixa">Baixa (1 chamada/min)</option>
-                  <option value="media">Média (3 chamadas/min)</option>
-                  <option value="alta">Alta (6 chamadas/min)</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-600">Meta de agendamentos</label>
-                <input type="number" className="input" placeholder="Ex: 30 reuniões" value={form.meta_agendamentos} onChange={e => s('meta_agendamentos', e.target.value)} />
+
+              {/* Meta de agendamentos */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-600">Meta de agendamentos</label>
+                  <span className="text-2xs text-gray-400">rastreada pelo CI</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {[10, 30, 50, 100].map(v => (
+                    <button key={v} type="button" onClick={() => s('meta_agendamentos', String(v))}
+                      className={clsx('py-2 rounded-lg border-2 text-xs font-bold transition-all',
+                        form.meta_agendamentos === String(v)
+                          ? 'border-brand bg-brand-50 text-brand-700'
+                          : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200')}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    className="input pr-20"
+                    placeholder="Outro número..."
+                    value={form.meta_agendamentos}
+                    onChange={e => s('meta_agendamentos', e.target.value)}
+                    min="1"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">reuniões</span>
+                </div>
+                {form.meta_agendamentos && Number(form.meta_agendamentos) > 0 && (
+                  <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg">
+                    <span className="text-sm flex-shrink-0">🎯</span>
+                    <p className="text-xs text-emerald-700 leading-relaxed">
+                      Com ICP ativo, estime <strong>~1 reunião a cada 35–50 ligações</strong>.
+                      Para {form.meta_agendamentos} reuniões: aproximadamente <strong>{Math.round(Number(form.meta_agendamentos) * 42).toLocaleString('pt-BR')} contatos</strong> na lista.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </Section>

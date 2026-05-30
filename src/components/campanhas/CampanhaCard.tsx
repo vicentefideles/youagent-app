@@ -285,7 +285,7 @@ export default function CampanhaCard({
           </button>
         </div>
 
-        {/* Barra de consumo */}
+        {/* Barra de consumo da lista */}
         <div>
           <div className="flex justify-between items-center mb-1">
             <span className="text-xs text-gray-400">Consumo da lista</span>
@@ -295,6 +295,33 @@ export default function CampanhaCard({
             <div className={clsx('h-full rounded-full transition-all', barColor)} style={{ width: `${consumoPct}%` }} />
           </div>
         </div>
+
+        {/* Barra de progresso da meta — só exibe se meta foi definida */}
+        {campanha.meta_agendamentos ? (() => {
+          const meta = campanha.meta_agendamentos
+          const pct  = Math.min(100, Math.round((agendadas / meta) * 100))
+          const metaColor = pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-brand' : 'bg-amber-400'
+          return (
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <Target size={10} className="text-brand-400" />
+                  Meta de reuniões
+                </span>
+                <span className={clsx('text-xs font-bold', pct >= 100 ? 'text-emerald-600' : 'text-gray-600')}>
+                  {agendadas}/{meta}
+                  {pct >= 100 && ' ✓'}
+                </span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className={clsx('h-full rounded-full transition-all', metaColor)} style={{ width: `${pct}%` }} />
+              </div>
+              {pct >= 100 && (
+                <p className="text-2xs text-emerald-600 font-semibold mt-1">🎉 Meta atingida!</p>
+              )}
+            </div>
+          )
+        })() : null}
       </div>
 
       {/* ── MÉTRICAS (4 colunas) ── */}
