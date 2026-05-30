@@ -457,6 +457,22 @@ export default function CampanhasPage() {
       // Vendedores
       vendedores_ids:        form.vendedoresSelecionados || [],
       distribuicao_reunioes: form.distribuicao || 'round_robin',
+      // Orquestração multi-canal
+      orq_nao_atendeu_on:    form.orq_nao_atendeu_on,
+      orq_nao_atendeu_tent:  form.orq_nao_atendeu_tent,
+      orq_nao_atendeu_canal: form.orq_nao_atendeu_canal,
+      orq_nao_atendeu_delay: form.orq_nao_atendeu_delay,
+      orq_recusou_on:        form.orq_recusou_on,
+      orq_recusou_acao:      form.orq_recusou_acao,
+      orq_recusou_lgpd:      form.orq_recusou_lgpd,
+      orq_agendou_on:        form.orq_agendou_on,
+      orq_agendou_email:     form.orq_agendou_email,
+      orq_agendou_wz:        form.orq_agendou_wz,
+      orq_agendou_lembrete:  form.orq_agendou_lembrete,
+      orq_gatekeeper_on:     form.orq_gatekeeper_on,
+      orq_gk_callback:       form.orq_gk_callback,
+      orq_gk_abertura:       form.orq_gk_abertura,
+      orq_tent_redir:        Number(form.tent_redir) || 3,
     }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campanhas'] }),
   })
