@@ -106,8 +106,7 @@ const TIPOS: TipoConfig[] = [
   },
 ]
 
-const SEGMENTOS = ['Indústria','Comércio / Varejo','Tecnologia / SaaS','Agronegócio','Serviços','Saúde','Construção Civil','Educação','Logística','Financeiro']
-const ESTADOS   = ['SP','MG','GO','RJ','PR','RS','SC','BA','CE','PE','DF','ES','MS','MT','PA','AM','RN','PB','AL','SE','PI','MA','TO','RO','AC','RR','AP','NACIONAL']
+
 const DIAS = [{ key:'seg',l:'Seg'},{key:'ter',l:'Ter'},{key:'qua',l:'Qua'},{key:'qui',l:'Qui'},{key:'sex',l:'Sex'},{key:'sab',l:'Sáb'},{key:'dom',l:'Dom'}]
 
 interface FormState extends NovaCampanhaForm {

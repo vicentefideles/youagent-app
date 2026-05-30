@@ -58,7 +58,6 @@ interface HorarioSugestao {
 
 export default function CampanhaCard({
   campanha, onPausar, onIniciar,
-  onImportar: _onImportar, onVerFila: _onVerFila,
   onEditar, onAgressividade, onReprocessar
 }: Props) {
   const navigate = useNavigate()
