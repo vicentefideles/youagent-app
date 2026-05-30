@@ -10,12 +10,100 @@ interface Props {
   onFechar: () => void
 }
 
-const TIPOS: { key: TipoCampanha; icon: string; label: string; sub: string; aviso: string }[] = [
-  { key: 'outbound',  icon: '📞', label: 'SDR Outbound',   sub: 'Liga para lista fria B2B',        aviso: '📞 Agente disca para lista de prospects frios, qualifica pelo ICP e agenda reunião com o closer. Modo padrão — cobertura máxima de gatilhos e objeções.' },
-  { key: 'inbound',   icon: '📥', label: 'SDR Inbound',    sub: 'Recebe e qualifica leads',        aviso: '📥 Agente recebe leads vindos de formulários, ads ou chat e qualifica em tempo real — SLA configurável.' },
-  { key: 'renovacao', icon: '🔄', label: 'Renovação',      sub: 'Upsell em base ativa',            aviso: '🔄 Agente contata clientes ativos para renovação, upsell ou prevenção de churn — tom consultivo por padrão.' },
-  { key: 'b2c',       icon: '👤', label: 'B2C',            sub: 'Pessoa física / consumidor',      aviso: '⚠️ Modo B2C ativa regras específicas: sem gatekeeper, personas de consumidor, horários ANATEL pessoa física (9h–21h seg-sex).' },
-  { key: 'nurturing', icon: '🌱', label: 'Nurturing',      sub: 'Multi-toque 30–90 dias',          aviso: '🌱 Sequência de múltiplos toques programada: ligações, e-mails e WhatsApp espaçados ao longo de semanas.' },
+interface TipoConfig {
+  key: TipoCampanha
+  icon: string
+  label: string
+  tag: string
+  tagColor: string
+  quando: string
+  bullets: string[]
+  aviso: string
+  avisoColor: string
+  ci: string
+}
+
+const TIPOS: TipoConfig[] = [
+  {
+    key: 'outbound',
+    icon: '📞',
+    label: 'SDR Outbound',
+    tag: 'Mais usado',
+    tagColor: 'bg-brand-100 text-brand-700',
+    quando: 'Prospecção ativa — lista fria B2B',
+    bullets: [
+      'Agente disca para prospects que nunca ouviram falar de você',
+      'Qualifica pelo ICP, detecta sinais de compra e agenda com o closer',
+      'Modo padrão: cobertura máxima de gatilhos e objeções',
+    ],
+    aviso: 'Ideal para empresas que querem gerar pipeline do zero, sem depender de inbound.',
+    avisoColor: 'bg-brand-50 border-brand-100 text-brand-800',
+    ci: 'ICP Score + Gatilhos de urgência/preço + Cross-cliente ativo',
+  },
+  {
+    key: 'inbound',
+    icon: '📥',
+    label: 'SDR Inbound',
+    tag: 'Alta conversão',
+    tagColor: 'bg-emerald-100 text-emerald-700',
+    quando: 'Qualificar leads que já demonstraram interesse',
+    bullets: [
+      'Agente liga automaticamente para quem preencheu um formulário, clicou num anúncio ou entrou no chat',
+      'SLA configurável: de 5 minutos a 2 horas após o lead chegar',
+      'Lead já quente — taxa de atendimento 2-3× maior que outbound',
+    ],
+    aviso: 'Use quando você já tem tráfego pago ou orgânico gerando leads. O agente substitui o SDR humano na primeira resposta.',
+    avisoColor: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    ci: 'ICP Score + Detecção de urgência + Tempo de resposta como gatilho',
+  },
+  {
+    key: 'renovacao',
+    icon: '🔄',
+    label: 'Renovação',
+    tag: 'Retenção',
+    tagColor: 'bg-blue-100 text-blue-700',
+    quando: 'Reativar ou expandir clientes da base ativa',
+    bullets: [
+      'Agente contata clientes em risco de churn ou com oportunidade de upsell',
+      'Tom consultivo por padrão — foco em relacionamento, não em venda fria',
+      'Usa dados de uso do produto para personalizar o argumento',
+    ],
+    aviso: 'Use para contratos próximos do vencimento, clientes com queda de uso ou base que ainda não expandiu o plano.',
+    avisoColor: 'bg-blue-50 border-blue-200 text-blue-800',
+    ci: 'ICP de churn + Gatilhos de valor/relacionamento + Histórico de interações',
+  },
+  {
+    key: 'b2c',
+    icon: '👤',
+    label: 'B2C',
+    tag: 'Pessoa física',
+    tagColor: 'bg-amber-100 text-amber-700',
+    quando: 'Venda direta para consumidores finais',
+    bullets: [
+      'Sem gatekeeper — agente fala diretamente com o decisor',
+      'Personas ajustadas para consumidor (não empresa)',
+      'Regras ANATEL para pessoa física: 9h–21h seg-sex automaticamente',
+    ],
+    aviso: '⚠️ Atenção: modo B2C ativa regras legais específicas de discagem para pessoa física. Verifique compliance da sua lista antes de ativar.',
+    avisoColor: 'bg-amber-50 border-amber-200 text-amber-800',
+    ci: 'Perfil de consumidor + Gatilhos B2C + Compliance ANATEL automático',
+  },
+  {
+    key: 'nurturing',
+    icon: '🌱',
+    label: 'Nurturing',
+    tag: 'Multi-toque',
+    tagColor: 'bg-violet-100 text-violet-700',
+    quando: 'Leads que precisam de mais tempo para decidir',
+    bullets: [
+      'Sequência programada de 30 a 90 dias: ligações + e-mails + WhatsApp',
+      'Cada toque usa argumentos diferentes para não repetir abordagem',
+      'Ideal para enterprise ou tickets altos com ciclo longo de vendas',
+    ],
+    aviso: 'Use quando o lead reconhece o problema mas ainda não está pronto para decidir. O agente mantém presença sem ser invasivo.',
+    avisoColor: 'bg-violet-50 border-violet-200 text-violet-800',
+    ci: 'Sequência de gatilhos por fase + Aprendizado entre toques + Cross-cliente de objeções',
+  },
 ]
 
 const SEGMENTOS = ['Indústria','Comércio / Varejo','Tecnologia / SaaS','Agronegócio','Serviços','Saúde','Construção Civil','Educação','Logística','Financeiro']
@@ -166,20 +254,58 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
           {/* ── TIPO DE CAMPANHA ── */}
           <div>
             <p className="section-label mb-3">Tipo de campanha</p>
-            <div className="grid grid-cols-5 gap-2">
-              {TIPOS.map(t => (
+
+            {/* Cards — grid 2+3 */}
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {TIPOS.slice(0, 2).map(t => (
                 <button key={t.key} type="button" onClick={() => s('tipo', t.key)}
-                  className={clsx('flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all text-center',
-                    form.tipo === t.key ? 'border-brand bg-brand-50' : 'border-gray-100 hover:border-gray-200')}>
-                  <span className="text-2xl">{t.icon}</span>
-                  <span className={clsx('text-xs font-bold leading-tight', form.tipo === t.key ? 'text-brand-700' : 'text-gray-700')}>{t.label}</span>
-                  <span className="text-2xs text-gray-400 leading-tight">{t.sub}</span>
+                  className={clsx('flex flex-col gap-2 p-3.5 rounded-xl border-2 transition-all text-left',
+                    form.tipo === t.key ? 'border-brand bg-brand-50' : 'border-gray-100 hover:border-gray-200 bg-white')}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">{t.icon}</span>
+                    <span className={clsx('text-2xs font-bold px-1.5 py-0.5 rounded-full', t.tagColor)}>{t.tag}</span>
+                  </div>
+                  <div>
+                    <p className={clsx('text-xs font-bold', form.tipo === t.key ? 'text-brand-700' : 'text-gray-800')}>{t.label}</p>
+                    <p className="text-2xs text-gray-400 mt-0.5 leading-tight">{t.quando}</p>
+                  </div>
                 </button>
               ))}
             </div>
-            <div className={clsx('mt-3 p-3 rounded-lg text-xs text-gray-600 leading-relaxed',
-              form.tipo === 'b2c' ? 'bg-amber-50 border border-amber-200' : 'bg-brand-50 border border-brand-100')}>
-              {tipoAtual.aviso}
+            <div className="grid grid-cols-3 gap-2">
+              {TIPOS.slice(2).map(t => (
+                <button key={t.key} type="button" onClick={() => s('tipo', t.key)}
+                  className={clsx('flex flex-col gap-2 p-3.5 rounded-xl border-2 transition-all text-left',
+                    form.tipo === t.key ? 'border-brand bg-brand-50' : 'border-gray-100 hover:border-gray-200 bg-white')}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">{t.icon}</span>
+                    <span className={clsx('text-2xs font-bold px-1.5 py-0.5 rounded-full', t.tagColor)}>{t.tag}</span>
+                  </div>
+                  <div>
+                    <p className={clsx('text-xs font-bold', form.tipo === t.key ? 'text-brand-700' : 'text-gray-800')}>{t.label}</p>
+                    <p className="text-2xs text-gray-400 mt-0.5 leading-tight">{t.quando}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Painel de detalhes do tipo selecionado */}
+            <div className={clsx('mt-3 rounded-xl border p-4 transition-all', tipoAtual.avisoColor)}>
+              <div className="flex flex-col gap-2.5">
+                <ul className="flex flex-col gap-1.5">
+                  {tipoAtual.bullets.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs leading-relaxed">
+                      <span className="mt-0.5 flex-shrink-0 opacity-60">•</span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs leading-relaxed opacity-80 border-t border-current/10 pt-2.5">{tipoAtual.aviso}</p>
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <span className="text-2xs font-bold opacity-50 uppercase tracking-wide">CI ativo:</span>
+                  <span className="text-2xs font-medium opacity-70">{tipoAtual.ci}</span>
+                </div>
+              </div>
             </div>
 
             {/* Painel Inbound */}
