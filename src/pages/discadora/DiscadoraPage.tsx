@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi, whatsappUsuarioApi } from '@/services/api'
+import { useWebRTCPhone } from '@/hooks/useWebRTCPhone'
 import { useAuthStore } from '@/store/authStore'
 import {
   PhoneCall, Calendar, Mic, MicOff, Phone, PhoneOff, Radio, History, Antenna,
@@ -1722,71 +1723,59 @@ function TabGravacoes() {
 // ─── ABA MANUAL ──────────────────────────────────────────────────────────────
 
 function TabManual() {
-  useAuthStore() // mantém store ativo; user disponível se necessário no futuro
+  useAuthStore()
 
-  const [busca, setBusca]               = useState('')
-  const [motivo, setMotivo]             = useState('Reagendamento — cliente não entrou na reunião')
-  const [anotacao, setAnotacao]         = useState('')
+  // ── WebRTC (microfone do browser → cliente) ──────────────────────────────
+  const [webrtc, webrtcActions] = useWebRTCPhone()
+
+  // ── Formulário ────────────────────────────────────────────────────────────
+  const [busca, setBusca]     = useState('')
+  const [motivo, setMotivo]   = useState('Reagendamento — cliente não entrou na reunião')
+  const [anotacao, setAnotacao] = useState('')
   const [notaEmChamada, setNotaEmChamada] = useState('')
-  const [contato, setContato]           = useState<{ id?: string; nome: string; empresa: string; tel: string; email: string } | null>(null)
-  const [numero, setNumero]             = useState('')
-  const [chamandoAtiva, setChamandoAtiva] = useState(false)
-  const [ligacaoId, setLigacaoId]       = useState<string | null>(null)   // ID da row ligacoes (para PATCH)
-  const [callId, setCallId]             = useState<string | null>(null)   // call_control_id (Telnyx)
-  const [resultado, setResultado]       = useState<string | null>(null)
-  const [salvando, setSalvando]         = useState(false)
-  const [timer, setTimer]               = useState(0)
-  const [waLoading, setWaLoading]       = useState(false)
-  const [waMsg, setWaMsg]               = useState<string | null>(null)
-  const [waMsgTexto, setWaMsgTexto]     = useState('')
-  const [waHistorico, setWaHistorico]   = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
-  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollingRef   = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Fase da chamada: discando_vendedor → discando_cliente → atendida | null
-  const [faseCall, setFaseCall]         = useState<'discando_vendedor' | 'discando_cliente' | 'discando' | 'atendida' | null>(null)
-  // Telefone do vendedor (necessário para chamada de 2 pernas)
-  const [telefoneVendedor, setTelefoneVendedor] = useState('')
-  // Dados editáveis no CallCard
+  const [contato, setContato] = useState<{ id?: string; nome: string; empresa: string; tel: string; email: string } | null>(null)
+  const [numero, setNumero]   = useState('')
+
+  // ── Estado da sessão ──────────────────────────────────────────────────────
+  const [ligacaoId, setLigacaoId] = useState<string | null>(null)
+  const [resultado, setResultado] = useState<string | null>(null)
+  const [salvando, setSalvando]   = useState(false)
+
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
+  const [waLoading, setWaLoading]   = useState(false)
+  const [waMsg, setWaMsg]           = useState<string | null>(null)
+  const [waMsgTexto, setWaMsgTexto] = useState('')
+  const [waHistorico, setWaHistorico] = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
+
+  // ── DTMF teclado ──────────────────────────────────────────────────────────
+  const [mostrarDtmf, setMostrarDtmf] = useState(false)
+  const [toastCtrl, setToastCtrl]     = useState<string | null>(null)
+
+  // ── CallCard ──────────────────────────────────────────────────────────────
+  const [callCard, setCallCard]               = useState<any | null>(null)
   const [callCardResultado, setCallCardResultado] = useState('')
   const [callCardAnotacao, setCallCardAnotacao]   = useState('')
   const [salvandoCard, setSalvandoCard]           = useState(false)
-  // Controles de chamada (só disponíveis quando atendida)
-  const [mudo, setMudo]                 = useState(false)
-  const [emEspera, setEmEspera]         = useState(false)
-  const [mostrarDtmf, setMostrarDtmf]   = useState(false)
-  const [toastCtrl, setToastCtrl]       = useState<string | null>(null)
-  // Card de detalhes da chamada
-  const [callCard, setCallCard]         = useState<any | null>(null)
+
+  // Mapeamentos do status WebRTC para lógica de UI
+  const chamandoAtiva = webrtc.status === 'ringing' || webrtc.status === 'active'
+  const faseAtendida  = webrtc.status === 'active'
+  const faseDiscando  = webrtc.status === 'ringing'
+  const timer         = webrtc.timer
+  const mudo          = webrtc.muted
+  const emEspera      = webrtc.held
 
   function toastControl(m: string) { setToastCtrl(m); setTimeout(() => setToastCtrl(null), 3000) }
 
-  // Inicia polling de status da ligação para detectar atendimento e encerramento
-  function iniciarPolling(id: string) {
-    if (pollingRef.current) clearInterval(pollingRef.current)
-    pollingRef.current = setInterval(async () => {
-      try {
-        const { data: lista } = await ligacoesApi.list({})
-        const lig = (lista as any[]).find(l => l.id === id)
-        if (!lig) return
-        // Progresso dos estados da chamada de 2 pernas
-        if (lig.status === 'discando_cliente') setFaseCall('discando_cliente')
-        if (lig.status === 'em_andamento' || lig.atendida_em) setFaseCall('atendida')
-        // Telnyx encerrou a chamada remotamente (ex: cliente desligou)
-        if (lig.status === 'encerrada' && faseCall !== null) {
-          if (pollingRef.current) clearInterval(pollingRef.current)
-          if (intervalRef.current) clearInterval(intervalRef.current)
-          setChamandoAtiva(false)
-          setFaseCall(null)
-          setResultado('encerrar')
-          refetchHistorico()
-        }
-      } catch { /* polling silencioso */ }
-    }, 2000)
-  }
-
-  function pararPolling() {
-    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null }
-  }
+  // Quando WebRTC detecta fim de chamada, mostra tela de resultado
+  const prevStatusRef = useRef<string>('')
+  useEffect(() => {
+    if (webrtc.status === 'hangup' && prevStatusRef.current !== 'hangup' && chamandoAtiva === false && resultado === null) {
+      setResultado('encerrar')
+      refetchHistorico()
+    }
+    prevStatusRef.current = webrtc.status
+  }, [webrtc.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Busca de contatos via API
   const { data: sugestoesRaw = [] } = useQuery({
@@ -1811,52 +1800,32 @@ function TabManual() {
     refetchInterval: 15000,
   })
 
+  // Ativa o microfone e conecta ao Telnyx (deve ser chamado antes do primeiro ligar)
+  async function ativarMicrofone() {
+    await webrtcActions.init()
+  }
+
   async function ligar() {
     const tel = contato?.tel || numero
-    if (!tel) return
-    setChamandoAtiva(true)
-    setFaseCall(telefoneVendedor.trim() ? 'discando_vendedor' : 'discando')
+    if (!tel || webrtc.status !== 'ready') return
     setResultado(null)
     setNotaEmChamada('')
-    setMudo(false)
-    setEmEspera(false)
     setMostrarDtmf(false)
-    setTimer(0)
-    intervalRef.current = setInterval(() => setTimer(t => t + 1), 1000)
-    try {
-      const res = await ligacoesApi.create({
-        numero_destino:  tel,
-        numero_vendedor: telefoneVendedor.trim() || undefined,
-        contato_id:      contato?.id || undefined,
-        iniciar_agora:   true,
-        tipo_ligacao:    'manual',
-        motivo,
-        anotacao_pre:    anotacao || undefined,
-      })
-      const d = res.data as any
-      setCallId(d?.call_control_id ?? null)
-      const newId = d?.id ?? null
-      setLigacaoId(newId)
-      if (newId) iniciarPolling(newId)
-    } catch (err) {
-      console.error('Erro ao iniciar chamada manual:', err)
-      setChamandoAtiva(false)
-      setFaseCall(null)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
+    const id = await webrtcActions.dial(tel, {
+      motivo,
+      anotacao:   anotacao || undefined,
+      contato_id: contato?.id,
+    })
+    if (id) setLigacaoId(id)
   }
 
   async function registrarResultado(res: string) {
     setSalvando(true)
-    pararPolling()
-    if (intervalRef.current) clearInterval(intervalRef.current)
 
-    // 1. Salva nota em-chamada via /anotacao (CI ingestion) se houver
-    if (callId && notaEmChamada.trim()) {
-      try { await ligacoesApi.anotacao(callId, notaEmChamada) } catch (_) {}
-    }
+    // Encerra chamada WebRTC
+    webrtcActions.hangup()
 
-    // 2. Persiste resultado + nota na row ligacoes
+    // Persiste resultado + nota na row ligacoes
     if (ligacaoId) {
       try {
         await ligacoesApi.update(ligacaoId, {
@@ -1867,26 +1836,17 @@ function TabManual() {
       } catch (_) {}
     }
 
-    // 3. Encerra chamada no Telnyx
-    if (callId) {
-      try { await ligacoesApi.encerrar(callId) } catch (_) {}
-    }
-
     setResultado(res)
-    setChamandoAtiva(false)
     setSalvando(false)
     refetchHistorico()
   }
 
-  async function desligar() {
-    pararPolling()
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    if (ligacaoId) {
-      try { await ligacoesApi.desligar(ligacaoId) } catch (_) {}
-    }
-    setChamandoAtiva(false)
-    setFaseCall(null)
+  function desligar() {
+    webrtcActions.hangup()
     setResultado('encerrar')
+    if (ligacaoId) {
+      ligacoesApi.update(ligacaoId, { status: 'encerrada', resultado: 'encerrar' }).catch(() => {})
+    }
     refetchHistorico()
   }
 
@@ -2168,21 +2128,43 @@ function TabManual() {
               </>
             )}
 
-            {/* Telefone do vendedor — necessário para 2-pernas */}
-            <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5">
-                Seu telefone <span className="text-red-500">*</span>
-                <span className="text-gray-400 font-normal ml-1">(Telnyx liga aqui primeiro)</span>
-              </label>
-              <input
-                className="input font-mono text-sm tracking-widest"
-                placeholder="(34) 99143-2096"
-                type="tel"
-                value={telefoneVendedor}
-                onChange={e => setTelefoneVendedor(e.target.value)}
-                disabled={chamandoAtiva}
-              />
-            </div>
+            {/* Status WebRTC */}
+            {webrtc.status === 'idle' && (
+              <button onClick={ativarMicrofone}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors">
+                <Mic size={13}/> Ativar microfone do computador
+              </button>
+            )}
+            {(webrtc.status === 'initializing' || webrtc.status === 'connecting') && (
+              <div className="flex items-center gap-2 py-2 px-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <RefreshCw size={12} className="text-blue-600 animate-spin"/>
+                <span className="text-xs text-blue-700 font-medium">Conectando ao Telnyx…</span>
+              </div>
+            )}
+            {webrtc.status === 'ready' && (
+              <div className="flex items-center gap-2 py-2 px-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>
+                <span className="text-xs text-emerald-700 font-medium">Microfone ativo — pronto para ligar</span>
+              </div>
+            )}
+            {webrtc.status === 'error' && (
+              <div className="flex flex-col gap-1 py-2 px-3 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-red-700 font-medium">
+                    {webrtc.setupRequired ? '⚙️ Configuração necessária' : '❌ Erro WebRTC'}
+                  </span>
+                  <button onClick={ativarMicrofone} className="text-2xs text-red-600 underline">Tentar novamente</button>
+                </div>
+                {webrtc.setupRequired && (
+                  <p className="text-2xs text-red-600">
+                    Crie uma <b>Credential-Based SIP Connection</b> no painel Telnyx e adicione o ID como <code>TELNYX_SIP_CONNECTION_ID</code> no Railway.
+                  </p>
+                )}
+                {!webrtc.setupRequired && webrtc.error && (
+                  <p className="text-2xs text-red-500 truncate">{webrtc.error}</p>
+                )}
+              </div>
+            )}
 
             {/* Motivo */}
             <div>
@@ -2205,14 +2187,16 @@ function TabManual() {
                 placeholder="Ex: não atendeu o Meet de 14/05. Tentar reagendar..." />
             </div>
 
-            <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero) || !telefoneVendedor.trim()}
+            <button
+              onClick={webrtc.status === 'idle' || webrtc.status === 'error' ? ativarMicrofone : ligar}
+              disabled={chamandoAtiva || (!contato && !numero) || webrtc.status === 'initializing' || webrtc.status === 'connecting'}
               className="btn-primary w-full justify-center gap-2 py-2.5 text-sm disabled:opacity-60">
               <Phone size={14}/>
-              {chamandoAtiva ? '📞 Em ligação...' : '📞 Ligar agora'}
+              {chamandoAtiva ? '📞 Em ligação...'
+                : webrtc.status === 'ready' ? '📞 Ligar agora'
+                : webrtc.status === 'initializing' || webrtc.status === 'connecting' ? 'Conectando…'
+                : '🎤 Ativar e ligar'}
             </button>
-            {!telefoneVendedor.trim() && !chamandoAtiva && (
-              <p className="text-2xs text-amber-600 text-center">Preencha seu telefone para receber a chamada</p>
-            )}
           </div>
         </div>
 
@@ -2278,37 +2262,21 @@ function TabManual() {
                 <div className="text-base font-bold text-gray-900">{contato?.nome ?? (contato?.tel || numero)}</div>
                 <div className="text-xs text-gray-500">{contato?.empresa ?? 'Contato manual'}</div>
                 <div className="text-2xl font-mono font-bold text-gray-900 mt-1">{formatTimer(timer)}</div>
-                {faseCall === 'discando_vendedor' && (
-                  <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                    <RefreshCw size={10} className="animate-spin"/> Aguardando você atender o telefone…
-                  </span>
-                )}
-                {faseCall === 'discando_cliente' && (
-                  <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
-                    <RefreshCw size={10} className="animate-spin"/> Discando o cliente…
-                  </span>
-                )}
-                {(faseCall === 'discando') && (
+                {faseDiscando && (
                   <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
                     <RefreshCw size={10} className="animate-spin"/> Discando…
                   </span>
                 )}
-                {faseCall === 'atendida' && (
+                {faseAtendida && (
                   <span className="badge badge-success mt-1 animate-pulse text-2xs">● Em chamada</span>
                 )}
                 {motivo && <span className="text-2xs text-gray-500 font-medium mt-0.5 text-center">{motivo}</span>}
               </div>
 
-              {/* Aviso por fase */}
-              {faseCall === 'discando_vendedor' && (
-                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-center">
-                  <p className="text-xs text-blue-700 font-medium">📱 Atenda o seu telefone ({telefoneVendedor})</p>
-                  <p className="text-2xs text-blue-500 mt-0.5">Após você atender, o sistema liga automaticamente para o cliente</p>
-                </div>
-              )}
-              {(faseCall === 'discando_cliente' || faseCall === 'discando') && (
+              {/* Aviso quando discando */}
+              {faseDiscando && (
                 <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-center">
-                  <p className="text-xs text-amber-700 font-medium">Discando para o cliente…</p>
+                  <p className="text-xs text-amber-700 font-medium">🔊 Aguardando o cliente atender…</p>
                   <p className="text-2xs text-amber-500 mt-0.5">Os controles ficam disponíveis quando ele atender</p>
                 </div>
               )}
@@ -2322,16 +2290,12 @@ function TabManual() {
               </div>
 
               {/* ── Controles de chamada (só quando atendida) ── */}
-              <div className={clsx('flex items-center justify-center gap-3 mb-4 pb-4 border-b border-gray-100', faseCall !== 'atendida' && 'opacity-30 pointer-events-none')}>
+              <div className={clsx('flex items-center justify-center gap-3 mb-4 pb-4 border-b border-gray-100', !faseAtendida && 'opacity-30 pointer-events-none')}>
                 {/* Mudo */}
                 <button
-                  onClick={async () => {
-                    if (!callId) return
-                    try {
-                      await ligacoesApi.mudo(callId, !mudo)
-                      setMudo(m => !m)
-                      toastControl(mudo ? 'Microfone ativado' : 'Microfone mudo')
-                    } catch { toastControl('Erro ao mudar estado do microfone') }
+                  onClick={() => {
+                    webrtcActions.toggleMute()
+                    toastControl(mudo ? 'Microfone ativado' : 'Microfone mudo')
                   }}
                   title={mudo ? 'Ativar microfone' : 'Mutar microfone'}
                   className={clsx(
@@ -2344,13 +2308,9 @@ function TabManual() {
 
                 {/* Espera */}
                 <button
-                  onClick={async () => {
-                    if (!callId) return
-                    try {
-                      await ligacoesApi.espera(callId, !emEspera)
-                      setEmEspera(e => !e)
-                      toastControl(emEspera ? 'Chamada retomada' : 'Chamada em espera')
-                    } catch { toastControl('Erro ao colocar em espera') }
+                  onClick={() => {
+                    webrtcActions.toggleHold()
+                    toastControl(emEspera ? 'Chamada retomada' : 'Chamada em espera')
                   }}
                   title={emEspera ? 'Retomar chamada' : 'Colocar em espera'}
                   className={clsx(
@@ -2375,15 +2335,14 @@ function TabManual() {
               </div>
 
               {/* Teclado DTMF expandido */}
-              {mostrarDtmf && callId && (
+              {mostrarDtmf && (
                 <div className="mb-4 bg-gray-50 rounded-xl p-3 border border-gray-200">
                   <p className="text-2xs text-gray-500 text-center mb-2 font-medium">Teclado para URA / menus automáticos</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {['1','2','3','4','5','6','7','8','9','*','0','#'].map(d => (
                       <button key={d}
                         onClick={async () => {
-                          try { await ligacoesApi.dtmf(callId, d); toastControl(`Dígito ${d} enviado`) }
-                          catch { toastControl('Erro ao enviar dígito') }
+                          webrtcActions.sendDtmf(d); toastControl(`Dígito ${d} enviado`)
                         }}
                         className="h-9 rounded-lg bg-white border border-gray-200 text-sm font-bold text-gray-700 hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors">
                         {d}
@@ -2401,10 +2360,10 @@ function TabManual() {
                 </label>
                 <textarea
                   className="input min-h-[70px] resize-none text-xs"
-                  disabled={faseCall === 'discando'}
+                  disabled={faseDiscando}
                   value={notaEmChamada}
                   onChange={e => setNotaEmChamada(e.target.value)}
-                  placeholder={faseCall === 'discando' ? 'Disponível quando o cliente atender…' : 'Objeções, interesse, próximos passos...'}/>
+                  placeholder={faseDiscando ? 'Disponível quando o cliente atender…' : 'Objeções, interesse, próximos passos...'}/>
               </div>
 
               {/* Botões de resultado */}
@@ -2415,7 +2374,7 @@ function TabManual() {
                   { id:'nao_atendeu', label:'📵 Não atendeu',       cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
                   { id:'encerrar',    label:'⏹ Encerrar',           cls:'border-gray-300 text-gray-600 hover:bg-gray-50' },
                 ].map(btn => (
-                  <button key={btn.id} onClick={() => { registrarResultado(btn.id); setMudo(false); setEmEspera(false); setMostrarDtmf(false); setFaseCall(null) }} disabled={salvando}
+                  <button key={btn.id} onClick={() => { registrarResultado(btn.id); setMostrarDtmf(false) }} disabled={salvando}
                     className={clsx('text-xs font-semibold py-2.5 px-3 rounded-xl border bg-white transition-colors disabled:opacity-50', btn.cls)}>
                     {btn.label}
                   </button>
@@ -2452,7 +2411,7 @@ function TabManual() {
                   <p className="text-2xs text-brand-600">As anotações treinam o agente desta conta</p>
                 </div>
               </div>
-              <button onClick={() => { setResultado(null); setNotaEmChamada(''); setAnotacao(''); setContato(null); setNumero(''); setMudo(false); setEmEspera(false); setFaseCall(null); pararPolling() }}
+              <button onClick={() => { setResultado(null); setNotaEmChamada(''); setAnotacao(''); setContato(null); setNumero(''); webrtcActions.reset() }}
                 className="btn-secondary mt-4 text-sm gap-2">
                 <RotateCcw size={13}/> Nova chamada
               </button>

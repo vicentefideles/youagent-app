@@ -105,6 +105,12 @@ export const ligacoesApi = {
     api.post(`/ligacoes/${callControlId}/falar`, data),
 }
 
+// WebRTC
+export const webrtcApi = {
+  getToken: () => api.get('/webrtc/token'),
+  deleteCredential: (id: string) => api.delete(`/webrtc/credential/${id}`),
+}
+
 // Reuniões
 export const reunioesApi = {
   list:   (params?: { agente_id?: string; cliente_id?: string }) => {
