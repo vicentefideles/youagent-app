@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   QrCode,
   RefreshCw,
-  Send,
   WifiOff,
 } from 'lucide-react'
 import { useProfile } from '@/context/ProfileContext'
@@ -1675,10 +1674,6 @@ function SectionMeuWhatsApp() {
   const [qr, setQr]                 = useState<string | null>(null)
   const [loadingQr, setLoadingQr]   = useState(false)
   const [polling, setPolling]       = useState(false)
-  const [tel, setTel]               = useState('')
-  const [msg, setMsg]               = useState('')
-  const [historico, setHistorico]   = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
-  const [loadingEnvio, setLoadingEnvio] = useState(false)
   const [toast, setToast]           = useState<string | null>(null)
 
   function showToast(t: string) { setToast(t); setTimeout(() => setToast(null), 4000) }
@@ -1742,29 +1737,6 @@ function SectionMeuWhatsApp() {
       showToast('WhatsApp desconectado.')
     } catch (e: any) {
       showToast('Erro ao desconectar — ' + (e?.response?.data?.error ?? e.message))
-    }
-  }
-
-  async function carregarHistorico() {
-    if (!tel.trim()) return
-    try {
-      const r = await whatsappUsuarioApi.historico(tel.trim())
-      setHistorico(r.data as any[])
-    } catch (_) { setHistorico([]) }
-  }
-
-  async function enviarMensagem() {
-    if (!tel.trim() || !msg.trim()) return
-    setLoadingEnvio(true)
-    try {
-      await whatsappUsuarioApi.enviar({ telefone: tel.trim(), mensagem: msg.trim() })
-      setHistorico(h => [...h, { direcao: 'enviada', mensagem: msg.trim(), criado_em: new Date().toISOString() }])
-      setMsg('')
-      showToast('✓ Mensagem enviada')
-    } catch (e: any) {
-      showToast('Erro: ' + (e?.response?.data?.error ?? e.message))
-    } finally {
-      setLoadingEnvio(false)
     }
   }
 
@@ -1839,50 +1811,16 @@ function SectionMeuWhatsApp() {
         </div>
       </div>
 
-      {/* Painel de mensagens */}
+      {/* Info: mensagens ficam na Discadora */}
       {status === 'conectado' && (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-900">Enviar mensagem</h3>
-            <p className="text-xs text-gray-500 mt-0.5">As mensagens ficam salvas com histórico por contato</p>
-          </div>
-          <div className="p-4 flex flex-col gap-3">
-            <div className="flex gap-2">
-              <input className="input flex-1 font-mono text-sm" placeholder="(11) 99999-9999" type="tel"
-                value={tel} onChange={e => setTel(e.target.value)}
-                onBlur={carregarHistorico}/>
-            </div>
-
-            {/* Histórico */}
-            {historico.length > 0 && (
-              <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 bg-gray-50 rounded-xl p-3 border border-gray-100">
-                {historico.map((m, i) => (
-                  <div key={i} className={`flex ${m.direcao === 'enviada' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
-                      m.direcao === 'enviada'
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-white border border-gray-200 text-gray-800'
-                    }`}>
-                      <p>{m.mensagem}</p>
-                      <p className={`text-2xs mt-0.5 ${m.direcao === 'enviada' ? 'text-emerald-200' : 'text-gray-400'}`}>
-                        {new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-2 items-end">
-              <textarea className="input flex-1 min-h-[72px] resize-none text-sm" placeholder="Digite sua mensagem..."
-                value={msg} onChange={e => setMsg(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem() } }}/>
-              <button onClick={enviarMensagem} disabled={loadingEnvio || !tel || !msg}
-                className="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white transition-colors flex-shrink-0">
-                {loadingEnvio ? <RefreshCw size={16} className="animate-spin"/> : <Send size={16}/>}
-              </button>
-            </div>
-            <p className="text-2xs text-gray-400">Enter para enviar · Shift+Enter para nova linha</p>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+          <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0 mt-0.5"/>
+          <div>
+            <p className="text-sm font-semibold text-emerald-800">WhatsApp conectado e pronto para uso</p>
+            <p className="text-xs text-emerald-700 mt-0.5">
+              Para enviar mensagens e ver o histórico de conversas, acesse <strong>Discadora → Chamada Manual</strong>.
+              As mensagens são enviadas pelo seu número pessoal e ficam salvas por contato.
+            </p>
           </div>
         </div>
       )}

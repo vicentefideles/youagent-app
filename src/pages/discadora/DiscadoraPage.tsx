@@ -1855,20 +1855,27 @@ function TabManual() {
     encerrar:     'Chamada encerrada',
   }
 
+  // Templates WhatsApp pré-definidos
+  const WA_TEMPLATES = [
+    { id:'nao_atendeu',   label:'Não atendeu',        texto: `Olá${contato?.nome ? `, ${contato.nome}` : ''}! 👋 Ligamos agora mas não conseguimos falar com você. Gostaria de conversar? Posso te ligar novamente ou prefere marcar um horário? 📅` },
+    { id:'follow_up',     label:'Follow-up',           texto: `Olá${contato?.nome ? `, ${contato.nome}` : ''}! 😊 Passando para dar continuidade ao nosso contato. Tem algum momento para conversarmos? 🚀` },
+    { id:'confirmacao',   label:'Confirmar reunião',   texto: `Olá${contato?.nome ? `, ${contato.nome}` : ''}! ✅ Confirmando nossa reunião agendada. Qualquer dúvida é só responder aqui. Até lá!` },
+    { id:'reagendamento', label:'Reagendamento',       texto: `Olá${contato?.nome ? `, ${contato.nome}` : ''}! 🔄 Preciso reagendar nossa conversa. Qual seria o melhor horário para você?` },
+    { id:'proposta',      label:'Proposta comercial',  texto: `Olá${contato?.nome ? `, ${contato.nome}` : ''}! 💼 Gostaria de apresentar uma proposta personalizada para ${contato?.empresa ?? 'sua empresa'}. Podemos conversar?` },
+    { id:'personalizada', label:'✏️ Personalizada',    texto: '' },
+  ]
+
   return (
-    <div className="grid grid-cols-[400px_1fr] gap-4">
-      {/* ── Painel esquerdo ── */}
+    <div className="grid grid-cols-[340px_1fr_360px] gap-4">
+
+      {/* ── Col 1: Contato + Ligação ── */}
       <div className="flex flex-col gap-3">
         <div className="card">
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-900">Realizar chamada manual</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Ligue diretamente para um cliente pelo sistema</p>
+          <div className="p-4 border-b border-gray-100 flex items-center gap-2">
+            <Phone size={15} className="text-brand-600"/>
+            <h3 className="text-sm font-semibold text-gray-900">Chamada manual</h3>
           </div>
-          <div className="p-4 flex flex-col gap-4">
-            <div className="bg-brand-50 rounded-lg p-3 text-xs text-brand-700 flex gap-2">
-              <span className="flex-shrink-0">✦</span>
-              <span>Use para reagendamentos, follow-up pós-reunião ou quando o cliente não entrou na reunião. A ligação sai pelo sistema com o mesmo número configurado.</span>
-            </div>
+          <div className="p-4 flex flex-col gap-3">
 
             {/* Busca de contato */}
             <div>
@@ -1883,7 +1890,6 @@ function TabManual() {
                     <div key={s.id} className="p-2.5 hover:bg-brand-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
                       onClick={() => {
                         setContato(s); setBusca('')
-                        // Carrega histórico WA do contato ao selecionar
                         if (s.tel) whatsappUsuarioApi.historico(s.tel).then(r => setWaHistorico(r.data as any[])).catch(() => {})
                       }}>
                       <div className="text-sm font-medium text-gray-900">{s.nome}</div>
@@ -1895,40 +1901,34 @@ function TabManual() {
             </div>
 
             {/* Contato selecionado */}
-            {contato && (
-              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 text-sm font-bold flex items-center justify-center">
+            {contato ? (
+              <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-brand-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
                     {contato.nome.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                   </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-gray-900">{contato.nome}</div>
-                    <div className="text-xs text-gray-500">{contato.empresa}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 truncate">{contato.nome}</div>
+                    <div className="text-xs text-gray-500 truncate">{contato.empresa}</div>
                   </div>
-                  <button onClick={() => setContato(null)} className="p-1 rounded-lg hover:bg-gray-200 transition-colors">
-                    <XCircle size={15} className="text-gray-400"/>
+                  <button onClick={() => { setContato(null); setWaHistorico([]) }} className="p-1 rounded-lg hover:bg-brand-100">
+                    <XCircle size={14} className="text-brand-400"/>
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">Telefone</span><span className="font-mono">{contato.tel}</span></div>
-                  <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">E-mail</span><span className="text-brand-600 truncate block">{contato.email}</span></div>
-                </div>
+                <div className="text-xs font-mono text-brand-700 font-semibold">{contato.tel}</div>
               </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2"><div className="flex-1 h-px bg-gray-200"/><span className="text-2xs text-gray-400">ou número avulso</span><div className="flex-1 h-px bg-gray-200"/></div>
+                <input className="input font-mono text-sm tracking-widest" placeholder="(11) 99999-9999"
+                  type="tel" value={numero} onChange={e => setNumero(e.target.value)}/>
+              </>
             )}
-
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gray-200"/>
-              <span className="text-xs text-gray-400">ou digitar número</span>
-              <div className="flex-1 h-px bg-gray-200"/>
-            </div>
-
-            <input className="input font-mono text-sm tracking-widest" placeholder="(11) 99999-9999"
-              type="tel" value={numero} onChange={e => setNumero(e.target.value)}/>
 
             {/* Motivo */}
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5">Motivo da ligação</label>
-              <select className="input" value={motivo} onChange={e => setMotivo(e.target.value)}>
+              <label className="text-xs font-medium text-gray-700 block mb-1.5">Motivo</label>
+              <select className="input text-xs" value={motivo} onChange={e => setMotivo(e.target.value)}>
                 <option>Reagendamento — cliente não entrou na reunião</option>
                 <option>Follow-up pós-reunião</option>
                 <option>Confirmação de reunião</option>
@@ -1938,80 +1938,50 @@ function TabManual() {
               </select>
             </div>
 
-            {/* Anotação pré-ligação */}
+            {/* Anotação */}
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Anotação pré-ligação</label>
-              <textarea className="input min-h-[64px] resize-none" value={anotacao}
+              <textarea className="input min-h-[56px] resize-none text-xs" value={anotacao}
                 onChange={e => setAnotacao(e.target.value)}
-                placeholder="Ex: Cliente não atendeu o Google Meet de 14/05 às 14h. Tentar reagendar..." />
+                placeholder="Ex: não atendeu o Meet de 14/05. Tentar reagendar..." />
             </div>
 
-            {/* Botão Ligar */}
             <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero)}
-              className="btn-primary w-full justify-center gap-2 py-3 text-sm disabled:opacity-60">
-              <Phone size={15}/>
+              className="btn-primary w-full justify-center gap-2 py-2.5 text-sm disabled:opacity-60">
+              <Phone size={14}/>
               {chamandoAtiva ? '📞 Em ligação...' : '📞 Ligar agora'}
             </button>
-
-            {/* Painel WhatsApp */}
-            <div className="border border-emerald-200 rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border-b border-emerald-100">
-                <MessageSquare size={13} className="text-emerald-700"/>
-                <span className="text-xs font-semibold text-emerald-800">WhatsApp</span>
-                <span className="text-2xs text-emerald-600 ml-auto">pelo seu número conectado</span>
-              </div>
-
-              {/* Histórico de conversa */}
-              {waHistorico.length > 0 && (
-                <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 bg-gray-50 px-3 py-2 border-b border-gray-100">
-                  {waHistorico.map((m, i) => (
-                    <div key={i} className={`flex ${m.direcao === 'enviada' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-xs ${
-                        m.direcao === 'enviada' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
-                      }`}>
-                        <p className="leading-relaxed">{m.mensagem}</p>
-                        <p className={`text-2xs mt-0.5 ${m.direcao === 'enviada' ? 'text-emerald-200' : 'text-gray-400'}`}>
-                          {new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {waHistorico.length === 0 && (contato || numero) && (
-                <div className="px-3 py-2 bg-gray-50 text-2xs text-gray-400 text-center border-b border-gray-100">
-                  Sem histórico com este contato
-                </div>
-              )}
-
-              {/* Campo de mensagem */}
-              <div className="p-3 flex flex-col gap-2">
-                <textarea
-                  className="input min-h-[56px] resize-none text-xs"
-                  placeholder={`Mensagem para ${contato?.nome ?? 'contato'}… (padrão: motivo da ligação)`}
-                  value={waMsgTexto}
-                  onChange={e => setWaMsgTexto(e.target.value)}
-                />
-                <button onClick={enviarWhatsApp}
-                  disabled={waLoading || (!contato && !numero)}
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                  style={{ backgroundColor: '#25d366', color: 'white' }}>
-                  <MessageSquare size={12}/>
-                  {waLoading ? 'Enviando…' : 'Enviar WhatsApp'}
-                </button>
-                {waMsg && (
-                  <p className={clsx('text-xs font-medium', waMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
-                    {waMsg}
-                  </p>
-                )}
-              </div>
-            </div>
           </div>
+        </div>
+
+        {/* Histórico de chamadas */}
+        <div className="card p-4">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Últimas chamadas</h3>
+          {historicoRaw.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-3">Nenhuma chamada manual ainda.</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {(historicoRaw as any[]).slice(0,5).map((h: any, i: number) => {
+                const res = (h.resultado ?? 'encerrada') as string
+                const labelMap: Record<string,string> = { reagendou:'Reagendou', confirmou:'Confirmou', nao_atendeu:'Não atendeu', encerrada:'Encerrada', agendada:'Agendou' }
+                const cls = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
+                return (
+                  <div key={h.id ?? i} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                    <User size={12} className="text-gray-400 flex-shrink-0"/>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-gray-800 truncate">{h.contatos?.empresa ?? h.numero_destino ?? '—'}</div>
+                      {h.motivo && <div className="text-2xs text-gray-400 truncate">{h.motivo}</div>}
+                    </div>
+                    <span className={clsx('badge text-2xs flex-shrink-0', cls)}>{labelMap[res] ?? res}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Painel direito ── */}
+      {/* ── Col 2: Chamada ativa ── */}
       <div className="flex flex-col gap-4">
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-gray-100">
@@ -2093,36 +2063,100 @@ function TabManual() {
           )}
         </div>
 
-        {/* Histórico */}
-        <div className="card p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Últimas chamadas manuais</h3>
-          {historicoRaw.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-4">Nenhuma chamada manual registrada ainda.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {(historicoRaw as any[]).map((h: any, i: number) => {
-                const res   = (h.resultado ?? 'encerrada') as string
-                const labelMap: Record<string, string> = { reagendou:'Reagendou', confirmou:'Confirmou', nao_atendeu:'Não atendeu', encerrada:'Encerrada', agendada:'Agendou' }
-                const cls   = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
-                const data  = h.encerrada_em ? new Date(h.encerrada_em).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
-                return (
-                  <div key={h.id ?? i} className="flex items-start gap-3 p-2.5 rounded-lg bg-gray-50">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <User size={14} className="text-gray-500"/>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-gray-900">{h.contatos?.empresa ?? h.numero_destino ?? '—'} · {h.contatos?.nome ?? '—'}</div>
-                      {h.motivo && <div className="text-2xs text-gray-400 mt-0.5">{h.motivo}</div>}
-                      <div className="text-2xs text-gray-400">{data}</div>
-                    </div>
-                    <span className={clsx('badge text-2xs flex-shrink-0', cls)}>{labelMap[res] ?? res}</span>
-                  </div>
-                )
-              })}
+      </div>{/* fim col 2 */}
+
+      {/* ── Col 3: WhatsApp ── */}
+      <div className="flex flex-col gap-3">
+        <div className="card overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare size={15} className="text-emerald-600"/>
+              <h3 className="text-sm font-semibold text-gray-900">WhatsApp</h3>
             </div>
-          )}
+            <span className="text-2xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
+              pelo seu número
+            </span>
+          </div>
+
+          <div className="p-4 flex flex-col gap-3">
+            {/* Contato alvo */}
+            <div className="text-xs text-gray-500">
+              {contato
+                ? <span className="font-semibold text-gray-800">{contato.nome} · <span className="font-mono">{contato.tel}</span></span>
+                : numero
+                  ? <span className="font-mono text-gray-700">{numero}</span>
+                  : <span className="text-gray-400 italic">Selecione um contato à esquerda</span>
+              }
+            </div>
+
+            {/* Histórico de conversa */}
+            <div className="min-h-[140px] max-h-56 overflow-y-auto flex flex-col gap-1.5 bg-gray-50 rounded-xl p-3 border border-gray-100">
+              {waHistorico.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full py-6 text-center">
+                  <MessageSquare size={22} className="text-gray-300 mb-2"/>
+                  <p className="text-2xs text-gray-400">Histórico aparece aqui</p>
+                </div>
+              ) : waHistorico.map((m, i) => (
+                <div key={i} className={`flex ${m.direcao === 'enviada' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-xs ${
+                    m.direcao === 'enviada' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
+                  }`}>
+                    <p className="leading-relaxed">{m.mensagem}</p>
+                    <p className={`text-2xs mt-0.5 ${m.direcao === 'enviada' ? 'text-emerald-200' : 'text-gray-400'}`}>
+                      {new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Seletor de modelo */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1.5">Modelo de mensagem</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {WA_TEMPLATES.map(t => (
+                  <button key={t.id}
+                    onClick={() => setWaMsgTexto(t.texto)}
+                    className={clsx(
+                      'text-2xs font-medium py-1.5 px-2 rounded-lg border text-left transition-colors',
+                      waMsgTexto === t.texto && t.texto !== ''
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:bg-emerald-50'
+                    )}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Campo de mensagem */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1.5">Mensagem</label>
+              <textarea
+                className="input min-h-[80px] resize-none text-xs"
+                placeholder="Selecione um modelo acima ou escreva aqui..."
+                value={waMsgTexto}
+                onChange={e => setWaMsgTexto(e.target.value)}
+              />
+            </div>
+
+            <button onClick={enviarWhatsApp}
+              disabled={waLoading || (!contato && !numero) || !waMsgTexto.trim()}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+              style={{ backgroundColor: '#25d366', color: 'white' }}>
+              <MessageSquare size={14}/>
+              {waLoading ? 'Enviando…' : 'Enviar mensagem'}
+            </button>
+
+            {waMsg && (
+              <p className={clsx('text-xs font-medium text-center', waMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
+                {waMsg}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      </div>{/* fim col 3 */}
+
     </div>
   )
 }
