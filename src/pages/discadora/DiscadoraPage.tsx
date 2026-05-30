@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi } from '@/services/api'
+import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -22,6 +22,7 @@ type StatusLigacao = 'em_ligacao' | 'na_fila' | 'retornar' | 'agendado'
 interface EntradaFila {
   id: string; empresa: string; contato: string; cargo: string
   telefone: string; agente: string; campanha: string; segmento: string
+  modalidade_campanha?: string
   status: StatusLigacao; icp: number; potencial: number
   tentativa: number; maxTentativas: number; duracao?: string
   snippet?: string; gatilhoDetectado?: string; transferindo?: boolean
@@ -32,8 +33,10 @@ interface Agendamento {
   telefone: string; email: string; modalidade: 'online' | 'presencial' | 'hibrido'
   cidade?: string; cnpj?: string; segmento?: string; resumoLigacao: string
   agente: string; duracaoLigacao: string; dataHora: string; meetLink?: string
+  endereco?: string; cep?: string; estado?: string; complemento?: string
   vendedor: string; vendedorIniciais: string; status: string
   noShowRisk: number; campanha: string; resultado?: string
+  notaVendedor?: string
 }
 
 // ─── TIPOS ADICIONAIS ────────────────────────────────────────────────────────
@@ -170,6 +173,7 @@ function TabFila() {
       telefone: l.numero_destino ?? l.telefone ?? '',
       agente: l.agentes?.nome ?? l.agente_nome ?? l.agente ?? '—',
       campanha: l.campanha_nome ?? l.campanha ?? '',
+      modalidade_campanha: l.campanhas?.modalidade ?? 'online',
       segmento: l.contatos?.segmento ?? l.segmento ?? '',
       status: (l.status === 'em_andamento' ? 'em_ligacao' : l.status ?? 'na_fila') as StatusLigacao,
       icp: l.icp ?? 0,
@@ -180,7 +184,8 @@ function TabFila() {
       snippet: l.snippet,
       gatilhoDetectado: l.gatilho_detectado,
       transferindo: l.transferindo ?? false,
-    } as EntradaFila & { _callControlId: string }))),
+      _contatoId: l.contato_id ?? l.contatos?.id,
+    } as EntradaFila & { _callControlId: string; _contatoId?: string }))),
     refetchInterval: 5000,
   })
   const FILA_DEMO: EntradaFila[] = [
@@ -207,6 +212,31 @@ function TabFila() {
   const [filtroCampanha, setFiltroCampanha] = useState('')
   const [filtroAgente, setFiltroAgente] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
+  const [modalMoverCampanha, setModalMoverCampanha] = useState(false)
+  const [campanhaMoverSel, setCampanhaMoverSel] = useState('')
+
+  // Dados para filtros dinâmicos
+  const { data: campanhasLista = [] } = useQuery({
+    queryKey: ['campanhas-fila'],
+    queryFn: () => campanhasApi.list().then(r => (r.data as any[]) ?? []),
+  })
+  const { data: agentesLista = [] } = useQuery({
+    queryKey: ['agentes-fila'],
+    queryFn: () => agentesApi.list().then(r => (r.data as any[]) ?? []),
+  })
+
+  // KPI agendadas hoje — vem de reunioes, não de ligacoes
+  const { data: reunioesHoje = [] } = useQuery({
+    queryKey: ['reunioes-hoje'],
+    queryFn: () => reunioesApi.list().then(r => {
+      const hoje = new Date().toISOString().slice(0, 10)
+      return ((r.data as any[]) ?? []).filter((re: any) => {
+        const d = re.data_hora ?? re.inicio ?? ''
+        return d.startsWith(hoje)
+      })
+    }),
+    refetchInterval: 30000,
+  })
   const [selecionados, setSelecionados] = useState<string[]>([])
   const [expandido, setExpandido] = useState<string | null>('1')
   const [scriptInput, setScriptInput] = useState<Record<string, string>>({})
@@ -237,7 +267,7 @@ function TabFila() {
     }
   }
 
-  // Simula progresso de monitorIA para ligações ativas
+  // Inicializa monitorIA para cada ligação ativa conforme fila atualiza (polling 5s)
   useEffect(() => {
     const ativas = fila.filter(l => l.status === 'em_ligacao')
     setMonitorIA(prev => {
@@ -250,25 +280,42 @@ function TabFila() {
             potencial: l.potencial,
             sugestao: l.transferindo ? 'transferir' : l.potencial >= 70 ? 'agendar' : 'continuar',
           }
+        } else {
+          // Atualiza gatilho e sugestão se chegou novo dado da API
+          if (l.gatilhoDetectado && !next[l.id].gatilhos.includes(l.gatilhoDetectado)) {
+            next[l.id] = { ...next[l.id], gatilhos: [...next[l.id].gatilhos, l.gatilhoDetectado] }
+          }
+          if (l.transferindo) next[l.id] = { ...next[l.id], sugestao: 'transferir' }
         }
       })
       return next
     })
-  }, [])
+  }, [fila])
 
   // Vendedores para transferência via API
   const { data: equipeRaw = [] } = useQuery({
     queryKey: ['equipe'],
     queryFn: () => equipeApi.list().then(r => r.data as any[]),
   })
-  const transferCandidates: (Vendedor & { telefone?: string })[] = equipeRaw.length > 0
+  const allTransferCandidates: (Vendedor & { telefone?: string; modalidade?: string })[] = equipeRaw.length > 0
     ? equipeRaw.map(v => ({
         nome: v.nome ?? v.name ?? '—',
         status: (v.status === 'em_chamada' ? 'em_chamada' : v.status === 'ausente' ? 'ausente' : 'disponivel') as Vendedor['status'],
         reunioes_hoje: v.reunioes_hoje ?? v.reunioes_count ?? 0,
         telefone: v.telefone ?? v.phone,
+        modalidade: v.modalidade ?? 'hibrido',
       }))
-    : TRANSFER_CANDIDATES
+    : TRANSFER_CANDIDATES.map(v => ({ ...v, modalidade: 'hibrido' }))
+
+  function getTransferCandidates(item: EntradaFila) {
+    const mod = item.modalidade_campanha ?? 'online'
+    return allTransferCandidates.filter(v => {
+      const vm = v.modalidade ?? 'hibrido'
+      if (mod === 'online')     return vm === 'online' || vm === 'hibrido'
+      if (mod === 'presencial') return vm === 'presencial' || vm === 'hibrido'
+      return true // hibrido da campanha aceita todos
+    })
+  }
 
   // Latência em tempo real
   const [latency, setLatency] = useState<LatencyState>({ telnyx: 112, eleven: 87, llm: 203, total: 402 })
@@ -293,8 +340,8 @@ function TabFila() {
   }
 
   const filaFiltrada = fila.filter(f => {
-    if (filtroCampanha && !f.campanha.includes(filtroCampanha)) return false
-    if (filtroAgente && f.agente !== filtroAgente) return false
+    if (filtroCampanha && f.campanha.trim().toLowerCase() !== filtroCampanha.trim().toLowerCase()) return false
+    if (filtroAgente && f.agente.trim().toLowerCase() !== filtroAgente.trim().toLowerCase()) return false
     if (filtroStatus && f.status !== filtroStatus) return false
     return true
   })
@@ -364,13 +411,52 @@ function TabFila() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Modal mover campanha */}
+      {modalMoverCampanha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-80">
+            <h3 className="text-sm font-bold text-gray-900 mb-1">Mover para campanha</h3>
+            <p className="text-xs text-gray-500 mb-4">{selecionados.length} contato(s) selecionado(s)</p>
+            <select
+              className="input w-full mb-4"
+              value={campanhaMoverSel}
+              onChange={e => setCampanhaMoverSel(e.target.value)}
+            >
+              <option value="">Selecione a campanha...</option>
+              {campanhasLista.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setModalMoverCampanha(false)} className="btn-secondary text-xs">Cancelar</button>
+              <button
+                disabled={!campanhaMoverSel}
+                onClick={async () => {
+                  try {
+                    await Promise.all(selecionados.map(id => {
+                      const it = fila.find(f => f.id === id) as any
+                      const contatoId = it?._contatoId
+                      if (!contatoId) return Promise.resolve()
+                      return contatosApi.patch(contatoId, { campanha_id: campanhaMoverSel })
+                    }))
+                  } catch { /* silent — contatos sem _contatoId no demo */ }
+                  setModalMoverCampanha(false)
+                  setSelecionados([])
+                }}
+                className="btn-primary text-xs disabled:opacity-50"
+              >Mover</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-5 gap-3">
         {[
           { label:'Em ligação agora', value: ativas, color:'text-emerald-600' },
-          { label:'Na fila', value: filaData.length, color:'text-gray-900' },
-          { label:'Retornar contato', value: filaData.filter(f => f.status === 'retornar').length, color:'text-amber-600' },
-          { label:'Agendadas hoje', value: filaData.filter(f => f.status === 'agendado').length, color:'text-brand-600' },
+          { label:'Na fila', value: fila.filter(f => f.status === 'na_fila').length, color:'text-gray-900' },
+          { label:'Retornar contato', value: fila.filter(f => f.status === 'retornar').length, color:'text-amber-600' },
+          { label:'Agendadas hoje', value: reunioesHoje.length, color:'text-brand-600' },
           { label:'Latência total', value:`${latency.total}ms`, color: latColor(latency.total), sub: latency.total < 500 ? 'Dentro do limite ✓' : 'Acima do limite ⚠' },
         ].map(k => (
           <div key={k.label} className="kpi-card">
@@ -416,11 +502,15 @@ function TabFila() {
           <div className="flex items-center gap-2">
             <select className="input py-1.5 text-xs" value={filtroCampanha} onChange={e => setFiltroCampanha(e.target.value)}>
               <option value="">Todas as campanhas</option>
-              <option value="SP">SP</option><option value="MG">MG</option><option value="GO">GO</option><option value="RJ">RJ</option><option value="RS">RS</option><option value="PR">PR</option>
+              {campanhasLista.map((c: any) => (
+                <option key={c.id} value={c.nome}>{c.nome}</option>
+              ))}
             </select>
             <select className="input py-1.5 text-xs" value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)}>
               <option value="">Todos os agentes</option>
-              <option>Ana</option><option>Carlos</option><option>Julia</option><option>Rafael</option><option>Marcos</option>
+              {agentesLista.map((a: any) => (
+                <option key={a.id} value={a.nome}>{a.nome}</option>
+              ))}
             </select>
             <select className="input py-1.5 text-xs" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
               <option value="">Todos os status</option><option value="em_ligacao">Em ligação</option><option value="na_fila">Na fila</option><option value="retornar">Retornar</option><option value="agendado">Agendado</option>
@@ -458,7 +548,10 @@ function TabFila() {
                 setSelecionados([])
               }}
             >⬆ Priorizar</button>
-            <button className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 bg-white">📋 Mover campanha</button>
+            <button
+              onClick={() => { setCampanhaMoverSel(''); setModalMoverCampanha(true) }}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50 transition-colors"
+            >📋 Mover campanha</button>
             <button onClick={() => setSelecionados([])} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-200 text-red-600 bg-white hover:bg-red-50 transition-colors">Cancelar</button>
             <button onClick={() => setSelecionados([])} className="ml-auto text-xs text-gray-400 hover:text-gray-600"><X size={14}/></button>
           </div>
@@ -505,7 +598,6 @@ function TabFila() {
                   {item.potencial > 0 && <span className="text-2xs font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">📞 {item.potencial}%</span>}
                 </div>
                 {item.snippet && <div className="mt-1.5 text-2xs text-gray-400 italic bg-white border border-gray-200 rounded px-2 py-1 max-w-[200px]">{item.snippet}</div>}
-                <TranscriptAoVivo callControlId={(item as any)._callControlId ?? item.id} enabled={item.status === 'em_ligacao'} />
               </div>
 
               {/* Agente */}
@@ -583,9 +675,11 @@ function TabFila() {
                     <span className="text-sm font-bold text-white">{item.empresa}</span>
                     <span className="text-2xs text-indigo-300 font-medium">{item.agente}</span>
                     {/* Campanha destacada */}
-                    <span className="text-2xs font-semibold bg-indigo-900/60 border border-indigo-500/40 text-indigo-300 rounded-full px-2 py-0.5">
-                      📋 {item.campanha}
-                    </span>
+                    {item.campanha && (
+                      <span className="text-2xs font-semibold bg-indigo-900/60 border border-indigo-500/40 text-indigo-300 rounded-full px-2 py-0.5">
+                        📋 {item.campanha}
+                      </span>
+                    )}
                     <IcpBadge value={item.icp} />
                   </div>
                   <div className="flex items-center gap-2">
@@ -609,7 +703,13 @@ function TabFila() {
                       <div><span className="text-gray-500">Slot:</span> <span className="font-semibold text-brand-300">15h00 hoje</span></div>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors">
+                      <button
+                        onClick={() => {
+                          const texto = `Briefing — ${item.empresa}\nContato: ${item.contato}${item.cargo ? ` (${item.cargo})` : ''}\nICP: ${item.icp}/100\nSinais: ${item.gatilhoDetectado ?? '—'}\nDuração: ${item.duracao ?? '—'}`
+                          navigator.clipboard.writeText(texto)
+                        }}
+                        className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors"
+                      >
                         <Copy size={10}/> Copiar Briefing
                       </button>
                       <button onClick={() => iniciarTransferencia(item.id, 'Ana Rodrigues')} className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors">
@@ -680,7 +780,14 @@ function TabFila() {
                         </div>
                         {/* Sugestão */}
                         {monitorIA[item.id].sugestao === 'transferir' && (
-                          <button className="flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+                          <button
+                            onClick={() => {
+                              const disponiveis = getTransferCandidates(item).filter(v => v.status === 'disponivel')
+                              const primeiro = disponiveis[0]
+                              if (primeiro) iniciarTransferencia(item.id, primeiro.nome, primeiro.telefone)
+                            }}
+                            className="flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                          >
                             <Zap size={10} /> ⚡ Transferir Agora
                           </button>
                         )}
@@ -787,9 +894,14 @@ function TabFila() {
                   {/* Col 3: Transferência — candidatos */}
                   <div>
                     <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">⚡ Transferência a quente</div>
-                  <div className="text-2xs text-gray-500 mb-2 leading-relaxed">Transfere a ligação para o vendedor agora — ele entra na chamada com o lead direto, sem perder o contato.</div>
+                  <div className="text-2xs text-gray-500 mb-2 leading-relaxed">
+                    Transfere a ligação para o vendedor agora — ele entra na chamada com o lead direto, sem perder o contato.
+                    {item.modalidade_campanha && item.modalidade_campanha !== 'online' && (
+                      <span className="ml-1 text-purple-400">· Modalidade: {item.modalidade_campanha}</span>
+                    )}
+                  </div>
                     <div className="flex flex-col gap-2">
-                      {transferCandidates.map(v => (
+                      {getTransferCandidates(item).map(v => (
                         <div
                           key={v.nome}
                           className={clsx(
@@ -826,7 +938,18 @@ function TabFila() {
                           ✓ Transferindo para {transferidoPara[item.id]}...
                         </div>
                       )}
-                      <button className="w-full text-xs font-semibold py-2 rounded-lg bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/30 transition-colors">⏸ Pausar agente</button>
+                      <button
+                        onClick={async () => {
+                          const ccid = (item as any)._callControlId
+                          if (!ccid) { alert('Ligação demo — indisponível.'); return }
+                          if (!confirm(`Encerrar ligação com ${item.empresa}?`)) return
+                          try {
+                            await ligacoesApi.encerrar(ccid)
+                            setFila(prev => prev.filter(f => f.id !== item.id))
+                          } catch { alert('Erro ao encerrar a ligação.') }
+                        }}
+                        className="w-full text-xs font-semibold py-2 rounded-lg bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/30 transition-colors"
+                      >⏸ Pausar agente</button>
                     </div>
                   </div>
                 </div>
@@ -842,16 +965,30 @@ function TabFila() {
 // ─── ABA AGENDADOS ───────────────────────────────────────────────────────────
 
 function TabAgendados() {
-  const { data: agendamentosReais = [] } = useQuery({
+  const { data: agendamentosReais = [], refetch: refetchAgendamentos } = useQuery({
     queryKey: ['reunioes'],
     queryFn: () => reunioesApi.list().then((r: any) => r.data),
   })
 
-  const [resultados, setResultados] = useState<Record<string, string>>({})
+  // Vendedores reais para transferência
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => (r.data as any[]) ?? []),
+  })
+
   const [modalJornada, setModalJornada] = useState<Agendamento | null>(null)
   const [etapaSelecionada, setEtapaSelecionada] = useState('Agendado')
   const [valorOpor, setValorOpor] = useState('')
   const [nota, setNota] = useState('')
+
+  // Filtros
+  const [filtroCampanha, setFiltroCampanha] = useState('')
+  const [filtroVendedor, setFiltroVendedor] = useState('')
+
+  // Campanhas únicas dos agendamentos (para o select)
+  const campanhasUnicas = Array.from(new Set(
+    (agendamentosReais as any[]).map((r: any) => r.campanha_nome ?? r.campanha ?? '').filter(Boolean)
+  ))
 
   const agendamentos: Agendamento[] = agendamentosReais.length > 0
     ? agendamentosReais.map((r: any): Agendamento => ({
@@ -870,20 +1007,32 @@ function TabAgendados() {
         duracaoLigacao: r.duracao_ligacao ?? r.duracao ?? '',
         dataHora: r.data_hora ?? (r.inicio ? new Date(r.inicio).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : ''),
         meetLink: r.meet_link ?? r.meetLink,
+        endereco: r.endereco ?? r.local_endereco ?? '',
+        cep: r.cep ?? '',
+        estado: r.estado ?? r.uf ?? '',
+        complemento: r.complemento ?? '',
         vendedor: r.vendedor_nome ?? r.vendedor ?? '—',
         vendedorIniciais: ((r.vendedor_nome ?? r.vendedor ?? 'VD') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2),
         status: r.status ?? 'pendente',
         noShowRisk: r.no_show_risk ?? r.noShowRisk ?? 0,
         campanha: r.campanha_nome ?? r.campanha ?? '',
         resultado: r.resultado,
+        notaVendedor: r.nota_vendedor ?? r.nota ?? '',
       }))
     : AGENDAMENTOS_FALLBACK
 
-  const fechamentos = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'fechou').length
-  const noShows = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'noshow').length
-  const perdidos = agendamentos.filter((r: Agendamento) => r.status === 'realizada' && r.resultado === 'perdemos').length
-  const emAndamento = agendamentos.filter((r: Agendamento) => r.status === 'agendada').length
-  const taxaConversao = agendamentos.length > 0 ? Math.round((fechamentos / agendamentos.length) * 100) : 0
+  // Filtragem aplicada sobre os agendamentos mapeados
+  const agendamentosFiltrados = agendamentos.filter((ag: Agendamento) => {
+    if (filtroCampanha && ag.campanha.trim().toLowerCase() !== filtroCampanha.trim().toLowerCase()) return false
+    if (filtroVendedor && ag.vendedor.trim().toLowerCase() !== filtroVendedor.trim().toLowerCase()) return false
+    return true
+  })
+
+  const fechamentos   = agendamentosFiltrados.filter((r: Agendamento) => r.resultado === 'fechou').length
+  const noShows       = agendamentosFiltrados.filter((r: Agendamento) => r.resultado === 'noshow').length
+  const perdidos      = agendamentosFiltrados.filter((r: Agendamento) => r.resultado === 'perdemos').length
+  const emAndamento   = agendamentosFiltrados.filter((r: Agendamento) => !['fechou','noshow','perdemos'].includes(r.resultado ?? '')).length
+  const taxaConversao = agendamentosFiltrados.length > 0 ? Math.round((fechamentos / agendamentosFiltrados.length) * 100) : 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -891,13 +1040,29 @@ function TabAgendados() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-gray-500">Reuniões agendadas pela IA. Cada card traz os dados completos do cliente para o vendedor chegar preparado.</p>
         <div className="flex items-center gap-2">
-          <select className="input py-1.5 text-xs"><option>Todas as campanhas</option></select>
-          <select className="input py-1.5 text-xs"><option>Todos os vendedores</option></select>
+          <select
+            className="input py-1.5 text-xs"
+            value={filtroCampanha}
+            onChange={e => setFiltroCampanha(e.target.value)}
+          >
+            <option value="">Todas as campanhas</option>
+            {campanhasUnicas.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select
+            className="input py-1.5 text-xs"
+            value={filtroVendedor}
+            onChange={e => setFiltroVendedor(e.target.value)}
+          >
+            <option value="">Todos os vendedores</option>
+            {equipeRaw.map((v: any) => (
+              <option key={v.id} value={v.nome}>{v.nome}</option>
+            ))}
+          </select>
           <button
             className="btn-secondary gap-2 text-xs py-1.5"
             onClick={() => {
               const header = 'Empresa,Contato,Cargo,Data/Hora,Vendedor,Status,Campanha'
-              const rows = agendamentos.map((a: any) => `${a.empresa},${a.contato},${a.cargo ?? ''},${a.dataHora},${a.vendedor},${a.status},${a.campanha}`)
+              const rows = agendamentosFiltrados.map((a: any) => `${a.empresa},${a.contato},${a.cargo ?? ''},${a.dataHora},${a.vendedor},${a.status},${a.campanha}`)
               const csv = [header, ...rows].join('\n')
               const blob = new Blob([csv], { type: 'text/csv' })
               const url = URL.createObjectURL(blob)
@@ -914,7 +1079,7 @@ function TabAgendados() {
           { id:'kpi-total-fechados', label:'Fechamentos',       value: String(fechamentos),                 color:'text-emerald-600', top:'border-t-emerald-500', sub: `${taxaConversao}% taxa` },
           { id:'kpi-noshows',        label:'No-show',           value: String(noShows),                     color:'text-amber-600',   top:'border-t-amber-500',   sub:'reminders ativos' },
           { id:'kpi-perdidos',       label:'Perdidos',          value: String(perdidos),                    color:'text-red-600',     top:'border-t-red-500',     sub:'em nurturing' },
-          { id:'kpi-em-andamento',   label:'Em andamento',      value: String(emAndamento || agendamentos.filter((r: Agendamento) => r.status === 'confirmado' || r.status === 'pendente').length), color:'text-brand-600', top:'border-t-brand-500', sub:'aguardando resultado' },
+          { id:'kpi-em-andamento',   label:'Em andamento',      value: String(emAndamento), color:'text-brand-600', top:'border-t-brand-500', sub:'aguardando resultado' },
           { id:'kpi-conv-receita',   label:'Taxa reunião→venda', value: `${taxaConversao}%`,                color:'text-purple-600',  top:'border-t-purple-500',  sub:'meta: 25%' },
         ].map(k => (
           <div key={k.id} className={clsx('card p-3 border-t-2', k.top)}>
@@ -927,132 +1092,183 @@ function TabAgendados() {
 
       {/* Cards */}
       <div className="flex flex-col gap-3">
-        {agendamentos.length === 0 && (
+        {agendamentosFiltrados.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
             <Calendar size={32} className="mb-3 opacity-30" />
-            <p className="text-sm font-medium">Nenhum agendamento encontrado</p>
-            <p className="text-xs mt-1">As reuniões agendadas pelos agentes aparecerão aqui.</p>
+            <p className="text-sm font-medium">{agendamentos.length === 0 ? 'Nenhum agendamento encontrado' : 'Nenhum resultado para os filtros selecionados'}</p>
+            <p className="text-xs mt-1">{agendamentos.length === 0 ? 'As reuniões agendadas pelos agentes aparecerão aqui.' : 'Tente remover os filtros.'}</p>
           </div>
         )}
-        {agendamentos.map((ag: any) => (
-          <div key={ag.id} className={clsx('card border-l-4', ag.status === 'confirmado' ? 'border-l-brand-500' : ag.status === 'pendente' ? 'border-l-amber-500' : 'border-l-emerald-500')}>
+        {agendamentosFiltrados.map((ag: any) => {
+          const resultado = ag.resultado as string | undefined
+          const resultadoMap: Record<string, { label: string; cls: string }> = {
+            fechou:    { label: '💰 Negócio fechado',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+            noshow:    { label: '👻 No-show',            cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+            perdemos:  { label: '❌ Perdemos',            cls: 'bg-red-50 text-red-700 border-red-200' },
+            reagendou: { label: '🔄 Reagendamento feito', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
+          }
+          const resultadoInfo = resultado ? resultadoMap[resultado] : null
+          const statusCor = ag.status === 'confirmada' || ag.status === 'confirmado' ? 'border-l-brand-500'
+            : ag.status === 'realizada' || ag.status === 'realizado' ? 'border-l-emerald-500'
+            : 'border-l-amber-500'
+
+          return (
+          <div key={ag.id} className={clsx('card border-l-4', statusCor)}>
             <div className="p-4">
-              <div className="grid grid-cols-[2fr_1.2fr_1.2fr_1fr] gap-4 items-start">
-                {/* Empresa */}
-                <div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
-                      <Building2 size={18} className="text-brand-400" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-gray-900">{ag.empresa}</span>
-                        <span className="badge badge-brand text-2xs">{ag.modalidade === 'online' ? '💻 Online' : ag.modalidade === 'presencial' ? '📍 Presencial' : '🔀 Híbrido'}</span>
-                        {ag.cidade && <span className="badge badge-neutral text-2xs"><MapPin size={9} className="inline mr-0.5"/>{ag.cidade}</span>}
-                      </div>
-                      {ag.cnpj && <div className="text-2xs text-gray-400 mt-0.5">CNPJ: {ag.cnpj} · {ag.segmento}</div>}
-                    </div>
+
+              {/* Linha 1 — Header do card */}
+              <div className="flex items-start justify-between mb-3 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={18} className="text-brand-400" />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 rounded-lg p-2">
-                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Reunião com</div>
-                      <div className="text-xs font-semibold text-gray-900">{ag.contato}</div>
-                      <div className="text-xs text-brand-600">{ag.cargo}</div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-gray-900">{ag.empresa}</span>
+                      {ag.campanha && <span className="text-2xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-full px-2 py-0.5">📋 {ag.campanha}</span>}
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-2">
-                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Contato</div>
-                      <div className="text-xs text-gray-700 font-mono">{ag.telefone}</div>
-                      <div className="text-xs text-brand-600">{ag.email}</div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {ag.cnpj && <span className="text-2xs text-gray-400 font-mono">CNPJ: {ag.cnpj}</span>}
+                      {ag.segmento && <span className="text-2xs text-gray-400">· {ag.segmento}</span>}
                     </div>
                   </div>
                 </div>
 
-                {/* Resumo */}
-                <div>
-                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Resumo da ligação</div>
-                  <div className="text-xs text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-2.5 border-l-2 border-brand-400">{ag.resumoLigacao}</div>
-                  <div className="mt-2 text-2xs text-gray-400">Agente: <strong className="text-gray-700">{ag.agente}</strong> · {ag.duracaoLigacao}</div>
-                </div>
-
-                {/* Data/vendedor */}
-                <div>
-                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Reunião agendada</div>
-                  <div className="bg-gray-50 rounded-lg p-2.5 mb-2">
-                    <div className="text-sm font-bold text-gray-900 font-mono">{ag.dataHora}</div>
-                    {ag.meetLink && <a href="#" className="text-xs text-brand-500 hover:underline mt-0.5 block">{ag.meetLink}</a>}
-                  </div>
-                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Vendedor responsável</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-brand-50 text-brand-600 text-2xs font-bold flex items-center justify-center">{ag.vendedorIniciais}</div>
-                    <span className="text-xs font-medium text-gray-900">{ag.vendedor}</span>
-                  </div>
-                </div>
-
-                {/* Status / resultado */}
-                <div className="flex flex-col gap-2">
-                  <span className={clsx('badge text-center', ag.status === 'confirmado' ? 'badge-success' : 'badge-amber')}>
-                    {ag.status === 'confirmado' ? 'Invite enviado' : 'Aguardando aprovação'}
+                {/* Status + resultado — leitura, não input */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={clsx('badge text-2xs',
+                    ag.status === 'confirmada' || ag.status === 'confirmado' ? 'badge-success' :
+                    ag.status === 'realizada'  || ag.status === 'realizado'  ? 'badge-brand' :
+                    'badge-amber'
+                  )}>
+                    {ag.status === 'confirmada' || ag.status === 'confirmado' ? '✓ Confirmada'
+                      : ag.status === 'realizada' || ag.status === 'realizado' ? '✓ Realizada'
+                      : 'Aguardando confirmação'}
                   </span>
+                  {resultadoInfo
+                    ? <span className={clsx('text-2xs font-semibold px-2 py-0.5 rounded-full border', resultadoInfo.cls)}>{resultadoInfo.label}</span>
+                    : <span className="text-2xs text-gray-400 italic">Aguardando resultado do vendedor</span>
+                  }
+                </div>
+              </div>
 
-                  {/* Botões extras para pendente */}
-                  {ag.status === 'pendente' && (
-                    <div className="flex flex-col gap-1">
+              {/* Linha 2 — Grid de informações */}
+              <div className="grid grid-cols-4 gap-3">
+
+                {/* Col 1 — Contato */}
+                <div className="flex flex-col gap-2">
+                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Reunião com</div>
+                  <div className="bg-gray-50 rounded-lg p-2.5">
+                    <div className="text-xs font-bold text-gray-900">{ag.contato}</div>
+                    {ag.cargo && <div className="text-2xs text-brand-600 mt-0.5">{ag.cargo}</div>}
+                    {ag.telefone && <div className="text-2xs text-gray-500 font-mono mt-1">{ag.telefone}</div>}
+                    {ag.email && <div className="text-2xs text-brand-500 mt-0.5 truncate">{ag.email}</div>}
+                    {ag.cidade && <div className="text-2xs text-gray-400 mt-0.5"><MapPin size={9} className="inline mr-0.5"/>{ag.cidade}{ag.estado ? ` · ${ag.estado}` : ''}</div>}
+                  </div>
+                </div>
+
+                {/* Col 2 — Resumo da ligação */}
+                <div className="flex flex-col gap-2">
+                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Resumo da ligação</div>
+                  <div className="text-xs text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-2.5 border-l-2 border-brand-400 flex-1">
+                    {ag.resumoLigacao || <span className="text-gray-400 italic">Sem resumo registrado</span>}
+                  </div>
+                  <div className="text-2xs text-gray-400">
+                    Agente: <strong className="text-gray-700">{ag.agente}</strong>
+                    {ag.duracaoLigacao && <> · {ag.duracaoLigacao}</>}
+                  </div>
+                </div>
+
+                {/* Col 3 — Reunião (data + modalidade) */}
+                <div className="flex flex-col gap-2">
+                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Reunião agendada</div>
+                  <div className="bg-gray-50 rounded-lg p-2.5">
+                    <div className="text-sm font-bold text-gray-900 font-mono mb-1">{ag.dataHora || '—'}</div>
+                    <span className={clsx('text-2xs font-semibold px-2 py-0.5 rounded-full border inline-block',
+                      ag.modalidade === 'online'     ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                      ag.modalidade === 'presencial' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                                                       'bg-purple-50 text-purple-600 border-purple-200'
+                    )}>
+                      {ag.modalidade === 'online' ? '💻 Online' : ag.modalidade === 'presencial' ? '📍 Presencial' : '🔀 Híbrido'}
+                    </span>
+                  </div>
+
+                  {/* Info específica por modalidade */}
+                  {(ag.modalidade === 'online' || ag.modalidade === 'hibrido') && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-2">
+                      <div className="text-2xs font-semibold text-blue-600 mb-1">Link da reunião</div>
+                      {ag.meetLink
+                        ? <a href={ag.meetLink} target="_blank" rel="noreferrer" className="text-2xs text-brand-600 hover:underline break-all">{ag.meetLink}</a>
+                        : <span className="text-2xs text-gray-400 italic">Não gerado ainda</span>
+                      }
+                    </div>
+                  )}
+                  {(ag.modalidade === 'presencial' || ag.modalidade === 'hibrido') && (
+                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-2">
+                      <div className="text-2xs font-semibold text-orange-600 mb-1">Local / Endereço</div>
+                      {ag.endereco
+                        ? <div className="text-2xs text-gray-700 leading-relaxed">
+                            {ag.endereco}
+                            {ag.complemento && <>, {ag.complemento}</>}
+                            {ag.cidade && <>, {ag.cidade}</>}
+                            {ag.estado && <> — {ag.estado}</>}
+                            {ag.cep && <> · CEP {ag.cep}</>}
+                          </div>
+                        : <span className="text-2xs text-gray-400 italic">Endereço não informado</span>
+                      }
+                    </div>
+                  )}
+                </div>
+
+                {/* Col 4 — Vendedor + nota + ações gestor */}
+                <div className="flex flex-col gap-2">
+                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Vendedor responsável</div>
+                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+                    <div className="w-7 h-7 rounded-full bg-brand-50 text-brand-600 text-2xs font-bold flex items-center justify-center flex-shrink-0">{ag.vendedorIniciais}</div>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-900">{ag.vendedor}</div>
+                      <div className={clsx('text-2xs mt-0.5', ag.noShowRisk < 25 ? 'text-emerald-600' : 'text-amber-600')}>
+                        No-show: {ag.noShowRisk}% — {ag.noShowRisk < 25 ? 'baixo risco' : 'médio risco'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Nota do vendedor (read-only para o gestor) */}
+                  {ag.notaVendedor && (
+                    <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-2">
+                      <div className="text-2xs font-semibold text-yellow-700 mb-1">📝 Nota do vendedor</div>
+                      <div className="text-2xs text-gray-600 leading-relaxed">{ag.notaVendedor}</div>
+                    </div>
+                  )}
+
+                  {/* Ação gestor: aprovar ou reatribuir vendedor (só para pendente) */}
+                  {(ag.status === 'pendente' || ag.status === 'agendada') && (
+                    <div className="flex flex-col gap-1.5 mt-auto pt-1">
                       <button
                         className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 bg-white transition-colors"
-                        onClick={() => {
-                          setResultados(r => ({ ...r, [ag.id]: 'aprovado' }))
-                          reunioesApi.update(ag.id, { status: 'confirmada' }).catch(console.error)
+                        onClick={() => reunioesApi.update(ag.id, { status: 'confirmada' }).then(() => refetchAgendamentos()).catch(console.error)}
+                      >✓ Confirmar reunião</button>
+                      <select
+                        className="input text-xs py-1"
+                        defaultValue=""
+                        onChange={e => {
+                          const v = e.target.value; if (!v) return
+                          reunioesApi.update(ag.id, { vendedor_nome: v }).then(() => refetchAgendamentos()).catch(console.error)
                         }}
-                      >✓ Aprovar</button>
-                      <button
-                        className="text-xs font-semibold py-1.5 px-2 rounded-lg border border-brand-300 text-brand-700 hover:bg-brand-50 bg-white transition-colors"
-                        onClick={() => {
-                          const v = prompt('Nome do vendedor:')
-                          if (v) {
-                            setResultados(r => ({ ...r, [ag.id]: 'transferido_' + v }))
-                            reunioesApi.update(ag.id, { vendedor: v }).catch(console.error)
-                          }
-                        }}
-                      >↔ Transferir vendedor</button>
+                      >
+                        <option value="">↔ Reatribuir vendedor...</option>
+                        {equipeRaw.map((v: any) => <option key={v.id} value={v.nome}>{v.nome}</option>)}
+                      </select>
                     </div>
                   )}
 
-                  <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Resultado da reunião</div>
-                  {resultados[ag.id] ? (
-                    <div className={clsx('rounded-lg p-2 text-xs font-semibold text-center border',
-                      resultados[ag.id] === 'fechou' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                      resultados[ag.id] === 'no_show' && 'bg-amber-50 text-amber-700 border-amber-200',
-                      resultados[ag.id] === 'perdeu' && 'bg-red-50 text-red-700 border-red-200',
-                      resultados[ag.id] === 'reagendou' && 'bg-brand-50 text-brand-700 border-brand-200',
-                    )}>
-                      {{ fechou:'💰 Negócio fechado!', no_show:'👻 No-show registrado', perdeu:'❌ Perdemos', reagendou:'🔄 Reagendamento feito' }[resultados[ag.id]]}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1.5">
-                      {[
-                        { id:'fechou', label:'💰 Fechou negócio', cls:'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                        { id:'no_show', label:'👻 No-show', cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                        { id:'perdeu', label:'❌ Perdemos', cls:'border-gray-300 text-gray-600 hover:bg-gray-50' },
-                        { id:'reagendou', label:'🔄 Reagendou', cls:'border-brand-300 text-brand-700 hover:bg-brand-50' },
-                      ].map(btn => (
-                        <button key={btn.id} onClick={() => setResultados(r => ({ ...r, [ag.id]: btn.id }))}
-                          className={clsx('w-full text-xs font-semibold py-1.5 px-2 rounded-lg border bg-white transition-colors', btn.cls)}>
-                          {btn.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className={clsx('text-2xs rounded px-2 py-1 text-center border', ag.noShowRisk < 25 ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200')}>
-                    📊 No-show: <strong>{ag.noShowRisk}%</strong> — {ag.noShowRisk < 25 ? 'baixo' : 'médio'} risco
-                  </div>
-
-                  <button onClick={() => setModalJornada(ag)} className="text-2xs font-semibold text-brand-600 hover:text-brand-700 text-center">📋 Ver jornada →</button>
+                  <button onClick={() => setModalJornada(ag)} className="text-2xs font-semibold text-brand-600 hover:text-brand-700 mt-auto text-center">📋 Ver jornada completa →</button>
                 </div>
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Modal Jornada */}

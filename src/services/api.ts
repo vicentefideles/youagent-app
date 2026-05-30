@@ -76,6 +76,7 @@ export const contatosApi = {
   byStatus:   (status: string, limit = 100) =>
     api.get(`/contatos?status=${status}&limit=${limit}`),
   bulkInsert: (data: unknown) => api.post('/contatos/bulk', data),
+  patch:      (id: string, data: unknown) => api.patch(`/contatos/${id}`, data),
 }
 
 /** @deprecated Use campanhasApi */
