@@ -67,9 +67,22 @@ interface Reuniao {
   agente: string
   sinais: string[]
   sugestao: string
+  // Dados cadastrais do contato
   telefone?: string
   email?: string
-  nome?: string
+  cnpj?: string
+  segmento?: string
+  cidade?: string
+  estado?: string
+  endereco?: string
+  // Dados da ligação de agendamento
+  resumo_ligacao?: string
+  duracao_ligacao?: string
+  // Jornada (preenchida pelo vendedor)
+  etapa?: string
+  valor_oportunidade?: string
+  nota?: string
+  resultado?: string
 }
 
 interface EmailVendedor {
@@ -1829,6 +1842,22 @@ export default function VendedorPageRestrita() {
     agente: r.agente_nome ?? r.agente ?? '',
     sinais: r.sinais ?? [],
     sugestao: r.sugestao ?? '',
+    // Dados cadastrais
+    telefone: r.telefone ?? r.contatos?.telefone ?? '',
+    email: r.email ?? r.contatos?.email ?? '',
+    cnpj: r.cnpj ?? r.contatos?.cnpj ?? '',
+    segmento: r.segmento ?? r.contatos?.ramo_atividade ?? '',
+    cidade: r.cidade ?? r.contatos?.cidade ?? '',
+    estado: r.estado ?? r.contatos?.estado ?? '',
+    endereco: r.endereco ?? r.contatos?.endereco ?? '',
+    // Dados da ligação de agendamento
+    resumo_ligacao: r.resumo_ligacao ?? r.resumo ?? '',
+    duracao_ligacao: r.duracao_ligacao ?? (r.duracao_segundos ? `${Math.floor(r.duracao_segundos/60)}m${String(r.duracao_segundos%60).padStart(2,'0')}s` : ''),
+    // Jornada
+    etapa: r.etapa ?? '',
+    valor_oportunidade: r.valor_oportunidade ?? '',
+    nota: r.nota ?? '',
+    resultado: r.resultado ?? '',
   }))
 
   const [tab, setTab] = useState<VTab>('agenda')
@@ -1859,6 +1888,7 @@ export default function VendedorPageRestrita() {
         etapa: jornadaEtapa,
         valor_oportunidade: jornadaValor,
         nota: jornadaNota,
+        resultado: modalJornada.resultado || undefined,
       })
       setJornadaToast(true)
       setTimeout(() => setJornadaToast(false), 3000)
@@ -1960,63 +1990,164 @@ export default function VendedorPageRestrita() {
       {/* Modal Jornada — editável pelo vendedor */}
       {modalJornada && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setModalJornada(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Jornada — {modalJornada.empresa}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{modalJornada.contato} · {modalJornada.data} {modalJornada.hora}</p>
+                <h2 className="text-base font-semibold text-gray-900">Jornada do Cliente — {modalJornada.empresa}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{modalJornada.contato} · {modalJornada.data} às {modalJornada.hora}</p>
               </div>
-              <button onClick={() => setModalJornada(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">✕</button>
+              <button onClick={() => setModalJornada(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                <X size={18} />
+              </button>
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Etapa */}
+
+              {/* ── DADOS COMPLETOS DO CLIENTE ── */}
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Etapa atual</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {ETAPAS_JORNADA.map(e => (
-                    <button
-                      key={e.id}
-                      onClick={() => setJornadaEtapa(e.id)}
-                      className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
-                        jornadaEtapa === e.id
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-gray-100 text-gray-500 hover:border-brand-200 hover:bg-brand-50/50'
-                      }`}
-                    >
-                      <span className="text-base">{e.icon}</span>
-                      <span className="text-center leading-tight">{e.label}</span>
-                    </button>
-                  ))}
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Dados do cliente</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contato</div>
+                    <div className="text-sm font-bold text-gray-900">{modalJornada.contato || '—'}</div>
+                    {modalJornada.cargo && <div className="text-xs text-brand-600 mt-0.5">{modalJornada.cargo}</div>}
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Empresa</div>
+                    <div className="text-sm font-bold text-gray-900">{modalJornada.empresa || '—'}</div>
+                    {modalJornada.segmento && <div className="text-xs text-gray-500 mt-0.5">{modalJornada.segmento}</div>}
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Telefone</div>
+                    <div className="text-xs font-mono text-gray-800">{modalJornada.telefone || '—'}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">E-mail</div>
+                    <div className="text-xs text-brand-600 truncate">{modalJornada.email || '—'}</div>
+                  </div>
+                  {modalJornada.cnpj && (
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">CNPJ</div>
+                      <div className="text-xs font-mono text-gray-700">{modalJornada.cnpj}</div>
+                    </div>
+                  )}
+                  {(modalJornada.cidade || modalJornada.estado) && (
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Localização</div>
+                      <div className="text-xs text-gray-700">{[modalJornada.cidade, modalJornada.estado].filter(Boolean).join(' · ')}</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Valor da oportunidade */}
+              {/* ── REUNIÃO ── */}
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Valor da oportunidade</label>
-                <input
-                  className="input w-full"
-                  placeholder="R$ 0,00"
-                  value={jornadaValor}
-                  onChange={e => setJornadaValor(e.target.value)}
-                />
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Reunião agendada</h3>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Data e hora</div>
+                    <div className="text-sm font-bold text-gray-900 font-mono">{modalJornada.data} · {modalJornada.hora}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Modalidade</div>
+                    <div className="text-xs font-semibold text-gray-800">
+                      {modalJornada.modalidade === 'online' ? '💻 Online' : modalJornada.modalidade === 'presencial' ? '📍 Presencial' : '🔀 Híbrido'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">ICP Score</div>
+                    <div className={`text-sm font-bold font-mono ${modalJornada.icp >= 70 ? 'text-emerald-600' : modalJornada.icp >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{modalJornada.icp}/100</div>
+                  </div>
+                </div>
+                {modalJornada.link && (
+                  <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center justify-between">
+                    <span className="text-xs text-blue-700 font-medium truncate">{modalJornada.link}</span>
+                    <a href={modalJornada.link.startsWith('http') ? modalJornada.link : `https://${modalJornada.link}`} target="_blank" rel="noreferrer"
+                      className="ml-2 flex-shrink-0 text-xs font-semibold text-blue-600 hover:text-blue-700 underline">Entrar →</a>
+                  </div>
+                )}
+                {modalJornada.endereco && (
+                  <div className="mt-2 bg-orange-50 border border-orange-100 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-orange-600 mb-0.5">📍 Endereço</div>
+                    <div className="text-xs text-gray-700">{modalJornada.endereco}{modalJornada.cidade ? `, ${modalJornada.cidade}` : ''}{modalJornada.estado ? ` — ${modalJornada.estado}` : ''}</div>
+                  </div>
+                )}
               </div>
 
-              {/* Nota */}
+              {/* ── RESUMO DA LIGAÇÃO DE AGENDAMENTO ── */}
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Nota / observação</label>
-                <textarea
-                  className="input w-full min-h-[90px] resize-none"
-                  placeholder="Próximo passo, objeções levantadas, pontos importantes..."
-                  value={jornadaNota}
-                  onChange={e => setJornadaNota(e.target.value)}
-                />
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">O que foi dito na ligação</h3>
+                <div className="bg-gray-50 rounded-xl p-4 border-l-2 border-brand-400">
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {modalJornada.resumo_ligacao || <span className="italic text-gray-400">Sem resumo registrado pela IA.</span>}
+                  </p>
+                  <div className="flex items-center gap-4 mt-3 pt-2 border-t border-gray-200 flex-wrap">
+                    {modalJornada.agente && <div className="text-2xs text-gray-400">Agente: <strong className="text-gray-600">{modalJornada.agente}</strong></div>}
+                    {modalJornada.duracao_ligacao && <div className="text-2xs text-gray-400">Duração: <strong className="text-gray-600">{modalJornada.duracao_ligacao}</strong></div>}
+                    {modalJornada.campanha && <div className="text-2xs text-gray-400">Campanha: <strong className="text-gray-600">{modalJornada.campanha}</strong></div>}
+                  </div>
+                </div>
+                {modalJornada.sinais.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {modalJornada.sinais.map((s, i) => (
+                      <span key={i} className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">{s}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── JORNADA (editável) ── */}
+              <div className="border-t border-gray-100 pt-5">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Atualizar jornada</h3>
+
+                {/* Etapa */}
+                <div className="mb-4">
+                  <label className="text-xs font-semibold text-gray-600 block mb-2">Etapa atual</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {ETAPAS_JORNADA.map(e => (
+                      <button key={e.id} onClick={() => setJornadaEtapa(e.id)}
+                        className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
+                          jornadaEtapa === e.id
+                            ? 'border-brand-500 bg-brand-50 text-brand-700'
+                            : 'border-gray-100 text-gray-500 hover:border-brand-200 hover:bg-brand-50/50'
+                        }`}
+                      >
+                        <span className="text-base">{e.icon}</span>
+                        <span className="text-center leading-tight">{e.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Valor da oportunidade</label>
+                    <input className="input w-full" placeholder="R$ 0,00" value={jornadaValor} onChange={e => setJornadaValor(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1.5">Resultado</label>
+                    <select className="input w-full" value={modalJornada.resultado ?? ''} onChange={e => setModalJornada(prev => prev ? { ...prev, resultado: e.target.value } : prev)}>
+                      <option value="">Aguardando...</option>
+                      <option value="fechou">💰 Fechou negócio</option>
+                      <option value="noshow">👻 No-show</option>
+                      <option value="perdemos">❌ Perdemos</option>
+                      <option value="reagendou">🔄 Reagendou</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1.5">Nota / próximo passo</label>
+                  <textarea className="input w-full min-h-[80px] resize-none" placeholder="Objeções levantadas, próximo passo, pontos importantes para o follow-up..."
+                    value={jornadaNota} onChange={e => setJornadaNota(e.target.value)} />
+                </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
               <button onClick={() => setModalJornada(null)} className="btn-secondary flex-1">Cancelar</button>
               <button onClick={salvarJornada} disabled={jornadaSalvando} className="btn-primary flex-1 disabled:opacity-60">
                 {jornadaSalvando ? 'Salvando...' : '💾 Salvar jornada'}
