@@ -147,6 +147,9 @@ export const whatsappUsuarioApi = {
   naoLidas:    () => api.get('/whatsapp/eu/nao-lidas'),
   /** Configura webhook na instância existente (chamado ao abrir a página) */
   configurarWebhook: () => api.post('/whatsapp/eu/configurar-webhook', {}),
+  /** Apaga todas as mensagens de uma conversa pelo telefone */
+  apagarConversa: (telefone: string) =>
+    api.delete(`/whatsapp/eu/conversa/${encodeURIComponent(telefone)}`),
 }
 
 // Planos

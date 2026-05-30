@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { whatsappUsuarioApi } from '@/services/api'
-import { MessageSquare, Search, Send, RefreshCw, Phone, User, CheckCheck, Clock, Wifi, WifiOff, FlaskConical, ChevronDown, ChevronUp } from 'lucide-react'
+import { MessageSquare, Search, Send, RefreshCw, Phone, User, CheckCheck, Clock, Wifi, WifiOff, Trash2, X } from 'lucide-react'
 import clsx from 'clsx'
 
 // ─── Templates rápidos ────────────────────────────────────────────────────────
@@ -43,16 +43,15 @@ export default function MensagensPage() {
   const qc = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const [conversa, setConversa]     = useState<Conversa | null>(null)
-  const [busca, setBusca]           = useState('')
-  const [texto, setTexto]           = useState('')
-  const [enviando, setEnviando]     = useState(false)
-  const [toastMsg, setToastMsg]     = useState<string | null>(null)
-  const [waStatus, setWaStatus]     = useState<'conectado' | 'desconectado' | 'verificando'>('verificando')
-  const [webhookOk, setWebhookOk]   = useState<boolean | null>(null)
-  const [testeTelefone, setTesteTelefone] = useState('')
-  const [testeAberto, setTesteAberto]     = useState(false)
-  const [testeEnviando, setTesteEnviando] = useState(false)
+  const [conversa, setConversa]         = useState<Conversa | null>(null)
+  const [busca, setBusca]               = useState('')
+  const [texto, setTexto]               = useState('')
+  const [enviando, setEnviando]         = useState(false)
+  const [toastMsg, setToastMsg]         = useState<string | null>(null)
+  const [waStatus, setWaStatus]         = useState<'conectado' | 'desconectado' | 'verificando'>('verificando')
+  const [confirmApagar, setConfirmApagar] = useState<Conversa | null>(null)
+  const [apagando, setApagando]         = useState(false)
+  const [hoverTel, setHoverTel]         = useState<string | null>(null)
 
   function toast(m: string) { setToastMsg(m); setTimeout(() => setToastMsg(null), 4000) }
 
@@ -63,9 +62,7 @@ export default function MensagensPage() {
       .catch(() => setWaStatus('desconectado'))
 
     // Garante que o webhook está configurado na instância existente
-    whatsappUsuarioApi.configurarWebhook()
-      .then(r => setWebhookOk((r.data as any).ok === true))
-      .catch(() => setWebhookOk(false))
+    whatsappUsuarioApi.configurarWebhook().catch(() => {})
   }, [])
 
   // Lista de conversas — polling a cada 5s
@@ -116,6 +113,22 @@ export default function MensagensPage() {
       }
     } finally {
       setEnviando(false)
+    }
+  }
+
+  async function apagarConversa(c: Conversa) {
+    setApagando(true)
+    try {
+      await whatsappUsuarioApi.apagarConversa(c.telefone)
+      if (conversa?.telefone === c.telefone) setConversa(null)
+      qc.invalidateQueries({ queryKey: ['wa-conversas'] })
+      qc.removeQueries({ queryKey: ['wa-historico', c.telefone] })
+      toast('Conversa apagada')
+    } catch {
+      toast('Erro ao apagar conversa')
+    } finally {
+      setApagando(false)
+      setConfirmApagar(null)
     }
   }
 
@@ -179,69 +192,6 @@ export default function MensagensPage() {
         </div>
       </div>
 
-      {/* Painel de teste */}
-      <div className="mx-6 mt-3 flex-shrink-0">
-        <button onClick={() => setTesteAberto(v => !v)}
-          className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors">
-          <FlaskConical size={13} className="text-brand-500"/>
-          Testar recebimento de mensagens
-          {testeAberto ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
-          {webhookOk === true && <span className="ml-1 text-emerald-600 font-semibold">✓ Webhook ativo</span>}
-          {webhookOk === false && <span className="ml-1 text-amber-600 font-semibold">⚠ Webhook não configurado</span>}
-        </button>
-
-        {testeAberto && (
-          <div className="mt-2 bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
-            <p className="text-xs font-semibold text-gray-800">Guia de teste em 3 passos:</p>
-            <ol className="text-xs text-gray-600 space-y-2 list-none">
-              <li className="flex gap-2">
-                <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center flex-shrink-0 text-2xs">1</span>
-                <span>Envie uma mensagem de teste para o número abaixo e veja se aparece na lista</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center flex-shrink-0 text-2xs">2</span>
-                <span>Digite seu próprio número e clique em Enviar — você receberá no celular</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center flex-shrink-0 text-2xs">3</span>
-                <span>Responda do celular — a resposta deve aparecer no chat em até 5 segundos</span>
-              </li>
-            </ol>
-
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="text-2xs font-medium text-gray-600 block mb-1">Seu número (para teste)</label>
-                <input className="input text-sm font-mono py-1.5" placeholder="(11) 99999-9999" type="tel"
-                  value={testeTelefone} onChange={e => setTesteTelefone(e.target.value)}/>
-              </div>
-              <button
-                disabled={!testeTelefone.trim() || testeEnviando || waStatus !== 'conectado'}
-                onClick={async () => {
-                  setTesteEnviando(true)
-                  try {
-                    await whatsappUsuarioApi.enviar({
-                      telefone: testeTelefone,
-                      mensagem: '✅ Teste ETZ — Mensagens funcionando! Responda esta mensagem para testar o recebimento.'
-                    })
-                    toast('✓ Mensagem de teste enviada! Responda do celular para testar o recebimento.')
-                    qc.invalidateQueries({ queryKey: ['wa-conversas'] })
-                    setTesteAberto(false)
-                  } catch (e: any) {
-                    toast('Erro: ' + (e?.response?.data?.error ?? e.message))
-                  } finally {
-                    setTesteEnviando(false)
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#25d366' }}>
-                {testeEnviando ? <RefreshCw size={13} className="animate-spin"/> : <Send size={13}/>}
-                Enviar teste
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Aviso WA desconectado */}
       {waStatus === 'desconectado' && (
         <div className="mx-6 mt-3 flex-shrink-0 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 flex items-center gap-2">
@@ -282,51 +232,68 @@ export default function MensagensPage() {
                 <MessageSquare size={28} className="text-gray-300 mb-2"/>
                 <p className="text-sm font-medium text-gray-500">Nenhuma conversa ainda</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Inicie uma conversa pela aba Chamada Manual
+                  As confirmações de reunião enviadas pelo agente aparecerão aqui
                 </p>
               </div>
             )}
             {conversasFiltradas.map(c => (
-              <button
+              <div
                 key={c.telefone}
-                onClick={() => setConversa(c)}
-                className={clsx(
-                  'w-full flex items-start gap-3 px-4 py-3 border-b border-gray-50 text-left transition-colors',
-                  conversa?.telefone === c.telefone
-                    ? 'bg-emerald-50 border-l-2 border-l-emerald-500'
-                    : 'hover:bg-gray-50'
-                )}
+                className="relative"
+                onMouseEnter={() => setHoverTel(c.telefone)}
+                onMouseLeave={() => setHoverTel(null)}
               >
-                {/* Avatar */}
-                <div className={clsx(
-                  'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold',
-                  c.nao_lidas > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                )}>
-                  {iniciais(c)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-1">
-                    <span className={clsx('text-sm truncate', c.nao_lidas > 0 ? 'font-semibold text-gray-900' : 'font-medium text-gray-700')}>
-                      {nomeExibido(c)}
-                    </span>
-                    <span className="text-2xs text-gray-400 flex-shrink-0">{formatData(c.ultima_data)}</span>
-                  </div>
-                  {c.empresa && c.nome && (
-                    <p className="text-2xs text-gray-400 truncate">{c.empresa}</p>
+                <button
+                  onClick={() => setConversa(c)}
+                  className={clsx(
+                    'w-full flex items-start gap-3 px-4 py-3 border-b border-gray-50 text-left transition-colors',
+                    conversa?.telefone === c.telefone
+                      ? 'bg-emerald-50 border-l-2 border-l-emerald-500'
+                      : 'hover:bg-gray-50'
                   )}
-                  <div className="flex items-center justify-between mt-0.5">
-                    <p className={clsx('text-xs truncate', c.nao_lidas > 0 ? 'text-gray-700 font-medium' : 'text-gray-400')}>
-                      {c.direcao === 'enviada' && <CheckCheck size={11} className="inline mr-0.5 text-emerald-500"/>}
-                      {c.ultima_mensagem || <span className="italic text-gray-300">Sem prévia</span>}
-                    </p>
-                    {c.nao_lidas > 0 && (
-                      <span className="ml-1 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white text-2xs font-bold flex items-center justify-center">
-                        {c.nao_lidas > 9 ? '9+' : c.nao_lidas}
-                      </span>
-                    )}
+                >
+                  {/* Avatar */}
+                  <div className={clsx(
+                    'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold',
+                    c.nao_lidas > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                  )}>
+                    {iniciais(c)}
                   </div>
-                </div>
-              </button>
+                  <div className="flex-1 min-w-0 pr-6">
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className={clsx('text-sm truncate', c.nao_lidas > 0 ? 'font-semibold text-gray-900' : 'font-medium text-gray-700')}>
+                        {nomeExibido(c)}
+                      </span>
+                      <span className="text-2xs text-gray-400 flex-shrink-0">{formatData(c.ultima_data)}</span>
+                    </div>
+                    {c.empresa && c.nome && (
+                      <p className="text-2xs text-gray-400 truncate">{c.empresa}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className={clsx('text-xs truncate', c.nao_lidas > 0 ? 'text-gray-700 font-medium' : 'text-gray-400')}>
+                        {c.direcao === 'enviada' && <CheckCheck size={11} className="inline mr-0.5 text-emerald-500"/>}
+                        {c.ultima_mensagem || <span className="italic text-gray-300">Sem prévia</span>}
+                      </p>
+                      {c.nao_lidas > 0 && (
+                        <span className="ml-1 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white text-2xs font-bold flex items-center justify-center">
+                          {c.nao_lidas > 9 ? '9+' : c.nao_lidas}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Botão apagar — aparece no hover */}
+                {hoverTel === c.telefone && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmApagar(c) }}
+                    title="Apagar conversa"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors z-10"
+                  >
+                    <Trash2 size={14}/>
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -367,6 +334,14 @@ export default function MensagensPage() {
                     </button>
                   ))}
                 </div>
+                {/* Apagar conversa no header */}
+                <button
+                  onClick={() => setConfirmApagar(conversa)}
+                  title="Apagar conversa"
+                  className="ml-2 w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                >
+                  <Trash2 size={15}/>
+                </button>
               </div>
 
               {/* Mensagens */}
@@ -445,6 +420,44 @@ export default function MensagensPage() {
         </div>
 
       </div>
+
+      {/* Modal confirmar apagar */}
+      {confirmApagar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={18} className="text-red-600"/>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Apagar conversa?</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Todas as mensagens com{' '}
+                  <span className="font-medium text-gray-700">
+                    {confirmApagar.nome ?? confirmApagar.empresa ?? confirmApagar.telefone}
+                  </span>{' '}
+                  serão apagadas permanentemente do sistema.
+                </p>
+              </div>
+              <button onClick={() => setConfirmApagar(null)} className="ml-auto text-gray-400 hover:text-gray-600">
+                <X size={16}/>
+              </button>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmApagar(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={() => apagarConversa(confirmApagar)}
+                disabled={apagando}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2">
+                {apagando ? <RefreshCw size={13} className="animate-spin"/> : <Trash2 size={13}/>}
+                Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toastMsg && (
