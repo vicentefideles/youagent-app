@@ -977,9 +977,6 @@ function TabAgendados() {
   })
 
   const [modalJornada, setModalJornada] = useState<Agendamento | null>(null)
-  const [etapaSelecionada, setEtapaSelecionada] = useState('Agendado')
-  const [valorOpor, setValorOpor] = useState('')
-  const [nota, setNota] = useState('')
 
   // Filtros
   const [filtroCampanha, setFiltroCampanha] = useState('')
@@ -1415,40 +1412,60 @@ function TabAgendados() {
                   </div>
                 </div>
 
-                {/* Atualizar etapa */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 block mb-1.5">Atualizar etapa</label>
-                    <select className="input" value={etapaSelecionada} onChange={e => setEtapaSelecionada(e.target.value)}>
-                      {ETAPAS_JORNADA.map(e => <option key={e.id} value={e.id}>{e.icon} {e.label}</option>)}
-                      <option value="perdido">❌ Perdido</option>
-                    </select>
+                {/* Painel de acompanhamento — somente leitura para admin/gestor */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Vendedor</div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 text-2xs font-bold flex items-center justify-center">
+                        {(modalJornada.vendedor || 'VD').split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-semibold text-gray-900">{modalJornada.vendedor || '—'}</span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 block mb-1.5">Valor da oportunidade</label>
-                    <input className="input" placeholder="R$ 0,00" value={valorOpor} onChange={e => setValorOpor(e.target.value)} />
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Risco No-show</div>
+                    <div className={clsx('text-sm font-bold', modalJornada.noShowRisk < 25 ? 'text-emerald-600' : 'text-amber-600')}>
+                      {modalJornada.noShowRisk}%
+                    </div>
+                    <div className={clsx('text-2xs', modalJornada.noShowRisk < 25 ? 'text-emerald-500' : 'text-amber-500')}>
+                      {modalJornada.noShowRisk < 25 ? 'Baixo risco' : 'Médio risco'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Resultado</div>
+                    {modalJornada.resultado
+                      ? <div className={clsx('text-xs font-bold',
+                          modalJornada.resultado === 'fechou'   ? 'text-emerald-600' :
+                          modalJornada.resultado === 'noshow'   ? 'text-amber-600' :
+                          modalJornada.resultado === 'perdemos' ? 'text-red-600' : 'text-brand-600'
+                        )}>
+                          {{ fechou:'💰 Negócio fechado', noshow:'👻 No-show', perdemos:'❌ Perdemos', reagendou:'🔄 Reagendado' }[modalJornada.resultado] ?? modalJornada.resultado}
+                        </div>
+                      : <div className="text-xs text-gray-400 italic">Aguardando vendedor</div>
+                    }
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 block mb-1.5">Nota</label>
-                  <textarea className="input min-h-[80px] resize-none" placeholder="Adicione uma nota sobre esta oportunidade..." value={nota} onChange={e => setNota(e.target.value)} />
+
+                {/* Nota do vendedor */}
+                {modalJornada.notaVendedor && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nota do vendedor</h3>
+                    <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3">
+                      <p className="text-sm text-gray-700 leading-relaxed">{modalJornada.notaVendedor}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Aviso read-only */}
+                <div className="flex items-center gap-2 bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
+                  <span className="text-brand-400">🔒</span>
+                  <p className="text-xs text-brand-600">A jornada é atualizada pelo vendedor na área dele. Aqui você acompanha o progresso em tempo real.</p>
                 </div>
               </div>
 
               <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
-                <button onClick={() => setModalJornada(null)} className="btn-secondary flex-1">Cancelar</button>
-                <button
-                  className="btn-primary flex-1"
-                  onClick={() => {
-                    if (modalJornada) {
-                      reunioesApi.update(modalJornada.id, { etapa: etapaSelecionada, valor_oportunidade: valorOpor, nota }).catch(console.error)
-                    }
-                    setModalJornada(null)
-                    setEtapaSelecionada('Agendado')
-                    setValorOpor('')
-                    setNota('')
-                  }}
-                >Salvar etapa</button>
+                <button onClick={() => setModalJornada(null)} className="btn-primary flex-1">Fechar</button>
               </div>
             </div>
           </div>

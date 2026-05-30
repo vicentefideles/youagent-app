@@ -247,11 +247,13 @@ function TabAgenda({
   setReunioes,
   onVerFicha,
   onVerResultado,
+  onVerJornada,
 }: {
   reunioes: Reuniao[]
   setReunioes: React.Dispatch<React.SetStateAction<Reuniao[]>>
   onVerFicha: (r: Reuniao) => void
   onVerResultado: (r: Reuniao) => void
+  onVerJornada: (r: Reuniao) => void
 }) {
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [reagendandoId, setReagendandoId] = useState<number | null>(null)
@@ -427,6 +429,12 @@ function TabAgenda({
                   >
                     <FileText size={11} />
                     Ver ficha
+                  </button>
+                  <button
+                    onClick={() => onVerJornada(r)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-brand-300 rounded-md text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
+                  >
+                    📋 Jornada
                   </button>
                   {r.status === 'Pendente' && (
                     <button
@@ -1828,6 +1836,37 @@ export default function VendedorPageRestrita() {
   const [resultadoReuniao, setResultadoReuniao] = useState<Reuniao | null>(null)
   const [reunioes, setReunioes] = useState<Reuniao[]>([])
 
+  // Modal Jornada — editável pelo vendedor
+  const [modalJornada, setModalJornada] = useState<Reuniao | null>(null)
+  const [jornadaEtapa, setJornadaEtapa] = useState('')
+  const [jornadaValor, setJornadaValor] = useState('')
+  const [jornadaNota, setJornadaNota] = useState('')
+  const [jornadaSalvando, setJornadaSalvando] = useState(false)
+  const [jornadaToast, setJornadaToast] = useState(false)
+
+  function abrirJornada(r: Reuniao) {
+    setModalJornada(r)
+    setJornadaEtapa((r as any).etapa ?? 'agendado')
+    setJornadaValor((r as any).valor_oportunidade ?? '')
+    setJornadaNota((r as any).nota ?? '')
+  }
+
+  async function salvarJornada() {
+    if (!modalJornada) return
+    setJornadaSalvando(true)
+    try {
+      await reunioesApi.update(String(modalJornada.id), {
+        etapa: jornadaEtapa,
+        valor_oportunidade: jornadaValor,
+        nota: jornadaNota,
+      })
+      setJornadaToast(true)
+      setTimeout(() => setJornadaToast(false), 3000)
+      setModalJornada(null)
+    } catch { /* silent */ }
+    finally { setJornadaSalvando(false) }
+  }
+
   useEffect(() => {
     setReunioes(reunioesReais)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1898,8 +1937,95 @@ export default function VendedorPageRestrita() {
     { id: 'whatsapp', label: 'Meu WhatsApp', icon: <MessageCircle size={14} /> },
   ]
 
+  const ETAPAS_JORNADA = [
+    { id: 'qualificado',  label: 'Qualificado',     icon: '✅' },
+    { id: 'agendado',     label: 'Agendado',         icon: '📅' },
+    { id: 'realizado',    label: 'Realizado',        icon: '🤝' },
+    { id: 'negociacao',   label: 'Negociação',       icon: '💬' },
+    { id: 'proposta',     label: 'Proposta enviada', icon: '📋' },
+    { id: 'fechado',      label: 'Fechado',          icon: '🏆' },
+    { id: 'perdido',      label: 'Perdido',          icon: '❌' },
+  ]
+
   return (
     <div className="p-6 space-y-5 animate-fade-in">
+
+      {/* Toast jornada salva */}
+      {jornadaToast && (
+        <div className="fixed top-4 right-4 z-50 bg-brand-600 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+          ✓ Jornada atualizada com sucesso
+        </div>
+      )}
+
+      {/* Modal Jornada — editável pelo vendedor */}
+      {modalJornada && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setModalJornada(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Jornada — {modalJornada.empresa}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{modalJornada.contato} · {modalJornada.data} {modalJornada.hora}</p>
+              </div>
+              <button onClick={() => setModalJornada(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">✕</button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Etapa */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Etapa atual</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {ETAPAS_JORNADA.map(e => (
+                    <button
+                      key={e.id}
+                      onClick={() => setJornadaEtapa(e.id)}
+                      className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
+                        jornadaEtapa === e.id
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-gray-100 text-gray-500 hover:border-brand-200 hover:bg-brand-50/50'
+                      }`}
+                    >
+                      <span className="text-base">{e.icon}</span>
+                      <span className="text-center leading-tight">{e.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Valor da oportunidade */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Valor da oportunidade</label>
+                <input
+                  className="input w-full"
+                  placeholder="R$ 0,00"
+                  value={jornadaValor}
+                  onChange={e => setJornadaValor(e.target.value)}
+                />
+              </div>
+
+              {/* Nota */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Nota / observação</label>
+                <textarea
+                  className="input w-full min-h-[90px] resize-none"
+                  placeholder="Próximo passo, objeções levantadas, pontos importantes..."
+                  value={jornadaNota}
+                  onChange={e => setJornadaNota(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setModalJornada(null)} className="btn-secondary flex-1">Cancelar</button>
+              <button onClick={salvarJornada} disabled={jornadaSalvando} className="btn-primary flex-1 disabled:opacity-60">
+                {jornadaSalvando ? 'Salvando...' : '💾 Salvar jornada'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -1965,6 +2091,7 @@ export default function VendedorPageRestrita() {
             setReunioes={setReunioes}
             onVerFicha={handleVerFicha}
             onVerResultado={handleVerResultado}
+            onVerJornada={abrirJornada}
           />
         )}
         {tab === 'ficha' && (
