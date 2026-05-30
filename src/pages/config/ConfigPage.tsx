@@ -30,7 +30,7 @@ import { useAuthStore } from '@/store/authStore'
 import ModuloBloqueado from '@/components/ModuloBloqueado'
 
 // Extended section IDs not yet in ProfileContext
-type ExtConfigSection = ConfigSection | 'horarios' | 'clientes' | 'meu-whatsapp'
+type ExtConfigSection = ConfigSection | 'horarios' | 'clientes'
 
 // ─── Inline Toggle ────────────────────────────────────────────────────────────
 
@@ -1914,7 +1914,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dev',                    label: 'Desenvolvimento',  icon: <Terminal className="w-4 h-4" />,   adminOnly: true  },
   { id: 'crm',                    label: 'CRM',              icon: <Database className="w-4 h-4" />,   adminOnly: false },
   { id: 'api',                    label: 'API & Webhooks',   icon: <Key className="w-4 h-4" />,        adminOnly: true  },
-  { id: 'meu-whatsapp',          label: 'Meu WhatsApp',     icon: <MessageSquare className="w-4 h-4" />, adminOnly: false, roles: ['admin_cliente', 'gerente', 'cliente'] },
+  { id: 'meu-whatsapp',          label: 'Meu WhatsApp',     icon: <MessageSquare className="w-4 h-4" />, adminOnly: false },
 ]
 
 // ─── ConfigPage ───────────────────────────────────────────────────────────────

@@ -36,19 +36,20 @@ export const NAV_RULES: Record<UserRole, NavRoute[]> = {
 export type ConfigSection =
   | 'empresa' | 'integracoes' | 'integracoes-avancadas'
   | 'seguranca' | 'notificacoes' | 'equipe' | 'dev' | 'crm' | 'api'
+  | 'meu-whatsapp'
 
 export const CONFIG_RULES: Record<UserRole, ConfigSection[]> = {
   admin_cliente: [
     'empresa', 'integracoes', 'integracoes-avancadas', 'seguranca',
-    'notificacoes', 'equipe', 'dev', 'crm', 'api',
+    'notificacoes', 'equipe', 'dev', 'crm', 'api', 'meu-whatsapp',
   ],
   gerente: [
-    'empresa', 'integracoes', 'notificacoes', 'equipe', 'crm',
+    'empresa', 'integracoes', 'notificacoes', 'equipe', 'crm', 'meu-whatsapp',
   ],
   vendedor: [],
   colaborador: [],
   platform_admin: [
-    'empresa', 'integracoes', 'seguranca', 'equipe', 'dev', 'api',
+    'empresa', 'integracoes', 'seguranca', 'equipe', 'dev', 'api', 'meu-whatsapp',
   ],
 }
 
