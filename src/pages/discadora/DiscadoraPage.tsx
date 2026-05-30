@@ -67,7 +67,12 @@ const AGENDAMENTOS_FALLBACK: Agendamento[] = [
   { id:'a3', empresa:'Tech Nova Sistemas', contato:'Carla Mendes', cargo:'Gestora Comercial', telefone:'(11) 96543-2109', email:'carla@technova.com.br', modalidade:'online', cidade:'São Paulo', segmento:'SaaS / Tech', resumoLigacao:'Interesse imediato em substituir o processo manual de prospecção. Solicitou demo completa da plataforma.', agente:'Ana', duracaoLigacao:'1m45s', dataHora:'15/05 · 09h30', meetLink:'meet.google.com/xyz-456', vendedor:'Maria Rodrigues', vendedorIniciais:'MR', status:'pendente', noShowRisk:24, campanha:'SP — Campanha Maio' },
 ]
 
-// Legacy gravacoes mock removed — TabGravacoes uses real API data
+const GRAVACOES_FALLBACK = [
+  { id:'g1', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', agente:'Ana (ETZ)', campanha:'SP — Campanha Maio', duracao:'2m34s', data:'14/05 · 14h12', resultado:'agendou'   as const, tipo:'ia'           as const, icp:87, url_gravacao:'' },
+  { id:'g2', empresa:'Indústria Delta',     contato:'Roberto Alves', agente:'Carlos (ETZ)', campanha:'GO — Campanha Maio', duracao:'1m08s', data:'14/05 · 15h30', resultado:'retornar'  as const, tipo:'ia'           as const, icp:62, url_gravacao:'' },
+  { id:'g3', empresa:'Tech Nova Sistemas',  contato:'Carla Mendes',  agente:'Ana (ETZ)', campanha:'SP — Campanha Maio', duracao:'4m17s', data:'15/05 · 09h45', resultado:'agendou'   as const, tipo:'transferencia' as const, icp:91, url_gravacao:'' },
+  { id:'g4', empresa:'Logística Express',   contato:'Paulo Rocha',   agente:'—', campanha:'SP — Campanha Maio', duracao:'3m02s', data:'15/05 · 11h20', resultado:'nao_atendeu' as const, tipo:'manual'        as const, icp:55, url_gravacao:'' },
+]
 
 // ─── TRANSCRIÇÃO AO VIVO (polling) ─────────────────────────────────────────
 
@@ -1477,9 +1482,10 @@ function TabGravacoes() {
   const [filtroResultado, setFiltroResultado] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
 
-  const { data: equipeRaw = [] } = useQuery({
-    queryKey: ['equipe'],
-    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  // Agentes de IA (não vendedores)
+  const { data: agentesRaw = [] } = useQuery({
+    queryKey: ['agentes'],
+    queryFn: () => agentesApi.list().then(r => r.data as any[]),
   })
 
   const { data: gravacoesBruto = [] } = useQuery({
@@ -1503,7 +1509,15 @@ function TabGravacoes() {
     ),
   })
 
-  const gravacoes = gravacoesBruto.filter(g => {
+  // Usa fallback quando a API não retorna dados (demo / sem gravações reais)
+  const gravacoesList = gravacoesBruto.length > 0 ? gravacoesBruto : GRAVACOES_FALLBACK
+
+  // Opções de agente: da API de agentes; complementa com nomes únicos das gravações
+  const agentesOpcoes = agentesRaw.length > 0
+    ? agentesRaw.map((a: any) => a.nome as string)
+    : [...new Set(gravacoesList.map(g => g.agente).filter(n => n && n !== '—'))]
+
+  const gravacoes = gravacoesList.filter(g => {
     if (filtroAgente && g.agente !== filtroAgente) return false
     if (filtroResultado && g.resultado !== filtroResultado) return false
     if (filtroTipo && g.tipo !== filtroTipo) return false
@@ -1547,7 +1561,7 @@ function TabGravacoes() {
         <div className="flex items-center gap-2">
           <select className="input py-1.5 text-xs" value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)}>
             <option value="">Todos os agentes</option>
-            {equipeRaw.map((v: any) => <option key={v.id} value={v.nome}>{v.nome}</option>)}
+            {agentesOpcoes.map((nome: string) => <option key={nome} value={nome}>{nome}</option>)}
           </select>
           <select className="input py-1.5 text-xs" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
             <option value="">Todos os tipos</option>
@@ -1565,11 +1579,22 @@ function TabGravacoes() {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_120px] px-4 py-2 bg-gray-50 border-b border-gray-100">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_120px] px-4 py-2 bg-gray-50 border-b border-gray-100 items-center">
           {['Empresa / Contato','Agente','Tipo','Data / Hora','Duração','Resultado','Ações'].map(h => (
             <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
           ))}
         </div>
+        {(filtroAgente || filtroTipo || filtroResultado) && (
+          <div className="px-4 py-2 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
+            <span className="text-xs text-brand-700 font-medium">
+              {gravacoes.length} de {gravacoesList.length} gravação{gravacoesList.length !== 1 ? 'ões' : ''} encontrada{gravacoes.length !== 1 ? 's' : ''}
+            </span>
+            <button onClick={() => { setFiltroAgente(''); setFiltroTipo(''); setFiltroResultado('') }}
+              className="text-xs text-brand-600 hover:text-brand-800 font-medium flex items-center gap-1">
+              <X size={11}/> Limpar filtros
+            </button>
+          </div>
+        )}
         {gravacoes.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
             <Mic size={32} className="mb-3 opacity-30" />
@@ -1592,7 +1617,16 @@ function TabGravacoes() {
               <button onClick={() => setPlaying(playing === g.id ? null : g.id)} className={clsx('p-1.5 rounded-lg border transition-colors', playing === g.id ? 'bg-brand-500 border-brand-500 text-white' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-brand-50 hover:border-brand-300')}>
                 {playing === g.id ? <Pause size={12}/> : <Play size={12}/>}
               </button>
-              <button className="p-1.5 rounded-lg border bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200 transition-colors"><Download size={12}/></button>
+              {g.url_gravacao ? (
+                <a href={g.url_gravacao} target="_blank" rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg border bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center">
+                  <Download size={12}/>
+                </a>
+              ) : (
+                <button disabled className="p-1.5 rounded-lg border bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed" title="Gravação não disponível">
+                  <Download size={12}/>
+                </button>
+              )}
               <span className="text-2xs text-purple-600 font-medium flex items-center gap-1"><Brain size={10}/> CI ✓</span>
             </div>
           </div>
