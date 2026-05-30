@@ -1740,17 +1740,47 @@ function TabManual() {
   const [waMsg, setWaMsg]               = useState<string | null>(null)
   const [waMsgTexto, setWaMsgTexto]     = useState('')
   const [waHistorico, setWaHistorico]   = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Controles de chamada
+  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollingRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Fase da chamada: 'discando' | 'atendida' (cliente pegou) | null
+  const [faseCall, setFaseCall]         = useState<'discando' | 'atendida' | null>(null)
+  // Controles de chamada (só disponíveis quando atendida)
   const [mudo, setMudo]                 = useState(false)
   const [emEspera, setEmEspera]         = useState(false)
   const [mostrarDtmf, setMostrarDtmf]   = useState(false)
   const [toastCtrl, setToastCtrl]       = useState<string | null>(null)
   // Card de detalhes da chamada
   const [callCard, setCallCard]         = useState<any | null>(null)
-  // ciEnviando/ciEnviados removidos — CI é automático via backend
 
   function toastControl(m: string) { setToastCtrl(m); setTimeout(() => setToastCtrl(null), 3000) }
+
+  // Inicia polling de status da ligação para detectar atendimento e encerramento
+  function iniciarPolling(id: string) {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { data: lista } = await ligacoesApi.list({})
+        const lig = (lista as any[]).find(l => l.id === id)
+        if (!lig) return
+        if (lig.status === 'em_andamento' || lig.atendida_em) {
+          setFaseCall('atendida')
+        }
+        // Telnyx encerrou a chamada remotamente (ex: cliente desligou)
+        if (lig.status === 'encerrada' && faseCall !== null) {
+          if (pollingRef.current) clearInterval(pollingRef.current)
+          if (intervalRef.current) clearInterval(intervalRef.current)
+          setChamandoAtiva(false)
+          setFaseCall(null)
+          setResultado('encerrar')
+          refetchHistorico()
+        }
+      } catch { /* polling silencioso */ }
+    }, 2000)
+  }
+
+  function pararPolling() {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null }
+  }
 
   // Busca de contatos via API
   const { data: sugestoesRaw = [] } = useQuery({
@@ -1779,8 +1809,12 @@ function TabManual() {
     const tel = contato?.tel || numero
     if (!tel) return
     setChamandoAtiva(true)
+    setFaseCall('discando')
     setResultado(null)
     setNotaEmChamada('')
+    setMudo(false)
+    setEmEspera(false)
+    setMostrarDtmf(false)
     setTimer(0)
     intervalRef.current = setInterval(() => setTimer(t => t + 1), 1000)
     try {
@@ -1794,16 +1828,20 @@ function TabManual() {
       })
       const d = res.data as any
       setCallId(d?.call_control_id ?? null)
-      setLigacaoId(d?.id ?? null)
+      const newId = d?.id ?? null
+      setLigacaoId(newId)
+      if (newId) iniciarPolling(newId)
     } catch (err) {
       console.error('Erro ao iniciar chamada manual:', err)
       setChamandoAtiva(false)
+      setFaseCall(null)
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }
 
   async function registrarResultado(res: string) {
     setSalvando(true)
+    pararPolling()
     if (intervalRef.current) clearInterval(intervalRef.current)
 
     // 1. Salva nota em-chamada via /anotacao (CI ingestion) se houver
@@ -2160,12 +2198,26 @@ function TabManual() {
                 <div className="text-base font-bold text-gray-900">{contato?.nome ?? (contato?.tel || numero)}</div>
                 <div className="text-xs text-gray-500">{contato?.empresa ?? 'Contato manual'}</div>
                 <div className="text-2xl font-mono font-bold text-gray-900 mt-1">{formatTimer(timer)}</div>
-                <span className="badge badge-success mt-1 animate-pulse text-2xs">● Em ligação</span>
-                {motivo && <span className="text-2xs text-amber-600 font-medium mt-0.5 text-center">{motivo}</span>}
+                {faseCall === 'discando' ? (
+                  <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                    <RefreshCw size={10} className="animate-spin"/> Discando…
+                  </span>
+                ) : (
+                  <span className="badge badge-success mt-1 animate-pulse text-2xs">● Cliente atendeu</span>
+                )}
+                {motivo && <span className="text-2xs text-gray-500 font-medium mt-0.5 text-center">{motivo}</span>}
               </div>
 
-              {/* ── Controles de chamada ── */}
-              <div className="flex items-center justify-center gap-3 mb-4 pb-4 border-b border-gray-100">
+              {/* Aviso discando */}
+              {faseCall === 'discando' && (
+                <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-center">
+                  <p className="text-xs text-amber-700 font-medium">Aguardando o cliente atender…</p>
+                  <p className="text-2xs text-amber-500 mt-0.5">Os controles ficam disponíveis quando a ligação for atendida</p>
+                </div>
+              )}
+
+              {/* ── Controles de chamada (só quando atendida) ── */}
+              <div className={clsx('flex items-center justify-center gap-3 mb-4 pb-4 border-b border-gray-100', faseCall !== 'atendida' && 'opacity-30 pointer-events-none')}>
                 {/* Mudo */}
                 <button
                   onClick={async () => {
@@ -2244,9 +2296,10 @@ function TabManual() {
                 </label>
                 <textarea
                   className="input min-h-[70px] resize-none text-xs"
+                  disabled={faseCall === 'discando'}
                   value={notaEmChamada}
                   onChange={e => setNotaEmChamada(e.target.value)}
-                  placeholder="Objeções, interesse, próximos passos..."/>
+                  placeholder={faseCall === 'discando' ? 'Disponível quando o cliente atender…' : 'Objeções, interesse, próximos passos...'}/>
               </div>
 
               {/* Botões de resultado */}
@@ -2257,7 +2310,7 @@ function TabManual() {
                   { id:'nao_atendeu', label:'📵 Não atendeu',       cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
                   { id:'encerrar',    label:'⏹ Encerrar',           cls:'border-gray-300 text-gray-600 hover:bg-gray-50' },
                 ].map(btn => (
-                  <button key={btn.id} onClick={() => { registrarResultado(btn.id); setMudo(false); setEmEspera(false); setMostrarDtmf(false) }} disabled={salvando}
+                  <button key={btn.id} onClick={() => { registrarResultado(btn.id); setMudo(false); setEmEspera(false); setMostrarDtmf(false); setFaseCall(null) }} disabled={salvando}
                     className={clsx('text-xs font-semibold py-2.5 px-3 rounded-xl border bg-white transition-colors disabled:opacity-50', btn.cls)}>
                     {btn.label}
                   </button>
@@ -2294,7 +2347,7 @@ function TabManual() {
                   <p className="text-2xs text-brand-600">As anotações treinam o agente desta conta</p>
                 </div>
               </div>
-              <button onClick={() => { setResultado(null); setNotaEmChamada(''); setAnotacao(''); setContato(null); setNumero(''); setMudo(false); setEmEspera(false) }}
+              <button onClick={() => { setResultado(null); setNotaEmChamada(''); setAnotacao(''); setContato(null); setNumero(''); setMudo(false); setEmEspera(false); setFaseCall(null); pararPolling() }}
                 className="btn-secondary mt-4 text-sm gap-2">
                 <RotateCcw size={13}/> Nova chamada
               </button>
