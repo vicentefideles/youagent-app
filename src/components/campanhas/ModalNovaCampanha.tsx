@@ -203,10 +203,119 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   )
 }
 
+// ── Pre-flight check ─────────────────────────────────────────────────────────
+interface CheckItem {
+  id: string
+  label: string
+  desc: string
+  status: 'ok' | 'warn' | 'error'
+  detail?: string
+}
+
+function buildChecks(form: FormState, agentes: { id: string; nome: string }[]): CheckItem[] {
+  const checks: CheckItem[] = []
+
+  // 1. Nome da campanha
+  checks.push({
+    id: 'nome',
+    label: 'Nome da campanha',
+    desc: 'Identificação única para acompanhar resultados e relatórios.',
+    status: form.nome.trim() ? 'ok' : 'error',
+    detail: form.nome.trim() ? `"${form.nome.trim()}"` : 'Obrigatório — informe o nome antes de ativar.',
+  })
+
+  // 2. Agente de IA
+  const agenteNome = form.agente_id === 'auto'
+    ? 'Automático (CI escolhe o melhor agente)'
+    : agentes.find(a => a.id === form.agente_id)?.nome
+  checks.push({
+    id: 'agente',
+    label: 'Agente de IA',
+    desc: 'Responsável pelas ligações. O CI vai alimentá-lo com argumentos validados de outras campanhas.',
+    status: form.agente_id ? 'ok' : 'warn',
+    detail: agenteNome || 'Nenhum agente selecionado — o CI selecionará automaticamente.',
+  })
+
+  // 3. Vendedores
+  const nVend = form.vendedoresSelecionados?.length ?? 0
+  checks.push({
+    id: 'vendedores',
+    label: 'Vendedores para receber reuniões',
+    desc: 'O agente agenda reuniões diretamente na agenda dos vendedores selecionados.',
+    status: nVend > 0 ? 'ok' : 'warn',
+    detail: nVend > 0 ? `${nVend} vendedor${nVend > 1 ? 'es' : ''} selecionado${nVend > 1 ? 's' : ''}` : 'Nenhum vendedor — adicione na seção Vendedores antes de ativar.',
+  })
+
+  // 4. Janela de operação
+  const temHorario = form.hora_inicio && form.hora_fim
+  const temDias    = form.dias_operacao.length > 0
+  checks.push({
+    id: 'janela',
+    label: 'Janela de operação',
+    desc: 'O engine respeita rigorosamente esses horários — nenhuma ligação fora da janela.',
+    status: temHorario && temDias ? 'ok' : 'warn',
+    detail: temHorario && temDias
+      ? `${form.hora_inicio}–${form.hora_fim} · ${form.dias_operacao.join(', ')}`
+      : 'Configure horário e dias de operação.',
+  })
+
+  // 5. ICP
+  checks.push({
+    id: 'icp',
+    label: 'Centro de Inteligência (ICP)',
+    desc: 'Filtra contatos por propensão de compra antes de ligar. Melhora a cada campanha.',
+    status: form.icp_ativo ? 'ok' : 'warn',
+    detail: form.icp_ativo
+      ? 'Ativo — o CI vai qualificar e priorizar os contatos automaticamente.'
+      : 'Desativado — o agente ligará para todos os contatos sem filtro de qualidade.',
+  })
+
+  // 6. Orquestração
+  const orqAtivos = [form.orq_nao_atendeu_on, form.orq_recusou_on, form.orq_agendou_on, form.orq_gatekeeper_on].filter(Boolean).length
+  checks.push({
+    id: 'orq',
+    label: 'Orquestração multi-canal',
+    desc: 'Automações pós-ligação: WhatsApp, e-mail e lembretes sem nenhuma ação manual.',
+    status: orqAtivos > 0 ? 'ok' : 'warn',
+    detail: orqAtivos > 0
+      ? `${orqAtivos} bloco${orqAtivos > 1 ? 's' : ''} ativo${orqAtivos > 1 ? 's' : ''} (não atendeu · recusou · agendou · gatekeeper)`
+      : 'Nenhum bloco ativo — ative ao menos um para maximizar o retorno da campanha.',
+  })
+
+  // 7. Contexto de tipo
+  const tipoOk =
+    (form.tipo === 'inbound'   && !!form.inbound_fonte) ||
+    (form.tipo === 'renovacao' && !!form.ren_produto) ||
+    (form.tipo === 'b2c'       && !!form.b2c_produto) ||
+    (form.tipo === 'nurturing' && !!form.nurt_duracao) ||
+    form.tipo === 'outbound'
+  checks.push({
+    id: 'tipo',
+    label: 'Contexto do tipo de campanha',
+    desc: 'Instrui o agente sobre como abordar o lead com base no tipo de campanha.',
+    status: tipoOk ? 'ok' : 'warn',
+    detail: tipoOk
+      ? 'Configurado — o agente vai adaptar a abordagem automaticamente.'
+      : 'Preencha os campos específicos do tipo de campanha selecionado.',
+  })
+
+  // 8. Compliance LGPD (sempre ok)
+  checks.push({
+    id: 'lgpd',
+    label: 'Compliance e proteção de dados',
+    desc: 'Opt-out automático ao detectar recusa, bloqueio permanente e log de consentimento.',
+    status: 'ok',
+    detail: 'Ativo por padrão em todas as campanhas — nenhuma configuração necessária.',
+  })
+
+  return checks
+}
+
 export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, onFechar }: Props) {
   const [form, setForm] = useState<FormState>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
+  const [preFlight, setPreFlight] = useState(false)
 
   function s<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm(f => ({ ...f, [key]: val }))
@@ -217,23 +326,33 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
       : [...form.dias_operacao, dia])
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleClickCriar(e: React.FormEvent) {
     e.preventDefault()
     if (!form.nome.trim()) { setErro('Informe o nome da campanha.'); return }
-    setErro(''); setLoading(true)
+    setErro('')
+    setPreFlight(true)
+  }
+
+  async function handleConfirmar() {
+    setLoading(true)
     try {
       await onSalvar(form)
       onFechar()
     } catch (err: unknown) {
       setErro((err as { message?: string })?.message || 'Erro ao criar campanha.')
+      setPreFlight(false)
     } finally { setLoading(false) }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
   }
 
   const tipoAtual = TIPOS.find(t => t.key === form.tipo) ?? TIPOS[0]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-popup w-full max-w-2xl max-h-[92vh] flex flex-col">
+      <div className="relative bg-white rounded-2xl shadow-popup w-full max-w-2xl max-h-[92vh] flex flex-col">
 
         {/* Header fixo */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -1163,14 +1282,110 @@ export default function ModalNovaCampanha({ agentes, vendedores = [], onSalvar, 
           {/* Footer fixo */}
           <div className="flex gap-3 pt-2 pb-1">
             <button type="button" onClick={onFechar} className="btn-secondary flex-1">Cancelar</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1 gap-2 disabled:opacity-40">
-              {loading ? <><Loader2 size={14} className="animate-spin" /> Criando...</> : (
-                <><span>Criar e ativar campanha</span>{form.icp_ativo && <span className="bg-white/20 rounded-full px-2 py-0.5 text-2xs font-bold">✓ ICP ativo</span>}</>
-              )}
+            <button type="button" onClick={handleClickCriar} disabled={loading} className="btn-primary flex-1 gap-2 disabled:opacity-40">
+              <span>Criar e ativar campanha</span>
+              {form.icp_ativo && <span className="bg-white/20 rounded-full px-2 py-0.5 text-2xs font-bold">✓ ICP ativo</span>}
             </button>
           </div>
 
         </form>
+
+        {/* ── Pre-flight check ── */}
+        {preFlight && (() => {
+          const checks = buildChecks(form, agentes)
+          const errors  = checks.filter(c => c.status === 'error')
+          const warns   = checks.filter(c => c.status === 'warn')
+
+          return (
+            <div className="absolute inset-0 z-10 bg-white rounded-2xl flex flex-col">
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">Verificação antes de ativar</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Revisamos tudo para garantir que o agente vai performar ao máximo</p>
+                </div>
+                <button onClick={() => setPreFlight(false)} className="btn-ghost p-2"><X size={18} /></button>
+              </div>
+
+              {/* Checklist */}
+              <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-3">
+
+                {checks.map(c => (
+                  <div key={c.id} className={`flex gap-3 p-3 rounded-xl border ${
+                    c.status === 'ok'    ? 'border-emerald-200 bg-emerald-50' :
+                    c.status === 'warn'  ? 'border-amber-200 bg-amber-50' :
+                                          'border-red-200 bg-red-50'
+                  }`}>
+                    <span className="text-base flex-shrink-0 mt-0.5">
+                      {c.status === 'ok' ? '✅' : c.status === 'warn' ? '⚠️' : '❌'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-semibold ${
+                        c.status === 'ok' ? 'text-emerald-800' : c.status === 'warn' ? 'text-amber-800' : 'text-red-800'
+                      }`}>{c.label}</p>
+                      <p className="text-2xs text-gray-500 leading-relaxed mt-0.5">{c.desc}</p>
+                      {c.detail && (
+                        <p className={`text-2xs font-medium mt-1 ${
+                          c.status === 'ok' ? 'text-emerald-700' : c.status === 'warn' ? 'text-amber-700' : 'text-red-700'
+                        }`}>{c.detail}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* CI — aprendizado contínuo */}
+                <div className="mt-1 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                  <p className="text-xs font-semibold text-purple-800 mb-3">🧠 Centro de Inteligência — o que vai acontecer a cada ligação</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { icon: '🎙️', t: 'Transcrição em tempo real', d: 'Cada fala é analisada ao vivo. Sinais de compra (urgência, preço, decisor) são detectados automaticamente.' },
+                      { icon: '📈', t: 'ICP refinado automaticamente', d: 'Após cada ligação, o CI atualiza o perfil ideal de cliente — cargo, segmento, porte — para priorizar melhor os próximos.' },
+                      { icon: '🔀', t: 'Argumentos validados compartilhados', d: 'Frases que converteram nesta campanha são propostas para outras campanhas da conta após aprovação.' },
+                      { icon: '🚀', t: 'Agente evolui a cada ciclo', d: 'O próximo agente criado herda os argumentos aprovados, keywords de gatilho e o perfil ICP acumulado desta campanha.' },
+                    ].map(item => (
+                      <div key={item.t} className="flex gap-2">
+                        <span className="text-base flex-shrink-0">{item.icon}</span>
+                        <div>
+                          <p className="text-xs font-medium text-purple-800">{item.t}</p>
+                          <p className="text-2xs text-purple-700 leading-relaxed mt-0.5">{item.d}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {erro && (
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{erro}</div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-3">
+                <button type="button" onClick={() => setPreFlight(false)} className="btn-secondary flex-1">
+                  ← Voltar e ajustar
+                </button>
+                {errors.length > 0 ? (
+                  <button type="button" disabled className="btn-primary flex-1 opacity-40 cursor-not-allowed">
+                    Corrija os erros antes de ativar
+                  </button>
+                ) : (
+                  <button type="button" onClick={handleConfirmar} disabled={loading} className="btn-primary flex-1 gap-2 disabled:opacity-40">
+                    {loading
+                      ? <><Loader2 size={14} className="animate-spin" /> Criando...</>
+                      : <>
+                          <span>{warns.length > 0 ? 'Ativar mesmo assim' : 'Confirmar e ativar'}</span>
+                          {warns.length > 0 && <span className="bg-white/20 rounded-full px-2 py-0.5 text-2xs font-bold">{warns.length} aviso{warns.length > 1 ? 's' : ''}</span>}
+                        </>
+                    }
+                  </button>
+                )}
+              </div>
+
+            </div>
+          )
+        })()}
+
       </div>
     </div>
   )
