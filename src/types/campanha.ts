@@ -73,4 +73,20 @@ export interface NovaCampanhaForm {
   // Vendedores
   vendedoresSelecionados?: string[]
   distribuicao?: string
+  // Orquestração multi-canal
+  orq_nao_atendeu_on?: boolean
+  orq_nao_atendeu_tent?: string
+  orq_nao_atendeu_canal?: string
+  orq_nao_atendeu_delay?: string
+  orq_recusou_on?: boolean
+  orq_recusou_acao?: string
+  orq_recusou_lgpd?: string
+  orq_agendou_on?: boolean
+  orq_agendou_email?: string
+  orq_agendou_wz?: string
+  orq_agendou_lembrete?: string
+  orq_gatekeeper_on?: boolean
+  orq_gk_callback?: string
+  orq_gk_abertura?: string
+  tent_redir?: string
 }
