@@ -6,7 +6,7 @@ import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
   User, Building2, MapPin, MessageSquare, X,
-  Play, Pause, CheckCircle2, XCircle, RotateCcw, Megaphone,
+  Play, Pause, CheckCircle2, XCircle, RotateCcw,
   Volume2, Video,
   RefreshCw, Archive, ArrowUpDown, ChevronDown,
   Copy, PhoneForwarded, FileText, Zap
@@ -218,9 +218,24 @@ function TabFila() {
     } as EntradaFila & { _callControlId: string }))),
     refetchInterval: 5000,
   })
-  const [fila, setFila] = useState<EntradaFila[]>([])
+  const FILA_DEMO: EntradaFila[] = [
+    {
+      id: 'demo-1', empresa: 'Grupo Comercial ABC', contato: 'Marcos Silva', cargo: 'Diretor Comercial',
+      telefone: '(11) 98765-4321', agente: 'Ana', campanha: 'SP — Outbound Maio', segmento: 'Comércio / Varejo',
+      status: 'em_ligacao', icp: 87, potencial: 82, tentativa: 1, maxTentativas: 3,
+      duracao: '2m14s', snippet: 'Sim, sou responsável pelas decisões comerciais aqui...', gatilhoDetectado: '🎯 Decisor confirmado', transferindo: false,
+    },
+    {
+      id: 'demo-2', empresa: 'Tech Nova Sistemas', contato: 'Carla Mendes', cargo: 'Gestora Comercial',
+      telefone: '(11) 96543-2109', agente: 'Carlos', campanha: 'SP — Outbound Maio', segmento: 'SaaS / Tech',
+      status: 'na_fila', icp: 74, potencial: 68, tentativa: 1, maxTentativas: 3,
+      duracao: undefined, snippet: undefined, gatilhoDetectado: undefined, transferindo: false,
+    },
+  ]
 
-  // Sync API data into local state (allows local mutations like pause/resume)
+  const [fila, setFila] = useState<EntradaFila[]>(FILA_DEMO)
+
+  // Sync API data into local state; mantém demo se API retornar vazio
   useEffect(() => {
     if (filaData.length > 0) setFila(filaData)
   }, [filaData])
@@ -425,7 +440,6 @@ function TabFila() {
             <select className="input py-1.5 text-xs" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
               <option value="">Todos os status</option><option value="em_ligacao">Em ligação</option><option value="na_fila">Na fila</option><option value="retornar">Retornar</option><option value="agendado">Agendado</option>
             </select>
-            <button className="btn-primary text-xs py-1.5 gap-1.5"><Megaphone size={12}/> + Nova campanha</button>
           </div>
         </div>
 
