@@ -120,14 +120,29 @@ export const inteligenciaApi = {
   getHorariosAnalise: () => api.get('/inteligencia/horarios/analise'),
 }
 
-// WhatsApp
+// WhatsApp — templates via Telnyx (automações)
 export const whatsappApi = {
   list:   () => api.get('/whatsapp'),
-  /** Envia mensagem com template pré-definido */
   enviar: (data: { telefone: string; template: 'nao_atendeu' | 'reuniao_confirmada' | 'follow_up'; dados?: Record<string, string> }) =>
     api.post('/whatsapp/enviar', data),
   /** @deprecated use enviar() */
   send: (data: unknown) => api.post('/whatsapp/enviar', data),
+}
+
+// WhatsApp pessoal do usuário logado (admin/gestor) — Evolution API
+export const whatsappUsuarioApi = {
+  /** Gera QR Code para conectar o WhatsApp pessoal */
+  conectar:     () => api.post('/whatsapp/eu/conectar', {}),
+  /** Polling de status da conexão */
+  status:       () => api.get('/whatsapp/eu/status'),
+  /** Desconecta o WhatsApp */
+  desconectar:  () => api.delete('/whatsapp/eu/desconectar'),
+  /** Envia mensagem pelo WA do usuário logado + salva histórico */
+  enviar:       (data: { telefone: string; mensagem: string }) =>
+    api.post('/whatsapp/eu/enviar', data),
+  /** Histórico de conversa com um telefone */
+  historico:    (telefone: string) =>
+    api.get(`/whatsapp/eu/historico/${encodeURIComponent(telefone)}`),
 }
 
 // Planos

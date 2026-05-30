@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi, whatsappApi } from '@/services/api'
+import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi, whatsappUsuarioApi } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
@@ -1738,6 +1738,8 @@ function TabManual() {
   const [timer, setTimer]               = useState(0)
   const [waLoading, setWaLoading]       = useState(false)
   const [waMsg, setWaMsg]               = useState<string | null>(null)
+  const [waMsgTexto, setWaMsgTexto]     = useState('')
+  const [waHistorico, setWaHistorico]   = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Busca de contatos via API
@@ -1823,28 +1825,24 @@ function TabManual() {
 
   async function enviarWhatsApp() {
     const tel = contato?.tel || numero
-    if (!tel) return
+    const texto = waMsgTexto.trim() || motivo
+    if (!tel || !texto) return
     setWaLoading(true)
     setWaMsg(null)
-    // Escolhe template pelo motivo selecionado
-    const template = motivo.toLowerCase().includes('não atendeu') || motivo.toLowerCase().includes('nao atendeu')
-      ? 'nao_atendeu' as const
-      : 'follow_up' as const
     try {
-      await whatsappApi.enviar({
-        telefone: tel,
-        template,
-        dados: {
-          nome:     contato?.nome ?? '',
-          mensagem: motivo,
-        },
-      })
-      setWaMsg('✓ Mensagem enviada pelo WhatsApp do sistema')
-    } catch {
-      setWaMsg('Erro ao enviar — verifique se o WhatsApp está conectado em Configurações')
+      await whatsappUsuarioApi.enviar({ telefone: tel, mensagem: texto })
+      const nova = { direcao: 'enviada', mensagem: texto, criado_em: new Date().toISOString() }
+      setWaHistorico(h => [...h, nova])
+      setWaMsgTexto('')
+      setWaMsg('✓ Mensagem enviada pelo seu WhatsApp')
+    } catch (e: any) {
+      const err = e?.response?.data?.error ?? 'Erro ao enviar'
+      setWaMsg(err.includes('não conectado')
+        ? 'WhatsApp não conectado — conecte em Configurações → Meu WhatsApp'
+        : 'Erro ao enviar — ' + err)
     } finally {
       setWaLoading(false)
-      setTimeout(() => setWaMsg(null), 5000)
+      setTimeout(() => setWaMsg(null), 6000)
     }
   }
 
@@ -1883,7 +1881,11 @@ function TabManual() {
                 <div className="border border-brand-300 rounded-lg overflow-hidden mt-1 shadow-sm">
                   {sugestoes.map(s => (
                     <div key={s.id} className="p-2.5 hover:bg-brand-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
-                      onClick={() => { setContato(s); setBusca('') }}>
+                      onClick={() => {
+                        setContato(s); setBusca('')
+                        // Carrega histórico WA do contato ao selecionar
+                        if (s.tel) whatsappUsuarioApi.historico(s.tel).then(r => setWaHistorico(r.data as any[])).catch(() => {})
+                      }}>
                       <div className="text-sm font-medium text-gray-900">{s.nome}</div>
                       <div className="text-xs text-gray-500">{s.empresa} · {s.tel}</div>
                     </div>
@@ -1951,20 +1953,59 @@ function TabManual() {
               {chamandoAtiva ? '📞 Em ligação...' : '📞 Ligar agora'}
             </button>
 
-            {/* Botão WhatsApp */}
-            <div>
-              <button onClick={enviarWhatsApp}
-                disabled={waLoading || (!contato && !numero)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-sm font-semibold transition-colors disabled:opacity-50"
-                style={{ color: '#128c7e', borderColor: '#25d366', backgroundColor: waLoading ? '#f0fdf4' : 'white' }}>
-                <MessageSquare size={14}/>
-                {waLoading ? 'Enviando...' : 'Enviar WhatsApp'}
-              </button>
-              {waMsg && (
-                <p className={clsx('text-xs mt-1.5 font-medium', waMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
-                  {waMsg}
-                </p>
+            {/* Painel WhatsApp */}
+            <div className="border border-emerald-200 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border-b border-emerald-100">
+                <MessageSquare size={13} className="text-emerald-700"/>
+                <span className="text-xs font-semibold text-emerald-800">WhatsApp</span>
+                <span className="text-2xs text-emerald-600 ml-auto">pelo seu número conectado</span>
+              </div>
+
+              {/* Histórico de conversa */}
+              {waHistorico.length > 0 && (
+                <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 bg-gray-50 px-3 py-2 border-b border-gray-100">
+                  {waHistorico.map((m, i) => (
+                    <div key={i} className={`flex ${m.direcao === 'enviada' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-xs ${
+                        m.direcao === 'enviada' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
+                      }`}>
+                        <p className="leading-relaxed">{m.mensagem}</p>
+                        <p className={`text-2xs mt-0.5 ${m.direcao === 'enviada' ? 'text-emerald-200' : 'text-gray-400'}`}>
+                          {new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
+
+              {waHistorico.length === 0 && (contato || numero) && (
+                <div className="px-3 py-2 bg-gray-50 text-2xs text-gray-400 text-center border-b border-gray-100">
+                  Sem histórico com este contato
+                </div>
+              )}
+
+              {/* Campo de mensagem */}
+              <div className="p-3 flex flex-col gap-2">
+                <textarea
+                  className="input min-h-[56px] resize-none text-xs"
+                  placeholder={`Mensagem para ${contato?.nome ?? 'contato'}… (padrão: motivo da ligação)`}
+                  value={waMsgTexto}
+                  onChange={e => setWaMsgTexto(e.target.value)}
+                />
+                <button onClick={enviarWhatsApp}
+                  disabled={waLoading || (!contato && !numero)}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: '#25d366', color: 'white' }}>
+                  <MessageSquare size={12}/>
+                  {waLoading ? 'Enviando…' : 'Enviar WhatsApp'}
+                </button>
+                {waMsg && (
+                  <p className={clsx('text-xs font-medium', waMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
+                    {waMsg}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>

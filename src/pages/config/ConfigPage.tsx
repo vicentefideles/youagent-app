@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { claudeApi, api, calendarApi, clientesApi, telnyxApi } from '@/services/api'
+import { claudeApi, api, calendarApi, clientesApi, telnyxApi, whatsappUsuarioApi } from '@/services/api'
 import TelnyxNumeroSection from '@/components/TelnyxNumeroSection'
 import {
   Building2,
@@ -17,6 +17,12 @@ import {
   Webhook,
   Clock,
   UserPlus,
+  MessageSquare,
+  CheckCircle2,
+  QrCode,
+  RefreshCw,
+  Send,
+  WifiOff,
 } from 'lucide-react'
 import { useProfile } from '@/context/ProfileContext'
 import type { ConfigSection } from '@/context/ProfileContext'
@@ -24,7 +30,7 @@ import { useAuthStore } from '@/store/authStore'
 import ModuloBloqueado from '@/components/ModuloBloqueado'
 
 // Extended section IDs not yet in ProfileContext
-type ExtConfigSection = ConfigSection | 'horarios' | 'clientes'
+type ExtConfigSection = ConfigSection | 'horarios' | 'clientes' | 'meu-whatsapp'
 
 // ─── Inline Toggle ────────────────────────────────────────────────────────────
 
@@ -1661,6 +1667,231 @@ function SectionClientes() {
   )
 }
 
+// ─── Seção: Meu WhatsApp ──────────────────────────────────────────────────────
+
+function SectionMeuWhatsApp() {
+  const { user } = useAuthStore()
+  const [status, setStatus]         = useState<'desconhecido' | 'conectado' | 'conectando' | 'desconectado'>('desconhecido')
+  const [qr, setQr]                 = useState<string | null>(null)
+  const [loadingQr, setLoadingQr]   = useState(false)
+  const [polling, setPolling]       = useState(false)
+  const [tel, setTel]               = useState('')
+  const [msg, setMsg]               = useState('')
+  const [historico, setHistorico]   = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
+  const [loadingEnvio, setLoadingEnvio] = useState(false)
+  const [toast, setToast]           = useState<string | null>(null)
+
+  function showToast(t: string) { setToast(t); setTimeout(() => setToast(null), 4000) }
+
+  // Verifica status ao montar
+  useEffect(() => {
+    whatsappUsuarioApi.status()
+      .then(r => {
+        const d = r.data as any
+        setStatus(d.conectado ? 'conectado' : d.estado === 'connecting' ? 'conectando' : 'desconectado')
+      })
+      .catch(() => setStatus('desconectado'))
+  }, [])
+
+  // Polling enquanto aguarda conexão
+  useEffect(() => {
+    if (!polling) return
+    const iv = setInterval(async () => {
+      try {
+        const r = await whatsappUsuarioApi.status()
+        const d = r.data as any
+        if (d.conectado) {
+          setStatus('conectado')
+          setQr(null)
+          setPolling(false)
+          showToast('✓ WhatsApp conectado com sucesso!')
+        }
+      } catch (_) {}
+    }, 3000)
+    return () => clearInterval(iv)
+  }, [polling])
+
+  async function conectar() {
+    setLoadingQr(true)
+    setQr(null)
+    try {
+      const r = await whatsappUsuarioApi.conectar()
+      const d = r.data as any
+      setQr(d.qr)
+      setStatus('conectando')
+      setPolling(true)
+    } catch (e: any) {
+      showToast('Erro ao gerar QR — ' + (e?.response?.data?.error ?? e.message))
+    } finally {
+      setLoadingQr(false)
+    }
+  }
+
+  async function desconectar() {
+    try {
+      await whatsappUsuarioApi.desconectar()
+      setStatus('desconectado')
+      setQr(null)
+      setPolling(false)
+      showToast('WhatsApp desconectado.')
+    } catch (e: any) {
+      showToast('Erro ao desconectar — ' + (e?.response?.data?.error ?? e.message))
+    }
+  }
+
+  async function carregarHistorico() {
+    if (!tel.trim()) return
+    try {
+      const r = await whatsappUsuarioApi.historico(tel.trim())
+      setHistorico(r.data as any[])
+    } catch (_) { setHistorico([]) }
+  }
+
+  async function enviarMensagem() {
+    if (!tel.trim() || !msg.trim()) return
+    setLoadingEnvio(true)
+    try {
+      await whatsappUsuarioApi.enviar({ telefone: tel.trim(), mensagem: msg.trim() })
+      setHistorico(h => [...h, { direcao: 'enviada', mensagem: msg.trim(), criado_em: new Date().toISOString() }])
+      setMsg('')
+      showToast('✓ Mensagem enviada')
+    } catch (e: any) {
+      showToast('Erro: ' + (e?.response?.data?.error ?? e.message))
+    } finally {
+      setLoadingEnvio(false)
+    }
+  }
+
+  const statusConfig = {
+    conectado:    { label: 'Conectado',    cls: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+    conectando:   { label: 'Aguardando QR', cls: 'bg-amber-100 text-amber-700',   dot: 'bg-amber-400 animate-pulse' },
+    desconectado: { label: 'Desconectado', cls: 'bg-gray-100 text-gray-500',       dot: 'bg-gray-400' },
+    desconhecido: { label: 'Verificando…', cls: 'bg-gray-100 text-gray-400',       dot: 'bg-gray-300 animate-pulse' },
+  }
+  const sc = statusConfig[status]
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-base font-semibold text-gray-900">Meu WhatsApp</h2>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Conecte seu WhatsApp pessoal para enviar e receber mensagens diretamente pelo sistema.
+          As conversas ficam salvas com histórico completo.
+        </p>
+      </div>
+
+      {/* Status + ações */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <MessageSquare size={20} className="text-emerald-600"/>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-900">{user?.nome ?? user?.email}</div>
+              <div className="text-xs text-gray-500">WhatsApp pessoal</div>
+            </div>
+          </div>
+          <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${sc.cls}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}/>
+            {sc.label}
+          </span>
+        </div>
+
+        {/* QR Code */}
+        {qr && (
+          <div className="flex flex-col items-center gap-3 py-4 border border-dashed border-emerald-300 rounded-xl mb-4 bg-emerald-50/40">
+            <div className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+              <QrCode size={14} className="text-emerald-600"/>
+              Escaneie com o WhatsApp do seu celular
+            </div>
+            <img src={qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`}
+              alt="QR Code WhatsApp" className="w-52 h-52 rounded-xl border-4 border-white shadow-md"/>
+            <p className="text-2xs text-gray-400">Abra o WhatsApp → Menu → Aparelhos conectados → Conectar aparelho</p>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {status !== 'conectado' ? (
+            <button onClick={conectar} disabled={loadingQr}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-sm font-semibold transition-colors">
+              {loadingQr
+                ? <><RefreshCw size={14} className="animate-spin"/> Gerando QR…</>
+                : <><QrCode size={14}/> {qr ? 'Novo QR Code' : 'Conectar WhatsApp'}</>}
+            </button>
+          ) : (
+            <button onClick={desconectar}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition-colors">
+              <WifiOff size={14}/> Desconectar
+            </button>
+          )}
+          {status === 'conectado' && (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium ml-2">
+              <CheckCircle2 size={14}/> Pronto para enviar mensagens
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Painel de mensagens */}
+      {status === 'conectado' && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900">Enviar mensagem</h3>
+            <p className="text-xs text-gray-500 mt-0.5">As mensagens ficam salvas com histórico por contato</p>
+          </div>
+          <div className="p-4 flex flex-col gap-3">
+            <div className="flex gap-2">
+              <input className="input flex-1 font-mono text-sm" placeholder="(11) 99999-9999" type="tel"
+                value={tel} onChange={e => setTel(e.target.value)}
+                onBlur={carregarHistorico}/>
+            </div>
+
+            {/* Histórico */}
+            {historico.length > 0 && (
+              <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                {historico.map((m, i) => (
+                  <div key={i} className={`flex ${m.direcao === 'enviada' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
+                      m.direcao === 'enviada'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-white border border-gray-200 text-gray-800'
+                    }`}>
+                      <p>{m.mensagem}</p>
+                      <p className={`text-2xs mt-0.5 ${m.direcao === 'enviada' ? 'text-emerald-200' : 'text-gray-400'}`}>
+                        {new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 items-end">
+              <textarea className="input flex-1 min-h-[72px] resize-none text-sm" placeholder="Digite sua mensagem..."
+                value={msg} onChange={e => setMsg(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem() } }}/>
+              <button onClick={enviarMensagem} disabled={loadingEnvio || !tel || !msg}
+                className="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white transition-colors flex-shrink-0">
+                {loadingEnvio ? <RefreshCw size={16} className="animate-spin"/> : <Send size={16}/>}
+              </button>
+            </div>
+            <p className="text-2xs text-gray-400">Enter para enviar · Shift+Enter para nova linha</p>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${
+          toast.startsWith('✓') ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {toast}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
 type NavItem = {
@@ -1683,6 +1914,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dev',                    label: 'Desenvolvimento',  icon: <Terminal className="w-4 h-4" />,   adminOnly: true  },
   { id: 'crm',                    label: 'CRM',              icon: <Database className="w-4 h-4" />,   adminOnly: false },
   { id: 'api',                    label: 'API & Webhooks',   icon: <Key className="w-4 h-4" />,        adminOnly: true  },
+  { id: 'meu-whatsapp',          label: 'Meu WhatsApp',     icon: <MessageSquare className="w-4 h-4" />, adminOnly: false, roles: ['admin_cliente', 'gerente', 'cliente'] },
 ]
 
 // ─── ConfigPage ───────────────────────────────────────────────────────────────
@@ -1753,6 +1985,7 @@ export default function ConfigPage() {
           {active === 'dev'                   && <SectionDev />}
           {active === 'crm'                   && <SectionCrm />}
           {active === 'api'                   && <SectionApi />}
+          {active === 'meu-whatsapp'          && <SectionMeuWhatsApp />}
         </div>
       </div>
     </div>
