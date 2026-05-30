@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi } from '@/services/api'
+import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -71,7 +71,8 @@ const GRAVACOES_FALLBACK = [
   { id:'g1', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', agente:'Ana (ETZ)', campanha:'SP — Campanha Maio', duracao:'2m34s', data:'14/05 · 14h12', resultado:'agendou'   as const, tipo:'ia'           as const, icp:87, url_gravacao:'' },
   { id:'g2', empresa:'Indústria Delta',     contato:'Roberto Alves', agente:'Carlos (ETZ)', campanha:'GO — Campanha Maio', duracao:'1m08s', data:'14/05 · 15h30', resultado:'retornar'  as const, tipo:'ia'           as const, icp:62, url_gravacao:'' },
   { id:'g3', empresa:'Tech Nova Sistemas',  contato:'Carla Mendes',  agente:'Ana (ETZ)', campanha:'SP — Campanha Maio', duracao:'4m17s', data:'15/05 · 09h45', resultado:'agendou'   as const, tipo:'transferencia' as const, icp:91, url_gravacao:'' },
-  { id:'g4', empresa:'Logística Express',   contato:'Paulo Rocha',   agente:'—', campanha:'SP — Campanha Maio', duracao:'3m02s', data:'15/05 · 11h20', resultado:'nao_atendeu' as const, tipo:'manual'        as const, icp:55, url_gravacao:'' },
+  // icp:0 → simula ligação ainda não analisada pelo CI (mostra "pendente")
+  { id:'g4', empresa:'Logística Express',   contato:'Paulo Rocha',   agente:'—', campanha:'SP — Campanha Maio', duracao:'3m02s', data:'15/05 · 11h20', resultado:'nao_atendeu' as const, tipo:'manual'        as const, icp:0,  url_gravacao:'' },
 ]
 
 // ─── TRANSCRIÇÃO AO VIVO (polling) ─────────────────────────────────────────
@@ -1526,6 +1527,8 @@ function TabGravacoes() {
 
   const [playing, setPlaying] = useState<string | null>(null)
   const [progresso, setProgresso] = useState(0)
+  const [analisando, setAnalisando] = useState(false)
+  const [analiseMsg, setAnaliseMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (!playing) { setProgresso(0); return }
@@ -1535,6 +1538,23 @@ function TabGravacoes() {
     return () => clearInterval(timer)
   }, [playing])
 
+  async function acionarCI() {
+    setAnalisando(true)
+    setAnaliseMsg(null)
+    try {
+      const res = await inteligenciaApi.detectarPadroes()
+      const padroes = (res.data as any)?.padroes ?? []
+      setAnaliseMsg(padroes.length > 0
+        ? `✓ ${padroes.length} padrão${padroes.length > 1 ? 'ões' : ''} detectado${padroes.length > 1 ? 's' : ''} e enviado${padroes.length > 1 ? 's' : ''} ao CI`
+        : '✓ Análise concluída — nenhum novo padrão encontrado')
+    } catch {
+      setAnaliseMsg('Erro ao acionar CI — tente novamente')
+    } finally {
+      setAnalisando(false)
+      setTimeout(() => setAnaliseMsg(null), 5000)
+    }
+  }
+
   const resultadoLabel = { agendou:'Agendou', retornar:'Retornar', nao_atendeu:'Não atendeu' } as const
   const resultadoCls   = { agendou:'badge-success', retornar:'badge-amber', nao_atendeu:'badge-neutral' } as const
   const tipoLabel = { ia:'Agente IA', manual:'Manual', transferencia:'Transferência' } as const
@@ -1543,13 +1563,32 @@ function TabGravacoes() {
   return (
     <div className="flex flex-col gap-4">
       {/* Painel CI — aprendizado automático */}
-      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 flex gap-3">
+      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 flex gap-3 items-start">
         <span className="text-xl flex-shrink-0">🧠</span>
-        <div>
-          <p className="text-xs font-semibold text-purple-800 mb-1">Todas as ligações alimentam o Centro de Inteligência automaticamente</p>
-          <p className="text-xs text-purple-700 leading-relaxed">
-            Cada chamada — seja do agente de IA, manual ou transferência — é analisada em tempo real. Sinais de compra, objeções e argumentos validados são extraídos e enviados ao CI, que melhora o ICP e compartilha aprendizados entre campanhas via cross-cliente. Nenhuma ação é necessária da sua parte.
-          </p>
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold text-purple-800 mb-1">Todas as ligações alimentam o Centro de Inteligência automaticamente</p>
+              <p className="text-xs text-purple-700 leading-relaxed">
+                Cada chamada — seja do agente de IA, manual ou transferência — é analisada com Claude após o encerramento. Scores de qualidade, sinais de compra e padrões de sucesso são extraídos e compartilhados via cross-cliente.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <button
+                onClick={acionarCI}
+                disabled={analisando}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+              >
+                <Brain size={12} className={analisando ? 'animate-pulse' : ''}/>
+                {analisando ? 'Analisando…' : 'Analisar padrões'}
+              </button>
+              {analiseMsg && (
+                <span className={clsx('text-2xs font-medium', analiseMsg.startsWith('✓') ? 'text-purple-700' : 'text-red-600')}>
+                  {analiseMsg}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1579,8 +1618,8 @@ function TabGravacoes() {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_120px] px-4 py-2 bg-gray-50 border-b border-gray-100 items-center">
-          {['Empresa / Contato','Agente','Tipo','Data / Hora','Duração','Resultado','Ações'].map(h => (
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_80px_100px] px-4 py-2 bg-gray-50 border-b border-gray-100 items-center">
+          {['Empresa / Contato','Agente','Tipo','Data / Hora','Duração','Resultado','CI','Ações'].map(h => (
             <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
           ))}
         </div>
@@ -1603,7 +1642,7 @@ function TabGravacoes() {
           </div>
         )}
         {gravacoes.map((g, i) => (
-          <div key={g.id} className={clsx('grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_120px] px-4 py-3 border-b border-gray-100 items-center', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
+          <div key={g.id} className={clsx('grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_80px_100px] px-4 py-3 border-b border-gray-100 items-center', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
             <div>
               <div className="text-sm font-medium text-gray-900">{g.empresa}</div>
               <div className="text-xs text-gray-500">{g.contato}</div>
@@ -1613,6 +1652,24 @@ function TabGravacoes() {
             <div className="text-xs text-gray-500">{g.data}</div>
             <div className="text-xs font-mono text-gray-600">{g.duracao}</div>
             <div><span className={clsx('badge text-2xs', resultadoCls[g.resultado])}>{resultadoLabel[g.resultado]}</span></div>
+
+            {/* Coluna CI — score + status */}
+            <div className="flex flex-col gap-0.5">
+              {g.icp > 0 ? (
+                <>
+                  <span className="text-2xs text-purple-700 font-semibold flex items-center gap-1">
+                    <Brain size={10}/> CI ✓
+                  </span>
+                  <span className="text-2xs text-purple-500 font-mono">ICP {g.icp}</span>
+                </>
+              ) : (
+                <span className="text-2xs text-gray-400 flex items-center gap-1" title="Análise CI ainda não concluída">
+                  <Brain size={10}/> pendente
+                </span>
+              )}
+            </div>
+
+            {/* Ações */}
             <div className="flex items-center gap-2">
               <button onClick={() => setPlaying(playing === g.id ? null : g.id)} className={clsx('p-1.5 rounded-lg border transition-colors', playing === g.id ? 'bg-brand-500 border-brand-500 text-white' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-brand-50 hover:border-brand-300')}>
                 {playing === g.id ? <Pause size={12}/> : <Play size={12}/>}
@@ -1627,7 +1684,6 @@ function TabGravacoes() {
                   <Download size={12}/>
                 </button>
               )}
-              <span className="text-2xs text-purple-600 font-medium flex items-center gap-1"><Brain size={10}/> CI ✓</span>
             </div>
           </div>
         ))}
