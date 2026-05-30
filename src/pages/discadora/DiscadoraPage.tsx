@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi } from '@/services/api'
+import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi } from '@/services/api'
 import {
   PhoneCall, Calendar, Mic, Phone, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
@@ -1188,7 +1188,16 @@ function TabAgendados() {
 // ─── ABA GRAVAÇÕES ───────────────────────────────────────────────────────────
 
 function TabGravacoes() {
-  const { data: gravacoes = [] } = useQuery({
+  const [filtroAgente, setFiltroAgente] = useState('')
+  const [filtroResultado, setFiltroResultado] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('')
+
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+
+  const { data: gravacoesBruto = [] } = useQuery({
     queryKey: ['gravacoes'],
     queryFn: () => ligacoesApi.list({ status: 'encerrada' }).then(r =>
       (r.data as any[])
@@ -1202,15 +1211,22 @@ function TabGravacoes() {
           duracao: l.duracao_segundos ? `${Math.floor(l.duracao_segundos / 60)}m${String(l.duracao_segundos % 60).padStart(2,'0')}s` : l.duracao ?? '—',
           data: l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) + ' · ' + new Date(l.encerrada_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '—',
           resultado: (l.resultado ?? 'retornar') as 'agendou' | 'retornar' | 'nao_atendeu',
+          tipo: (l.tipo_ligacao ?? (l.transferido_para ? 'transferencia' : 'ia')) as 'ia' | 'manual' | 'transferencia',
           icp: l.icp ?? 0,
           url_gravacao: l.url_gravacao,
         }))
     ),
   })
+
+  const gravacoes = gravacoesBruto.filter(g => {
+    if (filtroAgente && g.agente !== filtroAgente) return false
+    if (filtroResultado && g.resultado !== filtroResultado) return false
+    if (filtroTipo && g.tipo !== filtroTipo) return false
+    return true
+  })
+
   const [playing, setPlaying] = useState<string | null>(null)
   const [progresso, setProgresso] = useState(0)
-  const [treinadas, setTreinadas] = useState<Set<string>>(new Set())
-  const [treinadaFeedback, setTreinadaFeedback] = useState<string | null>(null)
 
   useEffect(() => {
     if (!playing) { setProgresso(0); return }
@@ -1219,31 +1235,53 @@ function TabGravacoes() {
     }, 300)
     return () => clearInterval(timer)
   }, [playing])
-  const resultadoLabel = { agendou:'Agendou', retornar:'Retornar', nao_atendeu:'Não atendeu' } as const
-  const resultadoCls = { agendou:'badge-success', retornar:'badge-amber', nao_atendeu:'badge-neutral' } as const
 
-  function handleTreinar(id: string) {
-    setTreinadas(prev => new Set([...prev, id]))
-    setTreinadaFeedback(id)
-    setTimeout(() => setTreinadaFeedback(null), 3000)
-  }
+  const resultadoLabel = { agendou:'Agendou', retornar:'Retornar', nao_atendeu:'Não atendeu' } as const
+  const resultadoCls   = { agendou:'badge-success', retornar:'badge-amber', nao_atendeu:'badge-neutral' } as const
+  const tipoLabel = { ia:'Agente IA', manual:'Manual', transferencia:'Transferência' } as const
+  const tipoCls   = { ia:'badge-brand', manual:'badge-neutral', transferencia:'badge-purple' } as const
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Painel CI — aprendizado automático */}
+      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 flex gap-3">
+        <span className="text-xl flex-shrink-0">🧠</span>
+        <div>
+          <p className="text-xs font-semibold text-purple-800 mb-1">Todas as ligações alimentam o Centro de Inteligência automaticamente</p>
+          <p className="text-xs text-purple-700 leading-relaxed">
+            Cada chamada — seja do agente de IA, manual ou transferência — é analisada em tempo real. Sinais de compra, objeções e argumentos validados são extraídos e enviados ao CI, que melhora o ICP e compartilha aprendizados entre campanhas via cross-cliente. Nenhuma ação é necessária da sua parte.
+          </p>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Gravações de chamadas</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Ouça, avalie e use para treinar a IA.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Ligações do agente de IA, manuais e transferências a quente para vendedores.</p>
         </div>
         <div className="flex items-center gap-2">
-          <select className="input py-1.5 text-xs" id="grav-filtro-agente"><option>Todos os agentes</option><option>Ana</option><option>Carlos</option><option>Julia</option></select>
-          <select className="input py-1.5 text-xs"><option>Todos os resultados</option><option>Agendou</option><option>Retornar</option><option>Não atendeu</option></select>
+          <select className="input py-1.5 text-xs" value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)}>
+            <option value="">Todos os agentes</option>
+            {equipeRaw.map((v: any) => <option key={v.id} value={v.nome}>{v.nome}</option>)}
+          </select>
+          <select className="input py-1.5 text-xs" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
+            <option value="">Todos os tipos</option>
+            <option value="ia">Agente IA</option>
+            <option value="manual">Manual</option>
+            <option value="transferencia">Transferência</option>
+          </select>
+          <select className="input py-1.5 text-xs" value={filtroResultado} onChange={e => setFiltroResultado(e.target.value)}>
+            <option value="">Todos os resultados</option>
+            <option value="agendou">Agendou</option>
+            <option value="retornar">Retornar</option>
+            <option value="nao_atendeu">Não atendeu</option>
+          </select>
         </div>
       </div>
 
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_180px] px-4 py-2 bg-gray-50 border-b border-gray-100">
-          {['Empresa / Contato','Agente','Data / Hora','Duração','Resultado','Ações'].map(h => (
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_120px] px-4 py-2 bg-gray-50 border-b border-gray-100">
+          {['Empresa / Contato','Agente','Tipo','Data / Hora','Duração','Resultado','Ações'].map(h => (
             <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
           ))}
         </div>
@@ -1255,12 +1293,13 @@ function TabGravacoes() {
           </div>
         )}
         {gravacoes.map((g, i) => (
-          <div key={g.id} className={clsx('grid grid-cols-[2fr_1fr_1fr_1fr_1fr_180px] px-4 py-3 border-b border-gray-100 items-center', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
+          <div key={g.id} className={clsx('grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_120px] px-4 py-3 border-b border-gray-100 items-center', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
             <div>
               <div className="text-sm font-medium text-gray-900">{g.empresa}</div>
               <div className="text-xs text-gray-500">{g.contato}</div>
             </div>
             <div className="text-xs text-gray-700">{g.agente}</div>
+            <div><span className={clsx('badge text-2xs', tipoCls[g.tipo])}>{tipoLabel[g.tipo]}</span></div>
             <div className="text-xs text-gray-500">{g.data}</div>
             <div className="text-xs font-mono text-gray-600">{g.duracao}</div>
             <div><span className={clsx('badge text-2xs', resultadoCls[g.resultado])}>{resultadoLabel[g.resultado]}</span></div>
@@ -1269,18 +1308,7 @@ function TabGravacoes() {
                 {playing === g.id ? <Pause size={12}/> : <Play size={12}/>}
               </button>
               <button className="p-1.5 rounded-lg border bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200 transition-colors"><Download size={12}/></button>
-              {treinadas.has(g.id) ? (
-                <span className={clsx('text-2xs font-semibold', treinadaFeedback === g.id ? 'text-emerald-600' : 'text-gray-400')}>
-                  {treinadaFeedback === g.id ? 'Enviada ✓' : 'Treinada ✓'}
-                </span>
-              ) : (
-                <button
-                  onClick={() => handleTreinar(g.id)}
-                  className="flex items-center gap-1 text-2xs font-semibold px-2 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
-                >
-                  <Brain size={10}/> Treinar IA
-                </button>
-              )}
+              <span className="text-2xs text-purple-600 font-medium flex items-center gap-1"><Brain size={10}/> CI ✓</span>
             </div>
           </div>
         ))}
@@ -1319,29 +1347,78 @@ function TabGravacoes() {
 
 function TabManual() {
   const [busca, setBusca] = useState('')
-  const [contato, setContato] = useState<{ nome: string; empresa: string; tel: string; email: string; motivo: string } | null>(null)
+  const [agenteId, setAgenteId] = useState('')
+  const [motivo, setMotivo] = useState('Reagendamento — cliente não entrou na reunião')
+  const [anotacao, setAnotacao] = useState('')
+  const [contato, setContato] = useState<{ id?: string; nome: string; empresa: string; tel: string; email: string } | null>(null)
   const [numero, setNumero] = useState('')
   const [chamandoAtiva, setChamandoAtiva] = useState(false)
+  const [callId, setCallId] = useState<string | null>(null)
   const [resultado, setResultado] = useState<string | null>(null)
   const [timer, setTimer] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const sugestoes = busca.length > 1 ? [
-    { nome:'Marcos Silva', empresa:'Grupo Comercial ABC', tel:'(11) 98765-4321', email:'marcos@grupoabc.com.br', motivo:'Não entrou na reunião de 14/05 14h', motivoCor:'text-amber-600' },
-    { nome:'Roberto Alves', empresa:'Indústria Delta', tel:'(31) 97654-3210', email:'roberto@deltaindustria.com.br', motivo:'Follow-up pós-reunião', motivoCor:'text-brand-600' },
-  ].filter(s => s.nome.toLowerCase().includes(busca.toLowerCase()) || s.empresa.toLowerCase().includes(busca.toLowerCase())) : []
+  // Agentes reais
+  const { data: agentesRaw = [] } = useQuery({
+    queryKey: ['agentes'],
+    queryFn: () => agentesApi.list().then(r => r.data as any[]),
+  })
 
-  function ligar() {
+  // Busca de contatos via API (debounce simples)
+  const { data: sugestoesRaw = [] } = useQuery({
+    queryKey: ['contatos-busca', busca],
+    queryFn: () => contatosApi.search(busca).then(r => (r.data as any).data ?? r.data ?? []),
+    enabled: busca.length > 1,
+  })
+  const sugestoes = (sugestoesRaw as any[]).map((c: any) => ({
+    id: c.id,
+    nome: c.nome ?? '—',
+    empresa: c.razao_social ?? c.empresa ?? '—',
+    tel: c.telefone ?? '',
+    email: c.email ?? '',
+  }))
+
+  // Histórico de chamadas manuais
+  const { data: historicoRaw = [] } = useQuery({
+    queryKey: ['ligacoes-manual'],
+    queryFn: () => ligacoesApi.list({ status: 'encerrada' }).then(r =>
+      (r.data as any[]).filter(l => l.tipo_ligacao === 'manual' || l.origem === 'manual').slice(0, 10)
+    ),
+    refetchInterval: 15000,
+  })
+
+  async function ligar() {
+    const tel = contato?.tel || numero
+    if (!tel) return
     setChamandoAtiva(true)
     setResultado(null)
     setTimer(0)
     intervalRef.current = setInterval(() => setTimer(t => t + 1), 1000)
+    try {
+      const res = await ligacoesApi.create({
+        numero_destino: tel,
+        agente_id: agenteId || undefined,
+        contato_id: contato?.id || undefined,
+        iniciar_agora: true,
+        tipo_ligacao: 'manual',
+        motivo,
+        anotacao_pre: anotacao,
+      })
+      setCallId((res.data as any)?.call_control_id ?? null)
+    } catch (err) {
+      console.error('Erro ao iniciar chamada manual:', err)
+    }
   }
-  function registrarResultado(res: string) {
+
+  async function registrarResultado(res: string) {
     setResultado(res)
     setChamandoAtiva(false)
     if (intervalRef.current) clearInterval(intervalRef.current)
+    if (callId) {
+      try { await ligacoesApi.encerrar(callId) } catch (_) {}
+    }
   }
+
   const formatTimer = (s: number) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
 
   return (
@@ -1372,7 +1449,6 @@ function TabManual() {
                     <div key={s.nome} className="p-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0" onClick={() => { setContato(s); setBusca('') }}>
                       <div className="text-sm font-medium text-gray-900">{s.nome}</div>
                       <div className="text-xs text-gray-500">{s.empresa} · {s.tel}</div>
-                      <div className={clsx('text-xs mt-0.5', s.motivoCor)}>{s.motivo}</div>
                     </div>
                   ))}
                 </div>
@@ -1395,7 +1471,7 @@ function TabManual() {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">Telefone</span><span className="font-mono">{contato.tel}</span></div>
                   <div><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">E-mail</span><span className="text-brand-600">{contato.email}</span></div>
-                  <div className="col-span-2"><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">Motivo</span><span className="text-amber-600 font-medium">{contato.motivo}</span></div>
+                  <div className="col-span-2"><span className="text-2xs text-gray-400 uppercase font-semibold block mb-0.5">Motivo</span><span className="text-amber-600 font-medium">{motivo}</span></div>
                 </div>
               </div>
             )}
@@ -1406,22 +1482,28 @@ function TabManual() {
 
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Agente que realizará a ligação</label>
-              <select className="input"><option>Ana — Agente SP</option><option>Carlos — Agente GO/MG</option></select>
+              <select className="input" value={agenteId} onChange={e => setAgenteId(e.target.value)}>
+                <option value="">Selecionar agente...</option>
+                {(agentesRaw as any[]).map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Motivo da ligação</label>
-              <select className="input">
+              <select className="input" value={motivo} onChange={e => setMotivo(e.target.value)}>
                 <option>Reagendamento — cliente não entrou na reunião</option>
-                <option>Follow-up pós-reunião</option><option>Confirmação de reunião</option>
-                <option>Retorno de chamada solicitado</option><option>Proposta comercial</option><option>Outro</option>
+                <option>Follow-up pós-reunião</option>
+                <option>Confirmação de reunião</option>
+                <option>Retorno de chamada solicitado</option>
+                <option>Proposta comercial</option>
+                <option>Outro</option>
               </select>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Anotação pré-ligação</label>
-              <textarea className="input min-h-[64px] resize-none" placeholder="Ex: Cliente não atendeu o Google Meet de 14/05 às 14h. Tentar reagendar..." />
+              <textarea className="input min-h-[64px] resize-none" value={anotacao} onChange={e => setAnotacao(e.target.value)} placeholder="Ex: Cliente não atendeu o Google Meet de 14/05 às 14h. Tentar reagendar..." />
             </div>
 
-            <button onClick={ligar} disabled={chamandoAtiva} className="btn-primary w-full justify-center gap-2 py-3 text-sm disabled:opacity-60">
+            <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero)} className="btn-primary w-full justify-center gap-2 py-3 text-sm disabled:opacity-60">
               <Phone size={15}/> {chamandoAtiva ? 'Em ligação...' : '📞 Ligar agora'}
             </button>
             <button className="btn-secondary w-full justify-center gap-2 text-sm" style={{ color:'#128c7e', borderColor:'#25d366' }}>
@@ -1503,24 +1585,31 @@ function TabManual() {
         {/* Histórico de chamadas manuais */}
         <div className="card p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Últimas chamadas manuais</h3>
-          <div className="flex flex-col gap-2">
-            {[
-              { empresa:'Grupo ABC', contato:'Marcos Silva', resultado:'Reagendou', data:'Hoje 10h14', motivo:'No-show', cls:'badge-success' },
-              { empresa:'Tech Nova', contato:'Carla Mendes', resultado:'Não atendeu', data:'Hoje 09h30', motivo:'Follow-up', cls:'badge-amber' },
-              { empresa:'Indústria Delta', contato:'Roberto Alves', resultado:'Confirmou', data:'Ontem 16h20', motivo:'Confirmação', cls:'badge-brand' },
-            ].map((h, i) => (
-              <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                  <User size={14} className="text-gray-500"/>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-gray-900">{h.empresa} · {h.contato}</div>
-                  <div className="text-2xs text-gray-400">{h.motivo} · {h.data}</div>
-                </div>
-                <span className={clsx('badge text-2xs', h.cls)}>{h.resultado}</span>
-              </div>
-            ))}
-          </div>
+          {historicoRaw.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-4">Nenhuma chamada manual registrada.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {(historicoRaw as any[]).map((h: any, i: number) => {
+                const res = (h.resultado ?? 'encerrada') as string
+                const labelMap: Record<string, string> = { agendada:'Agendou', nao_atendida:'Não atendeu', encerrada:'Encerrada', atendida:'Atendida' }
+                const cls = res === 'agendada' ? 'badge-success' : res === 'nao_atendida' ? 'badge-amber' : 'badge-neutral'
+                const label = labelMap[res] ?? res
+                const data = h.encerrada_em ? new Date(h.encerrada_em).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
+                return (
+                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <User size={14} className="text-gray-500"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-gray-900">{h.contatos?.empresa ?? h.numero_destino ?? '—'} · {h.contatos?.nome ?? '—'}</div>
+                      <div className="text-2xs text-gray-400">{data}</div>
+                    </div>
+                    <span className={clsx('badge text-2xs', cls)}>{label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1531,38 +1620,87 @@ function TabManual() {
 
 function TabAgenda() {
   const navigate = useNavigate()
+  const [vendedorSel, setVendedorSel] = useState('')
   const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string } | null>(null)
   const horas = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00']
-  const dias = ['Seg 05','Ter 06','Qua 07','Qui 08','Sex 09']
+
+  // Vendedores reais
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+  const vendedorAtual = (equipeRaw as any[]).find((v: any) => v.id === vendedorSel) ?? equipeRaw[0]
+
+  // Reuniões reais
+  const { data: reunioesRaw = [] } = useQuery({
+    queryKey: ['reunioes-agenda'],
+    queryFn: () => reunioesApi.list().then(r => r.data as any[]),
+  })
+
+  // Monta semana atual (seg–sex)
+  const hoje = new Date()
+  const diaSemana = hoje.getDay() // 0=dom
+  const seg = new Date(hoje); seg.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
+  const dias = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(seg); d.setDate(seg.getDate() + i)
+    return { label: d.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit' }), iso: d.toISOString().split('T')[0] }
+  })
+
+  // Filtra reuniões por vendedor e monta eventos
   type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber' }
-  const eventos: Record<string, Evento[]> = {
-    'Seg 05': [
-      { hora:'10:00', fim:'11:00', empresa:'Grupo ABC', contato:'Marcos Silva', cor:'brand' },
-      { hora:'14:00', fim:'14:30', empresa:'Tech Nova', contato:'Carla Mendes', cor:'amber' },
-    ],
-    'Ter 06': [{ hora:'09:00', fim:'09:30', empresa:'Indústria Delta', contato:'Roberto Alves', cor:'emerald' }],
-    'Qua 07': [{ hora:'11:00', fim:'11:30', empresa:'Omega Const.', contato:'Lucas Pereira', cor:'brand' }],
-  }
+  const cores: Array<'brand' | 'emerald' | 'amber'> = ['brand', 'emerald', 'amber']
+  const eventosPorDia: Record<string, Evento[]> = {}
+  ;(reunioesRaw as any[])
+    .filter((r: any) => !vendedorSel || r.vendedor_id === vendedorSel || r.vendedor_nome?.includes(vendedorAtual?.nome ?? ''))
+    .forEach((r: any, idx: number) => {
+      const inicio = r.inicio ?? r.data_hora
+      if (!inicio) return
+      const d = new Date(inicio)
+      const diaKey = d.toISOString().split('T')[0]
+      const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+      const fimD = new Date(d.getTime() + 30 * 60000)
+      const fim  = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+      if (!eventosPorDia[diaKey]) eventosPorDia[diaKey] = []
+      eventosPorDia[diaKey].push({ hora, fim, empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', cor: cores[idx % 3] })
+    })
 
   const corMap = { brand:'bg-brand-100 border-l-brand-500 text-brand-700', emerald:'bg-emerald-50 border-l-emerald-500 text-emerald-700', amber:'bg-amber-50 border-l-amber-500 text-amber-700' }
+
+  // KPIs reais
+  const totalHoje = (reunioesRaw as any[]).filter((r: any) => {
+    const d = r.inicio ?? r.data_hora; return d && new Date(d).toDateString() === new Date().toDateString()
+  }).length
+  const totalSemana = (reunioesRaw as any[]).filter((r: any) => {
+    const d = r.inicio ?? r.data_hora; if (!d) return false
+    const dt = new Date(d); return dt >= seg && dt <= new Date(seg.getTime() + 4 * 86400000)
+  }).length
+  const totalMes = (reunioesRaw as any[]).filter((r: any) => {
+    const d = r.inicio ?? r.data_hora; if (!d) return false
+    const dt = new Date(d); return dt.getMonth() === hoje.getMonth() && dt.getFullYear() === hoje.getFullYear()
+  }).length
 
   return (
     <div className="flex flex-col gap-4">
       {/* Seletor de vendedor (visão gerente) */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-sm">JS</div>
+          {vendedorAtual && (
+            <div className="w-10 h-10 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-sm">
+              {((vendedorAtual?.nome ?? 'V') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+            </div>
+          )}
           <div>
-            <div className="text-sm font-bold text-gray-900">João Silva</div>
-            <div className="text-xs text-gray-500">Vendedor · SP</div>
+            <div className="text-sm font-bold text-gray-900">{vendedorAtual?.nome ?? '—'}</div>
+            <div className="text-xs text-gray-500">{vendedorAtual?.cargo ?? vendedorAtual?.funcao ?? 'Vendedor'}</div>
           </div>
-          <select className="input text-xs py-1.5">
-            <option>João Silva</option><option>Maria Rodrigues</option><option>Carlos Vidal</option>
+          <select className="input text-xs py-1.5" value={vendedorSel} onChange={e => setVendedorSel(e.target.value)}>
+            <option value="">Todos os vendedores</option>
+            {(equipeRaw as any[]).map((v: any) => <option key={v.id} value={v.id}>{v.nome}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-4">
-            {[{label:'Hoje',value:'1',color:'text-brand-600'},{label:'Esta semana',value:'4',color:'text-gray-900'},{label:'Este mês',value:'12',color:'text-gray-900'}].map(k => (
+            {[{label:'Hoje',value:String(totalHoje),color:'text-brand-600'},{label:'Esta semana',value:String(totalSemana),color:'text-gray-900'},{label:'Este mês',value:String(totalMes),color:'text-gray-900'}].map(k => (
               <div key={k.label} className="text-center">
                 <div className={clsx('text-xl font-bold font-mono', k.color)}>{k.value}</div>
                 <div className="text-2xs text-gray-400">{k.label}</div>
@@ -1589,8 +1727,8 @@ function TabAgenda() {
               </div>
             </div>
             {dias.map(d => (
-              <div key={d} className={clsx('p-3 text-center border-l border-gray-100', d === 'Seg 05' && 'bg-brand-50')}>
-                <div className={clsx('text-xs font-semibold', d === 'Seg 05' ? 'text-brand-600' : 'text-gray-600')}>{d}</div>
+              <div key={d.iso} className={clsx('p-3 text-center border-l border-gray-100', d.iso === new Date().toISOString().split('T')[0] && 'bg-brand-50')}>
+                <div className={clsx('text-xs font-semibold capitalize', d.iso === new Date().toISOString().split('T')[0] ? 'text-brand-600' : 'text-gray-600')}>{d.label}</div>
               </div>
             ))}
           </div>
@@ -1601,9 +1739,9 @@ function TabAgenda() {
               <div key={hora} className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-gray-100 min-h-[52px]">
                 <div className="px-2 py-1 text-2xs text-gray-400 font-mono border-r border-gray-100 pt-1.5">{hora}</div>
                 {dias.map(dia => {
-                  const ev = eventos[dia]?.find(e => e.hora === hora)
+                  const ev = eventosPorDia[dia.iso]?.find(e => e.hora === hora)
                   return (
-                    <div key={dia} className="border-l border-gray-100 p-1 relative">
+                    <div key={dia.iso} className="border-l border-gray-100 p-1 relative">
                       {ev && (
                         <div
                           className={clsx('rounded-md px-1.5 py-1 text-2xs border-l-2 cursor-pointer hover:opacity-80 transition-opacity', corMap[ev.cor])}
@@ -1637,16 +1775,30 @@ function TabAgenda() {
           <div className="card p-4">
             <h4 className="text-xs font-semibold text-gray-700 mb-3">Próximas reuniões</h4>
             <div className="flex flex-col gap-2">
-              {[
-                { hora:'10:00', empresa:'Grupo ABC', contato:'Marcos Silva', cor:'brand' },
-                { hora:'14:00', empresa:'Tech Nova', contato:'Carla Mendes', cor:'amber' },
-              ].map((r, i) => (
-                <div key={i} className={clsx('border-l-2 pl-2 cursor-pointer hover:bg-gray-50 rounded-r-lg py-1', r.cor === 'brand' ? 'border-l-brand-500' : 'border-l-amber-500')} onClick={() => setDetalhe({ ...r, fim: '14:30' })}>
-                  <div className="text-2xs font-mono text-gray-500">{r.hora}</div>
-                  <div className="text-xs font-semibold text-gray-900">{r.empresa}</div>
-                  <div className="text-2xs text-gray-500">{r.contato}</div>
-                </div>
-              ))}
+              {(reunioesRaw as any[])
+                .filter((r: any) => {
+                  const d = r.inicio ?? r.data_hora; if (!d) return false
+                  return new Date(d) >= new Date()
+                })
+                .slice(0, 5)
+                .map((r: any, i: number) => {
+                  const d = new Date(r.inicio ?? r.data_hora)
+                  const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+                  const corIdx = i % 3
+                  const corCls = corIdx === 0 ? 'border-l-brand-500' : corIdx === 1 ? 'border-l-amber-500' : 'border-l-emerald-500'
+                  return (
+                    <div key={r.id ?? i} className={clsx('border-l-2 pl-2 cursor-pointer hover:bg-gray-50 rounded-r-lg py-1', corCls)}
+                      onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? '—', hora, fim: hora })}>
+                      <div className="text-2xs font-mono text-gray-500">{hora}</div>
+                      <div className="text-xs font-semibold text-gray-900">{r.empresa ?? '—'}</div>
+                      <div className="text-2xs text-gray-500">{r.contato ?? r.contato_nome ?? '—'}</div>
+                    </div>
+                  )
+                })
+              }
+              {(reunioesRaw as any[]).filter((r: any) => new Date(r.inicio ?? r.data_hora) >= new Date()).length === 0 && (
+                <p className="text-2xs text-gray-400 text-center py-2">Nenhuma reunião futura</p>
+              )}
             </div>
           </div>
 
@@ -2189,29 +2341,47 @@ const MOTIVO_CLS: Record<LeadReativacao['motivo'], string> = {
   tempo_expirado: 'badge-neutral',
 }
 
-const LEADS_REATIVACAO: LeadReativacao[] = [
-  { id:'r1', nome:'Marcos Silva',    empresa:'Grupo Comercial ABC',  ultimoContato:'08/05/2026', tentativas:3, motivo:'nao_atendeu',    campanha:'SP — Campanha Maio' },
-  { id:'r2', nome:'Patricia Ramos',  empresa:'Distribuidora XYZ',    ultimoContato:'06/05/2026', tentativas:2, motivo:'retornar',       campanha:'SP — Campanha Maio' },
-  { id:'r3', nome:'Renata Costa',    empresa:'Construtora Primavera', ultimoContato:'04/05/2026', tentativas:1, motivo:'nao_atendeu',    campanha:'RJ — Campanha Maio' },
-  { id:'r4', nome:'Bruno Almeida',   empresa:'TechSolutions LTDA',   ultimoContato:'01/05/2026', tentativas:3, motivo:'tempo_expirado', campanha:'RS — Campanha Maio' },
-  { id:'r5', nome:'Luciana Pinto',   empresa:'FarmaCenter',          ultimoContato:'29/04/2026', tentativas:2, motivo:'sem_interesse',  campanha:'PR — Campanha Maio' },
-  { id:'r6', nome:'Eduardo Campos',  empresa:'Logística Norte',      ultimoContato:'27/04/2026', tentativas:1, motivo:'nao_atendeu',    campanha:'SP — Campanha Maio' },
-  { id:'r7', nome:'Carla Mendes',    empresa:'Tech Nova Sistemas',   ultimoContato:'25/04/2026', tentativas:2, motivo:'retornar',       campanha:'MG — Campanha Maio' },
-  { id:'r8', nome:'Roberto Alves',   empresa:'Indústria Delta',      ultimoContato:'22/04/2026', tentativas:3, motivo:'tempo_expirado', campanha:'GO — Campanha Maio' },
-]
 
 function TabReativacao() {
   const [selecionados, setSelecionados] = useState<string[]>([])
   const [filtroMotivo, setFiltroMotivo] = useState('todos')
-  const [filtroCampanha, setFiltroCampanha] = useState('todas')
-  const [filtroData, setFiltroData] = useState('')
   const [reativados, setReativados] = useState<Set<string>>(new Set())
   const [arquivados, setArquivados] = useState<Set<string>>(new Set())
+  const [_reativandoIds, setReativandoIds] = useState<Set<string>>(new Set())
 
-  const leadsVisiveis = LEADS_REATIVACAO.filter(l => {
+  // Busca contatos esgotados e sem resposta da API
+  const { data: esgotadosRaw = [], refetch } = useQuery({
+    queryKey: ['contatos-reativacao'],
+    queryFn: async () => {
+      const [r1, r2] = await Promise.all([
+        contatosApi.byStatus('esgotado', 200),
+        contatosApi.byStatus('nao_atendeu', 200),
+      ])
+      const d1 = (r1.data as any)?.data ?? r1.data ?? []
+      const d2 = (r2.data as any)?.data ?? r2.data ?? []
+      return [...d1, ...d2]
+    },
+  })
+
+  const motivoMap: Record<string, LeadReativacao['motivo']> = {
+    esgotado: 'nao_atendeu',
+    nao_atendeu: 'nao_atendeu',
+  }
+
+  const leadsApi: LeadReativacao[] = (esgotadosRaw as any[]).map((c: any) => ({
+    id: String(c.id),
+    nome: c.nome ?? '—',
+    empresa: c.razao_social ?? c.empresa ?? '—',
+    ultimoContato: c.atualizado_em ? new Date(c.atualizado_em).toLocaleDateString('pt-BR') : c.criado_em ? new Date(c.criado_em).toLocaleDateString('pt-BR') : '—',
+    tentativas: c.tentativas ?? 0,
+    motivo: (motivoMap[c.status] ?? 'nao_atendeu') as LeadReativacao['motivo'],
+    campanha: c.campanha_id ?? '',
+  }))
+
+  const leadsVisiveis = leadsApi.filter(l => {
     if (arquivados.has(l.id)) return false
+    if (reativados.has(l.id)) return false
     if (filtroMotivo !== 'todos' && l.motivo !== filtroMotivo) return false
-    if (filtroCampanha !== 'todas' && !l.campanha.includes(filtroCampanha)) return false
     return true
   })
 
@@ -2221,19 +2391,40 @@ function TabReativacao() {
   function toggleAll(checked: boolean) {
     setSelecionados(checked ? leadsVisiveis.map(l => l.id) : [])
   }
-  function reativarLead(id: string) {
-    setReativados(prev => new Set([...prev, id]))
+  async function reativarLead(id: string) {
+    setReativandoIds(prev => new Set([...prev, id]))
+    try {
+      // Volta status para 'novo' para entrar na fila novamente
+      await fetch(`/api/v1/contatos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ status: 'novo', tentativas: 0 }),
+      })
+      setReativados(prev => new Set([...prev, id]))
+      refetch()
+    } catch (_) {
+      setReativados(prev => new Set([...prev, id]))
+    } finally {
+      setReativandoIds(prev => { const n = new Set(prev); n.delete(id); return n })
+    }
   }
-  function arquivarLead(id: string) {
+  async function arquivarLead(id: string) {
+    try {
+      await fetch(`/api/v1/contatos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ status: 'arquivado' }),
+      })
+    } catch (_) {}
     setArquivados(prev => new Set([...prev, id]))
     setSelecionados(prev => prev.filter(x => x !== id))
   }
   function reativarSelecionados() {
-    setReativados(prev => new Set([...prev, ...selecionados]))
+    selecionados.forEach(id => reativarLead(id))
     setSelecionados([])
   }
   function arquivarSelecionados() {
-    setArquivados(prev => new Set([...prev, ...selecionados]))
+    selecionados.forEach(id => arquivarLead(id))
     setSelecionados([])
   }
 
@@ -2247,10 +2438,10 @@ function TabReativacao() {
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: 'Leads disponíveis',     value: '342',  color: 'text-gray-900'     },
-          { label: 'Reativados este mês',   value: '87',   color: 'text-brand-600'    },
-          { label: 'Taxa de sucesso',        value: '31%',  color: 'text-emerald-600'  },
-          { label: 'Ligações geradas',       value: '156',  color: 'text-purple-600'   },
+          { label: 'Leads disponíveis',   value: String(leadsVisiveis.length),                color: 'text-gray-900'    },
+          { label: 'Reativados agora',    value: String(reativados.size),                    color: 'text-brand-600'   },
+          { label: 'Arquivados',          value: String(arquivados.size),                    color: 'text-gray-400'    },
+          { label: 'Total no banco',      value: String(esgotadosRaw.length),               color: 'text-purple-600'  },
         ].map(k => (
           <div key={k.label} className="kpi-card">
             <span className={clsx('text-2xl font-bold font-mono', k.color)}>{k.value}</span>
@@ -2273,26 +2464,7 @@ function TabReativacao() {
           <option value="tempo_expirado">Tempo expirado</option>
         </select>
 
-        <select
-          className="input py-1.5 text-xs"
-          value={filtroCampanha}
-          onChange={e => setFiltroCampanha(e.target.value)}
-        >
-          <option value="todas">Todas as campanhas</option>
-          <option value="SP">Campanha SP</option>
-          <option value="MG">Campanha MG</option>
-          <option value="GO">Campanha GO</option>
-        </select>
 
-        <div className="flex items-center gap-1.5">
-          <label className="text-xs text-gray-500 whitespace-nowrap">Inatividade desde</label>
-          <input
-            type="date"
-            className="input py-1.5 text-xs"
-            value={filtroData}
-            onChange={e => setFiltroData(e.target.value)}
-          />
-        </div>
 
         <button className="btn-primary text-xs py-1.5 gap-1.5">
           <Filter size={12}/> Filtrar

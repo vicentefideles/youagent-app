@@ -7,7 +7,7 @@ import {
   Settings, Users, LogOut, ChevronLeft, Bot,
   Zap, Menu, Megaphone, UserCheck, Shield,
   TrendingUp, PhoneIncoming, CreditCard, LayoutGrid,
-  Upload, DollarSign, Code2, Lock, PhoneCall,
+  DollarSign, Code2, Lock, PhoneCall,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import clsx from 'clsx'
@@ -160,7 +160,7 @@ type ContextualAction = { label: string; icon: React.ReactNode } | null
 
 const CONTEXTUAL_ACTIONS: Record<string, ContextualAction> = {
   '/dashboard':  { label: 'Nova Campanha',       icon: <Megaphone size={15} /> },
-  '/discadora':  { label: 'Importar Lista',       icon: <Upload size={15} /> },
+  '/discadora':  null,
   '/campanhas':  null,
   '/email':      { label: 'Nova Campanha Email',  icon: <Mail size={15} /> },
 }
