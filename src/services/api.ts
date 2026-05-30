@@ -92,6 +92,7 @@ export const ligacoesApi = {
   update:   (id: string, data: { resultado?: string; nota_pos_chamada?: string; status?: string }) =>
     api.patch(`/ligacoes/${id}`, data),
   encerrar:   (callControlId: string) => api.delete(`/ligacoes/${callControlId}/encerrar`),
+  desligar:   (id: string) => api.post(`/ligacoes/${id}/desligar`, {}),
   mudo:       (callControlId: string, ativar: boolean) => api.post(`/ligacoes/${callControlId}/mudo`, { ativar }),
   espera:     (callControlId: string, ativar: boolean) => api.post(`/ligacoes/${callControlId}/espera`, { ativar }),
   dtmf:       (callControlId: string, digito: string) => api.post(`/ligacoes/${callControlId}/dtmf`, { digito }),

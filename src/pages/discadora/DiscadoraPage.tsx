@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query'
 import { reunioesApi, ligacoesApi, claudeApi, equipeApi, transcricaoApi, contatosApi, agentesApi, campanhasApi, inteligenciaApi, whatsappUsuarioApi } from '@/services/api'
 import { useAuthStore } from '@/store/authStore'
 import {
-  PhoneCall, Calendar, Mic, MicOff, Phone, Radio, History, Antenna,
+  PhoneCall, Calendar, Mic, MicOff, Phone, PhoneOff, Radio, History, Antenna,
   Activity, Brain, Search, Download, Filter,
   User, Building2, MapPin, MessageSquare, X,
   Play, Pause, PauseCircle, CheckCircle2, XCircle, RotateCcw,
-  Volume2, Video, Hash, Sparkles, Send,
+  Volume2, Video, Hash, Sparkles, Send, Save,
   RefreshCw, Archive, ArrowUpDown,
   Copy, PhoneForwarded, FileText, Zap
 } from 'lucide-react'
@@ -1742,8 +1742,14 @@ function TabManual() {
   const [waHistorico, setWaHistorico]   = useState<Array<{ direcao: string; mensagem: string; criado_em: string }>>([])
   const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollingRef   = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Fase da chamada: 'discando' | 'atendida' (cliente pegou) | null
-  const [faseCall, setFaseCall]         = useState<'discando' | 'atendida' | null>(null)
+  // Fase da chamada: discando_vendedor → discando_cliente → atendida | null
+  const [faseCall, setFaseCall]         = useState<'discando_vendedor' | 'discando_cliente' | 'discando' | 'atendida' | null>(null)
+  // Telefone do vendedor (necessário para chamada de 2 pernas)
+  const [telefoneVendedor, setTelefoneVendedor] = useState('')
+  // Dados editáveis no CallCard
+  const [callCardResultado, setCallCardResultado] = useState('')
+  const [callCardAnotacao, setCallCardAnotacao]   = useState('')
+  const [salvandoCard, setSalvandoCard]           = useState(false)
   // Controles de chamada (só disponíveis quando atendida)
   const [mudo, setMudo]                 = useState(false)
   const [emEspera, setEmEspera]         = useState(false)
@@ -1762,9 +1768,9 @@ function TabManual() {
         const { data: lista } = await ligacoesApi.list({})
         const lig = (lista as any[]).find(l => l.id === id)
         if (!lig) return
-        if (lig.status === 'em_andamento' || lig.atendida_em) {
-          setFaseCall('atendida')
-        }
+        // Progresso dos estados da chamada de 2 pernas
+        if (lig.status === 'discando_cliente') setFaseCall('discando_cliente')
+        if (lig.status === 'em_andamento' || lig.atendida_em) setFaseCall('atendida')
         // Telnyx encerrou a chamada remotamente (ex: cliente desligou)
         if (lig.status === 'encerrada' && faseCall !== null) {
           if (pollingRef.current) clearInterval(pollingRef.current)
@@ -1809,7 +1815,7 @@ function TabManual() {
     const tel = contato?.tel || numero
     if (!tel) return
     setChamandoAtiva(true)
-    setFaseCall('discando')
+    setFaseCall(telefoneVendedor.trim() ? 'discando_vendedor' : 'discando')
     setResultado(null)
     setNotaEmChamada('')
     setMudo(false)
@@ -1819,12 +1825,13 @@ function TabManual() {
     intervalRef.current = setInterval(() => setTimer(t => t + 1), 1000)
     try {
       const res = await ligacoesApi.create({
-        numero_destino: tel,
-        contato_id:     contato?.id  || undefined,
-        iniciar_agora:  true,
-        tipo_ligacao:   'manual',
+        numero_destino:  tel,
+        numero_vendedor: telefoneVendedor.trim() || undefined,
+        contato_id:      contato?.id || undefined,
+        iniciar_agora:   true,
+        tipo_ligacao:    'manual',
         motivo,
-        anotacao_pre:   anotacao || undefined,
+        anotacao_pre:    anotacao || undefined,
       })
       const d = res.data as any
       setCallId(d?.call_control_id ?? null)
@@ -1868,6 +1875,18 @@ function TabManual() {
     setResultado(res)
     setChamandoAtiva(false)
     setSalvando(false)
+    refetchHistorico()
+  }
+
+  async function desligar() {
+    pararPolling()
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (ligacaoId) {
+      try { await ligacoesApi.desligar(ligacaoId) } catch (_) {}
+    }
+    setChamandoAtiva(false)
+    setFaseCall(null)
+    setResultado('encerrar')
     refetchHistorico()
   }
 
@@ -1998,6 +2017,48 @@ function TabManual() {
               </div>
             </div>
 
+            {/* Resultado + Anotação pós */}
+            <div className="space-y-2">
+              <div>
+                <label className="text-2xs font-semibold text-gray-600 block mb-1">Como foi a ligação?</label>
+                <select className="input text-xs" value={callCardResultado} onChange={e => setCallCardResultado(e.target.value)}>
+                  <option value="">— selecionar —</option>
+                  <option value="atendeu">Atendeu</option>
+                  <option value="reagendou">Reagendou</option>
+                  <option value="confirmou">Confirmou presença</option>
+                  <option value="nao_atendeu">Não atendeu</option>
+                  <option value="numero_errado">Número errado</option>
+                  <option value="interessado">Interessado — aguarda proposta</option>
+                  <option value="encerrada">Encerrada</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-2xs font-semibold text-gray-600 block mb-1">Anotação pós-chamada</label>
+                <textarea
+                  className="input min-h-[56px] resize-none text-xs"
+                  placeholder="Objeções, interesse, próximos passos..."
+                  value={callCardAnotacao}
+                  onChange={e => setCallCardAnotacao(e.target.value)}/>
+              </div>
+              <button
+                onClick={async () => {
+                  setSalvandoCard(true)
+                  try {
+                    await ligacoesApi.update(h.id, {
+                      resultado: callCardResultado || undefined,
+                      nota_pos_chamada: callCardAnotacao || undefined,
+                    })
+                    setCallCard(null)
+                    refetchHistorico()
+                  } catch (e) { console.error(e) }
+                  setSalvandoCard(false)
+                }}
+                disabled={salvandoCard}
+                className="btn-primary w-full justify-center gap-2 py-2 text-xs disabled:opacity-50">
+                <Save size={12}/> {salvandoCard ? 'Salvando…' : 'Salvar anotação'}
+              </button>
+            </div>
+
             {/* Enviar WhatsApp */}
             <div>
               <p className="text-2xs font-semibold text-gray-600 mb-1.5">Enviar WhatsApp de follow-up</p>
@@ -2107,6 +2168,22 @@ function TabManual() {
               </>
             )}
 
+            {/* Telefone do vendedor — necessário para 2-pernas */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 block mb-1.5">
+                Seu telefone <span className="text-red-500">*</span>
+                <span className="text-gray-400 font-normal ml-1">(Telnyx liga aqui primeiro)</span>
+              </label>
+              <input
+                className="input font-mono text-sm tracking-widest"
+                placeholder="(34) 99143-2096"
+                type="tel"
+                value={telefoneVendedor}
+                onChange={e => setTelefoneVendedor(e.target.value)}
+                disabled={chamandoAtiva}
+              />
+            </div>
+
             {/* Motivo */}
             <div>
               <label className="text-xs font-medium text-gray-700 block mb-1.5">Motivo</label>
@@ -2128,11 +2205,14 @@ function TabManual() {
                 placeholder="Ex: não atendeu o Meet de 14/05. Tentar reagendar..." />
             </div>
 
-            <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero)}
+            <button onClick={ligar} disabled={chamandoAtiva || (!contato && !numero) || !telefoneVendedor.trim()}
               className="btn-primary w-full justify-center gap-2 py-2.5 text-sm disabled:opacity-60">
               <Phone size={14}/>
               {chamandoAtiva ? '📞 Em ligação...' : '📞 Ligar agora'}
             </button>
+            {!telefoneVendedor.trim() && !chamandoAtiva && (
+              <p className="text-2xs text-amber-600 text-center">Preencha seu telefone para receber a chamada</p>
+            )}
           </div>
         </div>
 
@@ -2149,7 +2229,7 @@ function TabManual() {
                 const cls = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
                 const dur = h.duracao_segundos ? `${Math.floor(h.duracao_segundos/60)}m${String(h.duracao_segundos%60).padStart(2,'0')}s` : null
                 return (
-                  <button key={h.id ?? i} onClick={() => setCallCard(h)}
+                  <button key={h.id ?? i} onClick={() => { setCallCard(h); setCallCardResultado(h.resultado ?? ''); setCallCardAnotacao(h.nota_pos_chamada ?? '') }}
                     className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 hover:bg-brand-50 hover:border-brand-200 border border-transparent transition-colors text-left w-full">
                     <User size={12} className="text-gray-400 flex-shrink-0"/>
                     <div className="flex-1 min-w-0">
@@ -2198,23 +2278,48 @@ function TabManual() {
                 <div className="text-base font-bold text-gray-900">{contato?.nome ?? (contato?.tel || numero)}</div>
                 <div className="text-xs text-gray-500">{contato?.empresa ?? 'Contato manual'}</div>
                 <div className="text-2xl font-mono font-bold text-gray-900 mt-1">{formatTimer(timer)}</div>
-                {faseCall === 'discando' ? (
+                {faseCall === 'discando_vendedor' && (
+                  <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                    <RefreshCw size={10} className="animate-spin"/> Aguardando você atender o telefone…
+                  </span>
+                )}
+                {faseCall === 'discando_cliente' && (
+                  <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                    <RefreshCw size={10} className="animate-spin"/> Discando o cliente…
+                  </span>
+                )}
+                {(faseCall === 'discando') && (
                   <span className="flex items-center gap-1.5 mt-1 text-2xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
                     <RefreshCw size={10} className="animate-spin"/> Discando…
                   </span>
-                ) : (
-                  <span className="badge badge-success mt-1 animate-pulse text-2xs">● Cliente atendeu</span>
+                )}
+                {faseCall === 'atendida' && (
+                  <span className="badge badge-success mt-1 animate-pulse text-2xs">● Em chamada</span>
                 )}
                 {motivo && <span className="text-2xs text-gray-500 font-medium mt-0.5 text-center">{motivo}</span>}
               </div>
 
-              {/* Aviso discando */}
-              {faseCall === 'discando' && (
-                <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-center">
-                  <p className="text-xs text-amber-700 font-medium">Aguardando o cliente atender…</p>
-                  <p className="text-2xs text-amber-500 mt-0.5">Os controles ficam disponíveis quando a ligação for atendida</p>
+              {/* Aviso por fase */}
+              {faseCall === 'discando_vendedor' && (
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-center">
+                  <p className="text-xs text-blue-700 font-medium">📱 Atenda o seu telefone ({telefoneVendedor})</p>
+                  <p className="text-2xs text-blue-500 mt-0.5">Após você atender, o sistema liga automaticamente para o cliente</p>
                 </div>
               )}
+              {(faseCall === 'discando_cliente' || faseCall === 'discando') && (
+                <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-center">
+                  <p className="text-xs text-amber-700 font-medium">Discando para o cliente…</p>
+                  <p className="text-2xs text-amber-500 mt-0.5">Os controles ficam disponíveis quando ele atender</p>
+                </div>
+              )}
+
+              {/* ── Botão Desligar (sempre visível durante chamada) ── */}
+              <div className="flex justify-center mb-4">
+                <button onClick={desligar}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors shadow-sm">
+                  <PhoneOff size={15}/> Desligar
+                </button>
+              </div>
 
               {/* ── Controles de chamada (só quando atendida) ── */}
               <div className={clsx('flex items-center justify-center gap-3 mb-4 pb-4 border-b border-gray-100', faseCall !== 'atendida' && 'opacity-30 pointer-events-none')}>
