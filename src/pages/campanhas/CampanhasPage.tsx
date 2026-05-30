@@ -444,6 +444,7 @@ export default function CampanhasPage() {
       hora_fim:              form.hora_fim,
       limite_diario:         Number(form.limite_diario),
       pausa_almoco:          form.pausa_almoco,
+      pausa_almoco_horario:  (form as { pausa_almoco_val?: string }).pausa_almoco_val || 'none',
       dias_operacao:         form.dias_operacao,
       icp_ativo:             form.icp_ativo,
       icp_threshold:         70,
