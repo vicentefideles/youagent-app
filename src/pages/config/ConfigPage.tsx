@@ -1712,9 +1712,19 @@ function SectionMeuWhatsApp() {
     try {
       const r = await whatsappUsuarioApi.conectar()
       const d = r.data as any
-      setQr(d.qr)
-      setStatus('conectando')
-      setPolling(true)
+      if (d.conectado) {
+        setStatus('conectado')
+        setPolling(true)
+      } else if (d.qr) {
+        // Monta blob URL a partir do base64 puro para evitar ERR_INVALID_URL
+        const binary = atob(d.qr)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        const blob = new Blob([bytes], { type: 'image/png' })
+        setQr(URL.createObjectURL(blob))
+        setStatus('conectando')
+        setPolling(true)
+      }
     } catch (e: any) {
       const msg: string = e?.response?.data?.error ?? e?.message ?? 'Erro desconhecido'
       const isMongo = msg.toLowerCase().includes('mongo') || msg.toLowerCase().includes('topology')
@@ -1783,7 +1793,7 @@ function SectionMeuWhatsApp() {
               <QrCode size={14} className="text-emerald-600"/>
               Escaneie com o WhatsApp do seu celular
             </div>
-            <img src={qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`}
+            <img src={qr}
               alt="QR Code WhatsApp" className="w-52 h-52 rounded-xl border-4 border-white shadow-md"/>
             <p className="text-2xs text-gray-400">Abra o WhatsApp → Menu → Aparelhos conectados → Conectar aparelho</p>
           </div>
