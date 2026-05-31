@@ -1739,7 +1739,6 @@ function TabManual() {
   // ── Estado da sessão ──────────────────────────────────────────────────────
   const [ligacaoId, setLigacaoId] = useState<string | null>(null)
   const [resultado, setResultado] = useState<string | null>(null)
-  const [salvando, setSalvando]   = useState(false)
 
   // ── WhatsApp ──────────────────────────────────────────────────────────────
   const [waLoading, setWaLoading]   = useState(false)
@@ -1767,11 +1766,13 @@ function TabManual() {
 
   function toastControl(m: string) { setToastCtrl(m); setTimeout(() => setToastCtrl(null), 3000) }
 
-  // Quando WebRTC detecta fim de chamada, mostra tela de resultado
+  // Quando WebRTC detecta fim de chamada (cliente desligou), abre card de classificação
   const prevStatusRef = useRef<string>('')
   useEffect(() => {
-    if (webrtc.status === 'hangup' && prevStatusRef.current !== 'hangup' && chamandoAtiva === false && resultado === null) {
-      setResultado('encerrar')
+    if (webrtc.status === 'hangup' && prevStatusRef.current === 'active') {
+      // Chamada foi encerrada pelo cliente (não pelo botão Desligar)
+      // O botão Desligar já chama abrirCardClassificacao() diretamente
+      if (!callCard) abrirCardClassificacao()
       refetchHistorico()
     }
     prevStatusRef.current = webrtc.status
@@ -1842,34 +1843,31 @@ function TabManual() {
     if (id) setLigacaoId(id)
   }
 
-  async function registrarResultado(res: string) {
-    setSalvando(true)
-
-    // Encerra chamada WebRTC
-    webrtcActions.hangup()
-
-    // Persiste resultado + nota na row ligacoes
-    if (ligacaoId) {
-      try {
-        await ligacoesApi.update(ligacaoId, {
-          resultado:        res,
-          nota_pos_chamada: notaEmChamada || undefined,
-          status:           'encerrada',
-        })
-      } catch (_) {}
+  // Monta o card com os dados da chamada atual para classificação
+  function abrirCardClassificacao() {
+    const tel = contato?.tel || numero
+    const cardData: any = {
+      id: ligacaoId,
+      numero_destino: tel,
+      motivo,
+      anotacao_pre: anotacao || undefined,
+      nota_pos_chamada: notaEmChamada || undefined,
+      contatos: contato ? { nome: contato.nome, empresa: contato.empresa } : null,
+      url_gravacao: null,
+      resultado: null,
+      _isCurrentCall: true,  // flag: ao salvar, reseta o form
     }
-
-    setResultado(res)
-    setSalvando(false)
-    refetchHistorico()
+    setCallCard(cardData)
+    setCallCardResultado('')
+    setCallCardAnotacao(notaEmChamada || '')
   }
 
   function desligar() {
     webrtcActions.hangup()
-    setResultado('encerrar')
     if (ligacaoId) {
-      ligacoesApi.update(ligacaoId, { status: 'encerrada', resultado: 'encerrar' }).catch(() => {})
+      ligacoesApi.update(ligacaoId, { status: 'encerrada' }).catch(() => {})
     }
+    abrirCardClassificacao()
     refetchHistorico()
   }
 
@@ -1980,12 +1978,13 @@ function TabManual() {
             )}
 
             {/* Gravação */}
-            {h.url_gravacao && (
-              <div>
-                <p className="text-2xs font-semibold text-gray-600 mb-1.5">Gravação</p>
-                <audio controls src={h.url_gravacao} className="w-full h-9 rounded-lg"/>
-              </div>
-            )}
+            <div>
+              <p className="text-2xs font-semibold text-gray-600 mb-1.5">Gravação</p>
+              {h.url_gravacao
+                ? <audio controls src={h.url_gravacao} className="w-full h-9 rounded-lg"/>
+                : <p className="text-2xs text-gray-400 italic">Disponível em alguns minutos após o encerramento</p>
+              }
+            </div>
 
             {/* Centro de Inteligência — automático */}
             <div className="rounded-xl p-3 border bg-brand-50 border-brand-200 flex items-center gap-3">
@@ -2027,11 +2026,18 @@ function TabManual() {
                 onClick={async () => {
                   setSalvandoCard(true)
                   try {
-                    await ligacoesApi.update(h.id, {
-                      resultado: callCardResultado || undefined,
-                      nota_pos_chamada: callCardAnotacao || undefined,
-                    })
+                    if (h.id) {
+                      await ligacoesApi.update(h.id, {
+                        resultado: callCardResultado || undefined,
+                        nota_pos_chamada: callCardAnotacao || undefined,
+                      })
+                    }
                     setCallCard(null)
+                    // Se era a chamada atual, mostra tela de resultado e reseta WebRTC
+                    if (h._isCurrentCall) {
+                      setResultado(callCardResultado || 'encerrar')
+                      webrtcActions.reset()
+                    }
                     refetchHistorico()
                   } catch (e) { console.error(e) }
                   setSalvandoCard(false)
@@ -2390,19 +2396,10 @@ function TabManual() {
                   placeholder={faseDiscando ? 'Disponível quando o cliente atender…' : 'Objeções, interesse, próximos passos...'}/>
               </div>
 
-              {/* Botões de resultado (sem "Encerrar" — já existe botão Desligar em vermelho) */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id:'reagendou',   label:'📅 Reagendou',         cls:'border-brand-300 text-brand-700 hover:bg-brand-50' },
-                  { id:'confirmou',   label:'✓ Confirmou',          cls:'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                  { id:'nao_atendeu', label:'📵 Não atendeu',       cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                ].map(btn => (
-                  <button key={btn.id} onClick={() => { registrarResultado(btn.id); setMostrarDtmf(false) }} disabled={salvando}
-                    className={clsx('text-xs font-semibold py-2.5 px-3 rounded-xl border bg-white transition-colors disabled:opacity-50', btn.cls)}>
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
+              {/* Classificação acontece ao encerrar — card abre automaticamente */}
+              <p className="text-2xs text-gray-400 text-center">
+                Ao encerrar, um card abre para você classificar a chamada.
+              </p>
 
               {/* Toast controles */}
               {toastCtrl && (
