@@ -51,12 +51,14 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
   const [held, setHeld]                   = useState(false)
   const [timer, setTimer]                 = useState(0)
 
-  const clientRef      = useRef<any>(null)
-  const callRef        = useRef<any>(null)
-  const credIdRef      = useRef<string | null>(null)
+  const clientRef       = useRef<any>(null)
+  const callRef         = useRef<any>(null)
+  const credIdRef       = useRef<string | null>(null)
   const callerNumberRef = useRef<string>('')
-  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null)
-  const ligacaoIdRef   = useRef<string | null>(null)
+  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null)
+  const ligacaoIdRef    = useRef<string | null>(null)
+  // Ringback (tom de chamando) gerado via Web Audio API
+  const ringbackRef     = useRef<{ stop: () => void } | null>(null)
 
   // Limpa timer ao desmontar
   useEffect(() => {
@@ -64,6 +66,33 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [])
+
+  // Tom de chamando (ringback): 425Hz, padrão brasileiro 1s ligado / 4s desligado
+  function startRingback() {
+    stopRingback()
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(425, ctx.currentTime)
+      // Padrão: 1s on, 4s off, repetindo
+      let t = ctx.currentTime
+      for (let i = 0; i < 60; i++) {
+        gain.gain.setValueAtTime(0.15, t)
+        gain.gain.setValueAtTime(0, t + 1)
+        t += 5
+      }
+      oscillator.start()
+      ringbackRef.current = { stop: () => { try { oscillator.stop(); ctx.close() } catch (_) {} } }
+    } catch (_) {}
+  }
+
+  function stopRingback() {
+    if (ringbackRef.current) { ringbackRef.current.stop(); ringbackRef.current = null }
+  }
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -140,8 +169,10 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
         if (callStatus === 'ringing' || callStatus === 'requesting' || callStatus === 'trying') {
           callRef.current = call
           setStatus('ringing')
+          startRingback()
         } else if (callStatus === 'active') {
           callRef.current = call
+          stopRingback()
           setStatus('active')
           startTimer()
           // Atualiza DB: chamada atendida
@@ -149,6 +180,7 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
             ligacoesApi.update(ligacaoIdRef.current, { status: 'em_andamento' }).catch(() => {})
           }
         } else if (callStatus === 'hangup' || callStatus === 'destroy' || callStatus === 'purge') {
+          stopRingback()
           stopTimer()
           setStatus('hangup')
           setMuted(false)
@@ -181,7 +213,8 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
     opts?: { motivo?: string; anotacao?: string; contato_id?: string }
   ): Promise<string | null> => {
     const client = clientRef.current
-    if (!client || status !== 'ready') return null
+    // Aceita 'ready' ou 'hangup' (após encerramento de chamada anterior)
+    if (!client || (status !== 'ready' && status !== 'hangup')) return null
 
     // Formata E.164
     const digits = numero.replace(/\D/g, '')
@@ -228,6 +261,7 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
     if (callRef.current) {
       try { callRef.current.hangup() } catch (_) {}
     }
+    stopRingback()
     stopTimer()
     setStatus('hangup')
     setMuted(false)

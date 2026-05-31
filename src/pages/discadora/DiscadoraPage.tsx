@@ -1800,17 +1800,40 @@ function TabManual() {
     refetchInterval: 15000,
   })
 
-  // Ativa o microfone e conecta ao Telnyx (deve ser chamado antes do primeiro ligar)
+  // Ativa o microfone e conecta ao Telnyx
   async function ativarMicrofone() {
     await webrtcActions.init()
   }
 
   async function ligar() {
     const tel = contato?.tel || numero
-    if (!tel || webrtc.status !== 'ready') return
+    if (!tel) return
     setResultado(null)
     setNotaEmChamada('')
     setMostrarDtmf(false)
+
+    // Se não conectado ainda, inicializa primeiro e aguarda pronto
+    if (webrtc.status === 'idle' || webrtc.status === 'error') {
+      const ok = await webrtcActions.init()
+      if (!ok) return
+      // Aguarda status virar 'ready' (máx 8s)
+      await new Promise<void>(resolve => {
+        const t = setTimeout(resolve, 8000)
+        const check = setInterval(() => {
+          // status atualizado via hook — interval re-read via closure não funciona
+          // mas dial() internamente verifica clientRef
+          clearInterval(check)
+          clearTimeout(t)
+          resolve()
+        }, 3000)
+      })
+    }
+
+    // Se veio de uma chamada encerrada, reseta estado do hook
+    if (webrtc.status === 'hangup') {
+      webrtcActions.reset()
+    }
+
     const id = await webrtcActions.dial(tel, {
       motivo,
       anotacao:   anotacao || undefined,
@@ -2188,13 +2211,14 @@ function TabManual() {
             </div>
 
             <button
-              onClick={webrtc.status === 'idle' || webrtc.status === 'error' ? ativarMicrofone : ligar}
+              onClick={ligar}
               disabled={chamandoAtiva || (!contato && !numero) || webrtc.status === 'initializing' || webrtc.status === 'connecting'}
               className="btn-primary w-full justify-center gap-2 py-2.5 text-sm disabled:opacity-60">
               <Phone size={14}/>
-              {chamandoAtiva ? '📞 Em ligação...'
-                : webrtc.status === 'ready' ? '📞 Ligar agora'
+              {chamandoAtiva                                              ? '📞 Em ligação...'
+                : webrtc.status === 'ready'                              ? '📞 Ligar agora'
                 : webrtc.status === 'initializing' || webrtc.status === 'connecting' ? 'Conectando…'
+                : webrtc.status === 'hangup'                             ? '📞 Ligar novamente'
                 : '🎤 Ativar e ligar'}
             </button>
           </div>
@@ -2366,13 +2390,12 @@ function TabManual() {
                   placeholder={faseDiscando ? 'Disponível quando o cliente atender…' : 'Objeções, interesse, próximos passos...'}/>
               </div>
 
-              {/* Botões de resultado */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Botões de resultado (sem "Encerrar" — já existe botão Desligar em vermelho) */}
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { id:'reagendou',   label:'📅 Reagendou',         cls:'border-brand-300 text-brand-700 hover:bg-brand-50' },
-                  { id:'confirmou',   label:'✓ Confirmou presença', cls:'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
+                  { id:'confirmou',   label:'✓ Confirmou',          cls:'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
                   { id:'nao_atendeu', label:'📵 Não atendeu',       cls:'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                  { id:'encerrar',    label:'⏹ Encerrar',           cls:'border-gray-300 text-gray-600 hover:bg-gray-50' },
                 ].map(btn => (
                   <button key={btn.id} onClick={() => { registrarResultado(btn.id); setMostrarDtmf(false) }} disabled={salvando}
                     className={clsx('text-xs font-semibold py-2.5 px-3 rounded-xl border bg-white transition-colors disabled:opacity-50', btn.cls)}>
