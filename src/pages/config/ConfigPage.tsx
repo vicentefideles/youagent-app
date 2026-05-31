@@ -1715,12 +1715,14 @@ function SectionMeuWhatsApp() {
       if (d.conectado) {
         setStatus('conectado')
         setPolling(true)
-      } else if (d.qr) {
-        // Monta blob URL a partir do base64 puro para evitar ERR_INVALID_URL
-        const binary = atob(d.qr)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const blob = new Blob([bytes], { type: 'image/png' })
+      } else {
+        // Busca QR como imagem PNG real (evita qualquer problema com data URLs)
+        const token = localStorage.getItem('youagent_jwt')
+        const resp = await fetch('https://app.etztech.com/api/v1/whatsapp/eu/qr-image', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!resp.ok) throw new Error('Falha ao carregar QR code')
+        const blob = await resp.blob()
         setQr(URL.createObjectURL(blob))
         setStatus('conectando')
         setPolling(true)
