@@ -133,7 +133,8 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
 
       const rtcClient = new TelnyxRTC({
         ...authConfig,
-        // Habilita audio automático no browser
+        // Aponta o SDK para o elemento <audio> que reproduz o áudio remoto
+        remoteElement: 'etz-webrtc-remote-audio',
         ringtoneFile: '',
         ringbackFile: '',
       } as any)
@@ -175,6 +176,23 @@ export function useWebRTCPhone(): [WebRTCPhoneState, WebRTCPhoneActions] {
           stopRingback()
           setStatus('active')
           startTimer()
+
+          // Attach manual do remote stream para garantir áudio no browser
+          try {
+            const stream = call.remoteStream || call.options?.remoteStream
+            if (stream) {
+              let audioEl = document.getElementById('etz-webrtc-remote-audio') as HTMLAudioElement | null
+              if (!audioEl) {
+                audioEl = document.createElement('audio')
+                audioEl.id = 'etz-webrtc-remote-audio'
+                audioEl.autoplay = true
+                document.body.appendChild(audioEl)
+              }
+              audioEl.srcObject = stream
+              audioEl.play().catch(e => console.warn('[WebRTC] audio play erro:', e))
+            }
+          } catch (e) { console.warn('[WebRTC] attach stream erro:', e) }
+
           // Atualiza DB: chamada atendida
           if (ligacaoIdRef.current) {
             ligacoesApi.update(ligacaoIdRef.current, { status: 'em_andamento' }).catch(() => {})

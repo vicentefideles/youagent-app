@@ -1730,7 +1730,7 @@ function TabManual() {
 
   // ── Formulário ────────────────────────────────────────────────────────────
   const [busca, setBusca]     = useState('')
-  const [motivo, setMotivo]   = useState('Reagendamento — cliente não entrou na reunião')
+  const [motivo]              = useState('Chamada manual')
   const [anotacao, setAnotacao] = useState('')
   const [notaEmChamada, setNotaEmChamada] = useState('')
   const [contato, setContato] = useState<{ id?: string; nome: string; empresa: string; tel: string; email: string } | null>(null)
@@ -2002,17 +2002,28 @@ function TabManual() {
             {/* Resultado + Anotação pós */}
             <div className="space-y-2">
               <div>
-                <label className="text-2xs font-semibold text-gray-600 block mb-1">Como foi a ligação?</label>
-                <select className="input text-xs" value={callCardResultado} onChange={e => setCallCardResultado(e.target.value)}>
-                  <option value="">— selecionar —</option>
-                  <option value="atendeu">Atendeu</option>
-                  <option value="reagendou">Reagendou</option>
-                  <option value="confirmou">Confirmou presença</option>
-                  <option value="nao_atendeu">Não atendeu</option>
-                  <option value="numero_errado">Número errado</option>
-                  <option value="interessado">Interessado — aguarda proposta</option>
-                  <option value="encerrada">Encerrada</option>
-                </select>
+                <label className="text-2xs font-semibold text-gray-600 block mb-1.5">Como foi a ligação?</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { v:'confirmou',   label:'✅ Confirmou presença',      cls:'border-emerald-300 bg-emerald-50 text-emerald-800' },
+                    { v:'reagendou',   label:'📅 Reagendou',               cls:'border-brand-300  bg-brand-50  text-brand-800' },
+                    { v:'nao_atendeu', label:'📵 Não atendeu',             cls:'border-amber-300  bg-amber-50  text-amber-800' },
+                    { v:'caixa_postal',label:'📬 Caixa postal',            cls:'border-gray-300   bg-gray-50   text-gray-700' },
+                    { v:'interessado', label:'🔥 Interessado — follow-up', cls:'border-orange-300 bg-orange-50 text-orange-800' },
+                    { v:'numero_errado',label:'❌ Número errado',          cls:'border-red-200    bg-red-50    text-red-700' },
+                  ].map(opt => (
+                    <button key={opt.v}
+                      onClick={() => setCallCardResultado(opt.v)}
+                      className={clsx(
+                        'text-2xs font-semibold py-2 px-2 rounded-xl border transition-all text-left',
+                        callCardResultado === opt.v
+                          ? opt.cls + ' ring-2 ring-offset-1 ring-brand-400 shadow-sm'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      )}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="text-2xs font-semibold text-gray-600 block mb-1">Anotação pós-chamada</label>
@@ -2097,6 +2108,8 @@ function TabManual() {
 
   return (
     <>
+    {/* Elemento de áudio oculto para reprodução do áudio remoto (WebRTC) */}
+    <audio id="etz-webrtc-remote-audio" autoPlay style={{ display: 'none' }}/>
     {callCard && <CallCard/>}
     <div className="grid grid-cols-[340px_1fr_360px] gap-4">
 
@@ -2195,25 +2208,13 @@ function TabManual() {
               </div>
             )}
 
-            {/* Motivo */}
+            {/* Observação rápida (opcional) */}
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5">Motivo</label>
-              <select className="input text-xs" value={motivo} onChange={e => setMotivo(e.target.value)}>
-                <option>Reagendamento — cliente não entrou na reunião</option>
-                <option>Follow-up pós-reunião</option>
-                <option>Confirmação de reunião</option>
-                <option>Retorno de chamada solicitado</option>
-                <option>Proposta comercial</option>
-                <option>Outro</option>
-              </select>
-            </div>
-
-            {/* Anotação */}
-            <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5">Anotação pré-ligação</label>
-              <textarea className="input min-h-[56px] resize-none text-xs" value={anotacao}
-                onChange={e => setAnotacao(e.target.value)}
-                placeholder="Ex: não atendeu o Meet de 14/05. Tentar reagendar..." />
+              <label className="text-xs font-medium text-gray-700 block mb-1.5">
+                Observação <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <input className="input text-xs" placeholder="Ex: não atendeu o Meet, tentar reagendar..."
+                value={anotacao} onChange={e => setAnotacao(e.target.value)}/>
             </div>
 
             <button
