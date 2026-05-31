@@ -140,9 +140,9 @@ export const whatsappApi = {
   send: (data: unknown) => api.post('/whatsapp/enviar', data),
 }
 
-// WhatsApp pessoal do usuário logado (admin/gestor) — Evolution API
+// WhatsApp pessoal do usuário logado (admin/gestor) — Z-API
 export const whatsappUsuarioApi = {
-  conectar:    () => api.post('/whatsapp/eu/conectar', {}, { timeout: 45000 }),
+  conectar:    () => api.post('/whatsapp/eu/conectar', {}, { timeout: 30000 }),
   status:      () => api.get('/whatsapp/eu/status'),
   desconectar: () => api.delete('/whatsapp/eu/desconectar'),
   enviar:      (data: { telefone: string; mensagem: string }) =>
@@ -156,8 +156,9 @@ export const whatsappUsuarioApi = {
     api.patch(`/whatsapp/eu/lida/${encodeURIComponent(telefone)}`, {}),
   /** Total de mensagens não lidas (badge sidebar) */
   naoLidas:    () => api.get('/whatsapp/eu/nao-lidas'),
-  /** Configura webhook na instância existente (chamado ao abrir a página) */
-  configurarWebhook: () => api.post('/whatsapp/eu/configurar-webhook', {}),
+  /** Salva credenciais Z-API (instanceId + token) para este cliente */
+  salvarCredenciais: (data: { instance_id: string; token: string }) =>
+    api.post('/whatsapp/eu/credenciais', data),
   /** Apaga todas as mensagens de uma conversa pelo telefone */
   apagarConversa: (telefone: string) =>
     api.delete(`/whatsapp/eu/conversa/${encodeURIComponent(telefone)}`),

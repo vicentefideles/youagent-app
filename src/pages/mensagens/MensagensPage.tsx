@@ -65,7 +65,6 @@ export default function MensagensPage() {
     whatsappUsuarioApi.status()
       .then(r => setWaStatus((r.data as any).conectado ? 'conectado' : 'desconectado'))
       .catch(() => setWaStatus('desconectado'))
-    whatsappUsuarioApi.configurarWebhook().catch(() => {})
   }, [])
 
   const { data: conversas = [], isLoading: loadingConversas } = useQuery({
