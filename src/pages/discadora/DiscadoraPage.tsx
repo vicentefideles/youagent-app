@@ -15,6 +15,209 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 
+// ─── CALL CARD MODAL (componente externo para evitar re-render do pai) ───────
+
+interface CallCardModalProps {
+  callCard: any
+  onClose: () => void
+  onSave: (resultado: string, anotacao: string) => void
+}
+
+function CallCardModal({ callCard: h, onClose, onSave }: CallCardModalProps) {
+  const [resultado, setResultado]   = useState('')
+  const [anotacao, setAnotacao]     = useState(h?.nota_pos_chamada ?? '')
+  const [salvando, setSalvando]     = useState(false)
+  const [waMsgTexto, setWaMsgTexto] = useState('')
+  const [waMsg, setWaMsg]           = useState<string | null>(null)
+  const [waLoading, setWaLoading]   = useState(false)
+
+  if (!h) return null
+
+  const res = (h.resultado ?? 'encerrada') as string
+  const labelMap: Record<string, string> = {
+    reagendou: 'Reagendou', confirmou: 'Confirmou presença',
+    nao_atendeu: 'Não atendeu', encerrada: 'Encerrada', agendada: 'Agendou',
+  }
+  const cls = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
+  const dur = h.duracao_segundos ? `${Math.floor(h.duracao_segundos / 60)}m${String(h.duracao_segundos % 60).padStart(2, '0')}s` : '—'
+
+  async function enviarWa() {
+    const tel = h.numero_destino
+    const texto = waMsgTexto.trim()
+    if (!tel || !texto) return
+    setWaLoading(true)
+    try {
+      await whatsappUsuarioApi.enviar({ telefone: tel, mensagem: texto })
+      setWaMsgTexto('')
+      setWaMsg('✓ Mensagem enviada!')
+      setTimeout(() => setWaMsg(null), 4000)
+    } catch (e: any) {
+      setWaMsg('Erro: ' + (e?.response?.data?.error ?? e.message))
+    } finally { setWaLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-popup w-full max-w-md mx-4 animate-slide-up" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 text-sm font-bold flex items-center justify-center">
+            {(h.contatos?.nome ?? h.numero_destino ?? '?').slice(0, 2).toUpperCase()}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-900">{h.contatos?.nome ?? h.numero_destino}</p>
+            <p className="text-xs text-gray-400">{h.contatos?.empresa ?? h.motivo ?? ''}</p>
+          </div>
+          <span className={clsx('badge text-2xs', cls)}>{labelMap[res] ?? res}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-1"><X size={16} /></button>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col gap-4">
+          {/* Métricas */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-gray-50 rounded-xl py-2">
+              <p className="text-xs font-bold text-gray-900">{dur}</p>
+              <p className="text-2xs text-gray-500">Duração</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl py-2">
+              <p className="text-xs font-bold text-gray-900">{h.motivo ? h.motivo.split(' ').slice(0, 2).join(' ') : '—'}</p>
+              <p className="text-2xs text-gray-500">Motivo</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl py-2">
+              <p className="text-xs font-bold text-gray-900">{h.numero_destino ?? '—'}</p>
+              <p className="text-2xs text-gray-500">Número</p>
+            </div>
+          </div>
+
+          {/* Anotações existentes */}
+          {(h.anotacao_pre || h.nota_pos_chamada) && (
+            <div className="space-y-2">
+              {h.anotacao_pre && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <p className="text-2xs font-semibold text-amber-700 mb-1">Anotação pré-ligação</p>
+                  <p className="text-xs text-amber-800">{h.anotacao_pre}</p>
+                </div>
+              )}
+              {h.nota_pos_chamada && (
+                <div className="bg-brand-50 border border-brand-100 rounded-xl p-3">
+                  <p className="text-2xs font-semibold text-brand-700 mb-1">Anotação durante a chamada</p>
+                  <p className="text-xs text-brand-800">{h.nota_pos_chamada}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Gravação */}
+          <div>
+            <p className="text-2xs font-semibold text-gray-600 mb-1.5">Gravação</p>
+            {h.url_gravacao
+              ? <audio controls src={h.url_gravacao} className="w-full h-9 rounded-lg" />
+              : <p className="text-2xs text-gray-400 italic">Disponível em alguns minutos após o encerramento</p>
+            }
+          </div>
+
+          {/* CI badge */}
+          <div className="rounded-xl p-3 border bg-brand-50 border-brand-200 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center flex-shrink-0">
+              <Sparkles size={14} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-brand-800">Analisada automaticamente pelo CI</p>
+              <p className="text-2xs text-brand-600">Anotações e gravação treinam o agente desta conta — transferências a quente também</p>
+            </div>
+          </div>
+
+          {/* Classificação */}
+          <div className="space-y-2">
+            <div>
+              <label className="text-2xs font-semibold text-gray-600 block mb-1.5">Como foi a ligação?</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { v: 'confirmou',    label: '✅ Confirmou presença',      cls: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+                  { v: 'reagendou',    label: '📅 Reagendou',               cls: 'border-brand-300  bg-brand-50  text-brand-800' },
+                  { v: 'nao_atendeu',  label: '📵 Não atendeu',             cls: 'border-amber-300  bg-amber-50  text-amber-800' },
+                  { v: 'caixa_postal', label: '📬 Caixa postal',            cls: 'border-gray-300   bg-gray-50   text-gray-700' },
+                  { v: 'interessado',  label: '🔥 Interessado — follow-up', cls: 'border-orange-300 bg-orange-50 text-orange-800' },
+                  { v: 'numero_errado',label: '❌ Número errado',           cls: 'border-red-200    bg-red-50    text-red-700' },
+                ].map(opt => (
+                  <button key={opt.v}
+                    onClick={() => setResultado(opt.v)}
+                    className={clsx(
+                      'text-2xs font-semibold py-2 px-2 rounded-xl border transition-all text-left',
+                      resultado === opt.v
+                        ? opt.cls + ' ring-2 ring-offset-1 ring-brand-400 shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    )}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-2xs font-semibold text-gray-600 block mb-1">Anotação pós-chamada</label>
+              <textarea
+                className="input min-h-[56px] resize-none text-xs"
+                placeholder="Objeções, interesse, próximos passos..."
+                value={anotacao}
+                onChange={e => setAnotacao(e.target.value)} />
+            </div>
+            <button
+              onClick={async () => {
+                setSalvando(true)
+                try {
+                  if (h.id) {
+                    await ligacoesApi.update(h.id, {
+                      resultado: resultado || undefined,
+                      nota_pos_chamada: anotacao || undefined,
+                    })
+                  }
+                  onSave(resultado, anotacao)
+                } catch (e) { console.error(e) }
+                setSalvando(false)
+              }}
+              disabled={salvando}
+              className="btn-primary w-full justify-center gap-2 py-2 text-xs disabled:opacity-50">
+              <Save size={12} /> {salvando ? 'Salvando…' : 'Salvar anotação'}
+            </button>
+          </div>
+
+          {/* WhatsApp follow-up */}
+          <div>
+            <p className="text-2xs font-semibold text-gray-600 mb-1.5">Enviar WhatsApp de follow-up</p>
+            <div className="flex gap-2 mb-2">
+              {['Não atendeu', 'Reagendamento', 'Follow-up'].map(label => {
+                const textoMap: Record<string, string> = {
+                  'Não atendeu': `Olá! Tentamos ligar agora mas não conseguimos falar. Quando seria um bom horário? 📅`,
+                  'Reagendamento': `Olá! Preciso reagendar nossa conversa. Qual seria o melhor horário para você? 🔄`,
+                  'Follow-up': `Olá! Passando para dar continuidade ao nosso contato. Tem um momento? 🚀`,
+                }
+                return (
+                  <button key={label} onClick={() => setWaMsgTexto(textoMap[label])}
+                    className="text-2xs px-2 py-1 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 text-gray-600 hover:text-brand-700 transition-colors">
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex gap-2">
+              <textarea
+                className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 resize-none min-h-[56px] focus:outline-none focus:border-brand-400"
+                placeholder="Mensagem de follow-up..."
+                value={waMsgTexto}
+                onChange={e => setWaMsgTexto(e.target.value)} />
+              <button onClick={enviarWa} disabled={waLoading || !waMsgTexto.trim()}
+                className="w-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors flex-shrink-0">
+                {waLoading ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+              </button>
+            </div>
+            {waMsg && <p className="text-2xs text-emerald-600 mt-1">{waMsg}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── TIPOS ──────────────────────────────────────────────────────────────────
 
 type Tab = 'fila' | 'agendados' | 'gravacoes' | 'manual' | 'agenda' | 'aovivo' | 'historico' | 'ramal' | 'reativacao'
@@ -1751,10 +1954,7 @@ function TabManual() {
   const [toastCtrl, setToastCtrl]     = useState<string | null>(null)
 
   // ── CallCard ──────────────────────────────────────────────────────────────
-  const [callCard, setCallCard]               = useState<any | null>(null)
-  const [callCardResultado, setCallCardResultado] = useState('')
-  const [callCardAnotacao, setCallCardAnotacao]   = useState('')
-  const [salvandoCard, setSalvandoCard]           = useState(false)
+  const [callCard, setCallCard] = useState<any | null>(null)
 
   // Mapeamentos do status WebRTC para lógica de UI
   const chamandoAtiva = webrtc.status === 'ringing' || webrtc.status === 'active'
@@ -1858,8 +2058,6 @@ function TabManual() {
       _isCurrentCall: true,  // flag: ao salvar, reseta o form
     }
     setCallCard(cardData)
-    setCallCardResultado('')
-    setCallCardAnotacao(notaEmChamada || '')
   }
 
   function desligar() {
@@ -1903,199 +2101,6 @@ function TabManual() {
     encerrar:     'Chamada encerrada',
   }
 
-  // ── Card detalhe de chamada ───────────────────────────────────────────────────
-  function CallCard() {
-    const h = callCard
-    if (!h) return null
-    const res = (h.resultado ?? 'encerrada') as string
-    const labelMap: Record<string,string> = { reagendou:'Reagendou', confirmou:'Confirmou presença', nao_atendeu:'Não atendeu', encerrada:'Encerrada', agendada:'Agendou' }
-    const cls = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
-    const dur = h.duracao_segundos ? `${Math.floor(h.duracao_segundos/60)}m${String(h.duracao_segundos%60).padStart(2,'0')}s` : '—'
-    async function enviarWaDoCard() {
-      const tel = h.numero_destino
-      const texto = waMsgTexto.trim()
-      if (!tel || !texto) return
-      setWaLoading(true)
-      try {
-        await whatsappUsuarioApi.enviar({ telefone: tel, mensagem: texto })
-        setWaMsgTexto('')
-        setWaMsg('✓ Mensagem enviada!')
-        setTimeout(() => setWaMsg(null), 4000)
-      } catch (e: any) {
-        setWaMsg('Erro: ' + (e?.response?.data?.error ?? e.message))
-      } finally { setWaLoading(false) }
-    }
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in" onClick={() => setCallCard(null)}>
-        <div className="bg-white rounded-2xl shadow-popup w-full max-w-md mx-4 animate-slide-up" onClick={e => e.stopPropagation()}>
-          {/* Header */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-            <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 text-sm font-bold flex items-center justify-center">
-              {(h.contatos?.nome ?? h.numero_destino ?? '?').slice(0,2).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-gray-900">{h.contatos?.nome ?? h.numero_destino}</p>
-              <p className="text-xs text-gray-400">{h.contatos?.empresa ?? h.motivo ?? ''}</p>
-            </div>
-            <span className={clsx('badge text-2xs', cls)}>{labelMap[res] ?? res}</span>
-            <button onClick={() => setCallCard(null)} className="text-gray-400 hover:text-gray-600 ml-1"><X size={16}/></button>
-          </div>
-
-          <div className="px-5 py-4 flex flex-col gap-4">
-            {/* Métricas */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-gray-50 rounded-xl py-2">
-                <p className="text-xs font-bold text-gray-900">{dur}</p>
-                <p className="text-2xs text-gray-500">Duração</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl py-2">
-                <p className="text-xs font-bold text-gray-900">{h.motivo ? h.motivo.split(' ').slice(0,2).join(' ') : '—'}</p>
-                <p className="text-2xs text-gray-500">Motivo</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl py-2">
-                <p className="text-xs font-bold text-gray-900">{h.numero_destino ?? '—'}</p>
-                <p className="text-2xs text-gray-500">Número</p>
-              </div>
-            </div>
-
-            {/* Anotações */}
-            {(h.anotacao_pre || h.nota_pos_chamada) && (
-              <div className="space-y-2">
-                {h.anotacao_pre && (
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                    <p className="text-2xs font-semibold text-amber-700 mb-1">Anotação pré-ligação</p>
-                    <p className="text-xs text-amber-800">{h.anotacao_pre}</p>
-                  </div>
-                )}
-                {h.nota_pos_chamada && (
-                  <div className="bg-brand-50 border border-brand-100 rounded-xl p-3">
-                    <p className="text-2xs font-semibold text-brand-700 mb-1">Anotação durante a chamada</p>
-                    <p className="text-xs text-brand-800">{h.nota_pos_chamada}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Gravação */}
-            <div>
-              <p className="text-2xs font-semibold text-gray-600 mb-1.5">Gravação</p>
-              {h.url_gravacao
-                ? <audio controls src={h.url_gravacao} className="w-full h-9 rounded-lg"/>
-                : <p className="text-2xs text-gray-400 italic">Disponível em alguns minutos após o encerramento</p>
-              }
-            </div>
-
-            {/* Centro de Inteligência — automático */}
-            <div className="rounded-xl p-3 border bg-brand-50 border-brand-200 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center flex-shrink-0">
-                <Sparkles size={14} className="text-white"/>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-brand-800">Analisada automaticamente pelo CI</p>
-                <p className="text-2xs text-brand-600">
-                  Anotações e gravação treinam o agente desta conta — transferências a quente também
-                </p>
-              </div>
-            </div>
-
-            {/* Resultado + Anotação pós */}
-            <div className="space-y-2">
-              <div>
-                <label className="text-2xs font-semibold text-gray-600 block mb-1.5">Como foi a ligação?</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {[
-                    { v:'confirmou',   label:'✅ Confirmou presença',      cls:'border-emerald-300 bg-emerald-50 text-emerald-800' },
-                    { v:'reagendou',   label:'📅 Reagendou',               cls:'border-brand-300  bg-brand-50  text-brand-800' },
-                    { v:'nao_atendeu', label:'📵 Não atendeu',             cls:'border-amber-300  bg-amber-50  text-amber-800' },
-                    { v:'caixa_postal',label:'📬 Caixa postal',            cls:'border-gray-300   bg-gray-50   text-gray-700' },
-                    { v:'interessado', label:'🔥 Interessado — follow-up', cls:'border-orange-300 bg-orange-50 text-orange-800' },
-                    { v:'numero_errado',label:'❌ Número errado',          cls:'border-red-200    bg-red-50    text-red-700' },
-                  ].map(opt => (
-                    <button key={opt.v}
-                      onClick={() => setCallCardResultado(opt.v)}
-                      className={clsx(
-                        'text-2xs font-semibold py-2 px-2 rounded-xl border transition-all text-left',
-                        callCardResultado === opt.v
-                          ? opt.cls + ' ring-2 ring-offset-1 ring-brand-400 shadow-sm'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      )}>
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-2xs font-semibold text-gray-600 block mb-1">Anotação pós-chamada</label>
-                <textarea
-                  className="input min-h-[56px] resize-none text-xs"
-                  placeholder="Objeções, interesse, próximos passos..."
-                  value={callCardAnotacao}
-                  onChange={e => setCallCardAnotacao(e.target.value)}/>
-              </div>
-              <button
-                onClick={async () => {
-                  setSalvandoCard(true)
-                  try {
-                    if (h.id) {
-                      await ligacoesApi.update(h.id, {
-                        resultado: callCardResultado || undefined,
-                        nota_pos_chamada: callCardAnotacao || undefined,
-                      })
-                    }
-                    setCallCard(null)
-                    // Se era a chamada atual, mostra tela de resultado e reseta WebRTC
-                    if (h._isCurrentCall) {
-                      setResultado(callCardResultado || 'encerrar')
-                      webrtcActions.reset()
-                    }
-                    refetchHistorico()
-                  } catch (e) { console.error(e) }
-                  setSalvandoCard(false)
-                }}
-                disabled={salvandoCard}
-                className="btn-primary w-full justify-center gap-2 py-2 text-xs disabled:opacity-50">
-                <Save size={12}/> {salvandoCard ? 'Salvando…' : 'Salvar anotação'}
-              </button>
-            </div>
-
-            {/* Enviar WhatsApp */}
-            <div>
-              <p className="text-2xs font-semibold text-gray-600 mb-1.5">Enviar WhatsApp de follow-up</p>
-              <div className="flex gap-2 mb-2">
-                {['Não atendeu', 'Reagendamento', 'Follow-up'].map(label => {
-                  const textoMap: Record<string, string> = {
-                    'Não atendeu': `Olá! Tentamos ligar agora mas não conseguimos falar. Quando seria um bom horário? 📅`,
-                    'Reagendamento': `Olá! Preciso reagendar nossa conversa. Qual seria o melhor horário para você? 🔄`,
-                    'Follow-up': `Olá! Passando para dar continuidade ao nosso contato. Tem um momento? 🚀`,
-                  }
-                  return (
-                    <button key={label} onClick={() => setWaMsgTexto(textoMap[label])}
-                      className="text-2xs px-2 py-1 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 text-gray-600 hover:text-brand-700 transition-colors">
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="flex gap-2">
-                <textarea
-                  className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 resize-none min-h-[56px] focus:outline-none focus:border-brand-400"
-                  placeholder="Mensagem de follow-up..."
-                  value={waMsgTexto}
-                  onChange={e => setWaMsgTexto(e.target.value)}/>
-                <button onClick={enviarWaDoCard} disabled={waLoading || !waMsgTexto.trim()}
-                  className="w-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors flex-shrink-0">
-                  {waLoading ? <RefreshCw size={14} className="animate-spin"/> : <Send size={14}/>}
-                </button>
-              </div>
-              {waMsg && <p className="text-2xs text-emerald-600 mt-1">{waMsg}</p>}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // Templates WhatsApp pré-definidos
   const WA_TEMPLATES = [
     { id:'nao_atendeu',   label:'Não atendeu',        texto: `Olá${contato?.nome ? `, ${contato.nome}` : ''}! 👋 Ligamos agora mas não conseguimos falar com você. Gostaria de conversar? Posso te ligar novamente ou prefere marcar um horário? 📅` },
@@ -2110,7 +2115,20 @@ function TabManual() {
     <>
     {/* Elemento de áudio oculto para reprodução do áudio remoto (WebRTC) */}
     <audio id="etz-webrtc-remote-audio" autoPlay style={{ display: 'none' }}/>
-    {callCard && <CallCard/>}
+    {callCard && (
+      <CallCardModal
+        callCard={callCard}
+        onClose={() => setCallCard(null)}
+        onSave={(res, _nota) => {
+          setCallCard(null)
+          if (callCard._isCurrentCall) {
+            setResultado(res || 'encerrar')
+            webrtcActions.reset()
+          }
+          refetchHistorico()
+        }}
+      />
+    )}
     <div className="grid grid-cols-[340px_1fr_360px] gap-4">
 
       {/* ── Col 1: Contato + Ligação ── */}
@@ -2244,7 +2262,7 @@ function TabManual() {
                 const cls = res === 'confirmou' || res === 'agendada' ? 'badge-success' : res === 'nao_atendeu' ? 'badge-amber' : 'badge-neutral'
                 const dur = h.duracao_segundos ? `${Math.floor(h.duracao_segundos/60)}m${String(h.duracao_segundos%60).padStart(2,'0')}s` : null
                 return (
-                  <button key={h.id ?? i} onClick={() => { setCallCard(h); setCallCardResultado(h.resultado ?? ''); setCallCardAnotacao(h.nota_pos_chamada ?? '') }}
+                  <button key={h.id ?? i} onClick={() => setCallCard(h)}
                     className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 hover:bg-brand-50 hover:border-brand-200 border border-transparent transition-colors text-left w-full">
                     <User size={12} className="text-gray-400 flex-shrink-0"/>
                     <div className="flex-1 min-w-0">
