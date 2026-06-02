@@ -1716,12 +1716,19 @@ function SectionMeuWhatsApp() {
         setStatus('conectado')
         setPolling(true)
       } else {
-        // Busca QR como imagem PNG real (evita qualquer problema com data URLs)
-        const token = localStorage.getItem('youagent_jwt')
+        // Busca QR como imagem PNG real via proxy no backend
+        const jwtToken = localStorage.getItem('youagent_jwt')
         const resp = await fetch('https://app.etztech.com/api/v1/whatsapp/eu/qr-image', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${jwtToken}` },
         })
         if (!resp.ok) throw new Error('Falha ao carregar QR code')
+        const contentType = resp.headers.get('content-type') || ''
+        if (contentType.includes('application/json')) {
+          // Backend sinalizou que já está conectado
+          const json = await resp.json()
+          if (json.conectado) { setStatus('conectado'); setPolling(true); return }
+          throw new Error(json.error || 'Erro ao carregar QR')
+        }
         const blob = await resp.blob()
         setQr(URL.createObjectURL(blob))
         setStatus('conectando')
