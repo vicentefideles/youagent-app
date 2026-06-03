@@ -3242,7 +3242,7 @@ function TabAoVivo({
     const candidato = TRANSFER_CANDIDATES.find(v => v.status === 'disponivel')
     const nome = candidato?.nome ?? 'Especialista'
     if (item._callControlId) {
-      try { await ligacoesApi.transferir(item._callControlId, { vendedor_nome: nome }) } catch (_) {}
+      try { await ligacoesApi.transferir(item._callControlId, { numero_destino: candidato?.telefone ?? '', vendedor_nome: nome }) } catch (_) {}
     }
     setTransferidos(p => ({ ...p, [item.id]: nome }))
   }
