@@ -487,16 +487,18 @@ export default function MensagensPage() {
                           {/* Renderização de mídia */}
                           {m.media_url && (() => {
                             const url = m.media_url
-                            const isImg  = /^data:image|\.jpe?g$|\.png$|\.gif$|\.webp$/i.test(url)
-                            const isAud  = /^data:audio|\.mp3$|\.ogg$|\.wav$|\.m4a$/i.test(url)
-                            const isVid  = /^data:video|\.mp4$|\.webm$/i.test(url)
+                            const isImg  = /^data:image|\.jpe?g$|\.png$|\.gif$|\.webp$/i.test(url) && !/audio|video/.test(url)
+                            const isAud  = /^data:audio|\.mp3$|\.ogg$|\.wav$|\.m4a$|\.webm$|\/audio\//i.test(url)
+                            const isVid  = /^data:video|\.mp4$/i.test(url)
                             if (isImg) return (
                               <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
                                 <img src={url} alt="mídia" className="max-w-full rounded-lg max-h-64 object-cover"/>
                               </a>
                             )
                             if (isAud) return (
-                              <audio controls src={url} className="w-full mb-1.5" style={{ maxWidth: 240 }}/>
+                              <div className="mb-1.5 w-56">
+                                <audio controls src={url} className="w-full h-8" style={{ minWidth: 200 }}/>
+                              </div>
                             )
                             if (isVid) return (
                               <video controls src={url} className="max-w-full rounded-lg max-h-48 mb-1.5"/>
