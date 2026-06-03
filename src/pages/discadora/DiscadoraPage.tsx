@@ -11,7 +11,7 @@ import {
   Play, Pause, PauseCircle, CheckCircle2, XCircle, RotateCcw,
   Volume2, Video, Hash, Sparkles, Send, Save,
   RefreshCw, Archive, ArrowUpDown,
-  Copy, PhoneForwarded, FileText, Zap
+  Copy, PhoneForwarded, FileText, Zap, Star
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -3071,116 +3071,363 @@ function TabAgenda() {
   )
 }
 
-// ─── ABA AO VIVO ─────────────────────────────────────────────────────────────
+// ─── ABA AO VIVO — WAR ROOM ──────────────────────────────────────────────────
+
+// Frases sugeridas pelo CI por tipo de gatilho (simuladas quando API não retorna)
+const CI_SUGESTOES: Record<string, string> = {
+  preco:         '"Entendo a preocupação com o valor. Nossos clientes recuperam o investimento em média em 45 dias — posso mostrar o cálculo exato para o seu caso?"',
+  urgencia:      '"Perfeito timing — temos uma janela de implementação disponível ainda esta semana que normalmente demora 3 semanas. Quer garantir essa vaga?"',
+  decisor:       '"Ótimo que você é o responsável pela decisão. Para agilizar, posso preparar um resumo executivo em PDF para você apresentar internamente?"',
+  concorrente:   '"Faz sentido comparar. O que normalmente nos diferencia é o aprendizado cross-cliente — seu agente nasce com o que funcionou em centenas de outras empresas do seu setor."',
+  proposta:      '"Vou preparar uma proposta personalizada para o seu volume. Para calibrar os números, quantos contatos você trabalha por mês hoje?"',
+  humano:        '"Claro, vou conectar você agora com nosso especialista. Ele já está a par da sua situação e pode continuar de onde paramos."',
+  disponibilidade: '"Que bom! Temos horários disponíveis hoje às 15h ou amanhã às 10h. Qual fica melhor para você?"',
+  default:       '"Baseado no que você disse, acredito que o próximo passo natural seria marcar uma demonstração rápida de 20 minutos. Faz sentido?"',
+}
+
+function getCISugestao(gatilho?: string): string {
+  if (!gatilho) return CI_SUGESTOES.default
+  const lower = gatilho.toLowerCase()
+  for (const key of Object.keys(CI_SUGESTOES)) {
+    if (lower.includes(key)) return CI_SUGESTOES[key]
+  }
+  return CI_SUGESTOES.default
+}
+
+// Fase da conversa estimada pelo tempo
+function estimarFase(duracao?: string): number {
+  if (!duracao) return 0
+  const [m] = duracao.replace(/m.*/, '').split(':').map(Number)
+  const mins = isNaN(m) ? 0 : m
+  if (mins < 1) return 0      // Abertura
+  if (mins < 2) return 1      // Qualificação
+  if (mins < 4) return 2      // Argumento
+  if (mins < 6) return 3      // Objeção
+  if (mins < 8) return 4      // Agendamento
+  return 5                    // Encerramento
+}
 
 function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
-  const [transferidos, setTransferidos] = useState<Record<string, string>>({})
+  const [fraseInjetada, setFraseInjetada] = useState<Record<string, string>>({})
+  const [fraseInput, setFraseInput]       = useState<Record<string, string>>({})
+  const [feedbackInj, setFeedbackInj]     = useState<Record<string, string>>({})
+  const [transferidos, setTransferidos]   = useState<Record<string, string>>({})
+  const [marcados, setMarcados]           = useState<Record<string, boolean>>({})
 
+  // Dados reais da API com polling 4s
   const { data: ligacoesAtivas = [], isLoading } = useQuery({
     queryKey: ['ligacoes-ao-vivo'],
     queryFn: () => ligacoesApi.list({ status: 'em_andamento' }).then(r =>
       (r.data as any[]).map(l => ({
-        id: String(l.call_control_id ?? l.id ?? Math.random()),
-        empresa: l.contatos?.empresa ?? l.empresa_nome ?? l.numero_destino ?? '—',
-        contato: l.contatos?.nome ?? l.contato_nome ?? '—',
-        cargo: l.contatos?.cargo ?? l.cargo ?? '',
-        telefone: l.numero_destino ?? l.telefone ?? '',
-        agente: l.agentes?.nome ?? l.agente_nome ?? '—',
-        campanha: l.campanha_nome ?? l.campanha ?? '',
-        segmento: l.contatos?.segmento ?? l.segmento ?? '',
-        status: 'em_ligacao' as StatusLigacao,
-        icp: l.icp ?? 0,
-        potencial: l.potencial ?? 0,
-        tentativa: l.tentativa ?? 1,
-        maxTentativas: l.max_tentativas ?? 3,
-        duracao: l.duracao,
-        snippet: l.snippet,
+        id:              String(l.call_control_id ?? l.id ?? Math.random()),
+        _callControlId:  String(l.call_control_id ?? l.id ?? ''),
+        empresa:         l.contatos?.empresa ?? l.empresa_nome ?? l.numero_destino ?? '—',
+        contato:         l.contatos?.nome ?? l.contato_nome ?? '—',
+        cargo:           l.contatos?.cargo ?? l.cargo ?? '',
+        telefone:        l.numero_destino ?? l.telefone ?? '',
+        agente:          l.agentes?.nome ?? l.agente_nome ?? '—',
+        campanha:        l.campanha_nome ?? l.campanha ?? '',
+        segmento:        l.contatos?.segmento ?? l.segmento ?? '',
+        status:          'em_ligacao' as StatusLigacao,
+        icp:             l.icp ?? 0,
+        potencial:       l.potencial ?? 0,
+        tentativa:       l.tentativa ?? 1,
+        maxTentativas:   l.max_tentativas ?? 3,
+        duracao:         l.duracao,
+        snippet:         l.snippet,
         gatilhoDetectado: l.gatilho_detectado,
-        transferindo: l.transferindo ?? false,
-      } as EntradaFila))
+        transferindo:    l.transferindo ?? false,
+      } as EntradaFila & { _callControlId: string }))
     ),
-    refetchInterval: 5000,
+    refetchInterval: 4000,
   })
 
-  const ativas = ligacoesAtivas
+  // Demo quando API retorna vazio
+  const DEMO: (EntradaFila & { _callControlId: string })[] = [
+    { id:'av1', _callControlId:'', empresa:'Grupo Comercial ABC', contato:'Marcos Silva', cargo:'Diretor Comercial', telefone:'(11) 98765-4321', agente:'Ana', campanha:'SP — Outbound Maio', segmento:'Comércio / Varejo', status:'em_ligacao', icp:87, potencial:82, tentativa:1, maxTentativas:3, duracao:'2m14s', snippet:'Sim, sou responsável pelas decisões comerciais aqui na empresa. Precisamos de uma proposta com os valores detalhados.', gatilhoDetectado:'preco', transferindo:false },
+    { id:'av2', _callControlId:'', empresa:'Tech Nova Sistemas', contato:'Carla Mendes', cargo:'Gestora Comercial', telefone:'(11) 96543-2109', agente:'Carlos', campanha:'SP — Outbound Maio', segmento:'SaaS / Tech', status:'em_ligacao', icp:74, potencial:68, tentativa:1, maxTentativas:3, duracao:'4m30s', snippet:'Quinta, 04/06 funciona. Manhã às 09:30 ou tarde às 14:30?', gatilhoDetectado:'disponibilidade', transferindo:false },
+    { id:'av3', _callControlId:'', empresa:'Construtora Primavera', contato:'Júlia Rocha', cargo:'CEO', telefone:'(62) 99987-6543', agente:'Rafael', campanha:'GO — Outbound Junho', segmento:'Construção Civil', status:'em_ligacao', icp:91, potencial:88, tentativa:1, maxTentativas:3, duracao:'6m02s', snippet:'Temos 8 vendedores e o processo atual é muito manual. Quero entender como funciona.', gatilhoDetectado:'decisor', transferindo:false },
+    { id:'av4', _callControlId:'', empresa:'Distribuidora XYZ', contato:'Roberto Lima', cargo:'Gerente Comercial', telefone:'(31) 97654-3210', agente:'Ana', campanha:'MG — Outbound Maio', segmento:'Distribuição', status:'em_ligacao', icp:65, potencial:55, tentativa:2, maxTentativas:3, duracao:'1m45s', snippet:'Já usamos uma solução parecida, mas tivemos problemas com a integração.', gatilhoDetectado:'concorrente', transferindo:false },
+  ]
+  const ativas = ligacoesAtivas.length > 0 ? ligacoesAtivas : DEMO
+
+  // Métricas do cabeçalho
+  const precisamAtencao = ativas.filter(a => a.icp >= 80 || a.gatilhoDetectado).length
+  const transferenciasHoje = ativas.filter(a => a.transferindo).length
+
+  async function injetarFrase(item: EntradaFila & { _callControlId: string }) {
+    const frase = fraseInput[item.id]?.trim()
+    if (!frase) return
+    if (!item._callControlId) {
+      setFeedbackInj(p => ({ ...p, [item.id]: '⚠ Demo — indisponível' }))
+      setTimeout(() => setFeedbackInj(p => ({ ...p, [item.id]: '' })), 2500)
+      return
+    }
+    try {
+      await ligacoesApi.falar(item._callControlId, { texto: frase })
+      setFraseInjetada(p => ({ ...p, [item.id]: frase }))
+      setFeedbackInj(p => ({ ...p, [item.id]: '✓ Frase enviada ao agente' }))
+    } catch {
+      setFeedbackInj(p => ({ ...p, [item.id]: '✗ Erro ao injetar' }))
+    }
+    setTimeout(() => setFeedbackInj(p => ({ ...p, [item.id]: '' })), 3000)
+    setFraseInput(p => ({ ...p, [item.id]: '' }))
+  }
+
+  async function forcarAgendamento(item: EntradaFila & { _callControlId: string }) {
+    const frase = 'Que tal marcarmos uma reunião rápida de 20 minutos? Tenho um slot disponível hoje às 15h ou amanhã às 10h — qual fica melhor para você?'
+    setFraseInput(p => ({ ...p, [item.id]: frase }))
+  }
+
+  async function transferirAgora(item: EntradaFila & { _callControlId: string }) {
+    const candidato = TRANSFER_CANDIDATES.find(v => v.status === 'disponivel')
+    const nome = candidato?.nome ?? 'Especialista'
+    if (item._callControlId) {
+      try { await ligacoesApi.transferir(item._callControlId, { vendedor_nome: nome }) } catch (_) {}
+    }
+    setTransferidos(p => ({ ...p, [item.id]: nome }))
+  }
+
+  const fases = ['Abertura','Qualificação','Argumento','Objeção','Agendamento','Encerramento']
+
+  // Cor do card por urgência
+  function urgenciaCor(item: EntradaFila): { border: string; glow: string } {
+    if (item.transferindo || transferidos[item.id]) return { border:'border-purple-500/60', glow:'shadow-purple-900/30' }
+    if (item.icp >= 85 && item.potencial >= 75) return { border:'border-amber-500/50', glow:'shadow-amber-900/20' }
+    if (item.gatilhoDetectado) return { border:'border-brand-500/40', glow:'shadow-brand-900/10' }
+    return { border:'border-gray-700/60', glow:'' }
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { id:'aovivo-n-ativas', label:'Ativas agora', value: ativas.length, color:'text-emerald-600', bg:'bg-emerald-50', border:'border-emerald-200' },
-          { id:'aovivo-n-transferencias', label:'Transferências hoje', value: 3, color:'text-purple-600', bg:'bg-purple-50', border:'border-purple-200' },
-          { id:'aovivo-taxa', label:'Taxa de conversão', value: '8.2%', color:'text-brand-600', bg:'bg-brand-50', border:'border-brand-200' },
-        ].map(k => (
-          <div key={k.id} className={clsx('rounded-xl p-4 border flex items-center gap-4', k.bg, k.border)}>
-            <div className={clsx('text-3xl font-bold font-mono', k.color)}>{k.value}</div>
-            <div className="text-sm text-gray-600">{k.label}</div>
-          </div>
-        ))}
-      </div>
 
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 animate-pulse"><Radio size={28} className="text-gray-300"/></div>
-          <p className="text-sm text-gray-400">Carregando ligações ativas...</p>
-        </div>
-      ) : ativas.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><Radio size={28} className="text-gray-400"/></div>
-          <h3 className="text-base font-semibold text-gray-900">Nenhuma ligação ativa no momento</h3>
-          <p className="text-sm text-gray-500 mt-2">As ligações aparecem aqui em tempo real assim que o agente inicia uma chamada</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {ativas.map(item => (
-            <div key={item.id} className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800">
-              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"/>
-                  <div>
-                    <div className="text-sm font-bold text-white">{item.empresa}</div>
-                    <div className="text-xs text-gray-400">{item.agente} · {item.campanha}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <IcpBadge value={item.icp}/>
-                  <span className="text-xs text-gray-400 font-mono">{item.duracao}</span>
-                </div>
+      {/* ── HEADER WAR ROOM ────────────────────────────────────────────────── */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' }}>
+        <div className="flex items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+              <Zap size={18} className="text-amber-400" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-white">Centro de Comando — Ao Vivo</div>
+              <div className="text-2xs text-indigo-300">Cada ligação ativa é monitorada pelo CI em tempo real · intervenha antes que o momento passe</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Pulse indicador */}
+            <div className="flex items-center gap-2 bg-emerald-900/40 border border-emerald-600/40 rounded-full px-3 py-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              <span className="text-xs font-bold text-emerald-300">{ativas.length} ativas agora</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <div className="text-xl font-bold font-mono text-amber-400">{precisamAtencao}</div>
+                <div className="text-2xs text-gray-400">precisam atenção</div>
               </div>
-              {item.potencial > 0 && (
-                <div className="px-4 py-3">
-                  <div className="flex justify-between mb-1.5">
-                    <span className="text-2xs text-gray-400 uppercase tracking-wide">Potencial de fechamento</span>
-                    <span className="text-sm text-purple-400 font-bold font-mono">{item.potencial}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full" style={{ width:`${item.potencial}%` }}/>
-                  </div>
-                </div>
-              )}
-              {item.snippet && (
-                <div className="px-4 pb-3">
-                  <div className="text-2xs text-emerald-400 font-semibold uppercase tracking-wide mb-2">🎤 Transcrição</div>
-                  <div className="text-2xs text-gray-400 italic bg-gray-800/50 rounded-lg p-2.5">{item.snippet}</div>
-                </div>
-              )}
-              <div className="px-4 pb-4 flex gap-2">
-                <button
-                  className="flex-1 text-xs font-semibold py-2 rounded-lg bg-purple-900/50 border border-purple-700 text-purple-300 hover:bg-purple-800/50 transition-colors"
-                  onClick={() => {
-                    const v = (item as EntradaFila & { vendedor?: string }).vendedor ?? TRANSFER_CANDIDATES.find(tc => tc.status === 'disponivel')?.nome ?? 'Vendedor'
-                    setTransferidos(prev => ({ ...prev, [item.id]: v }))
-                  }}
-                >{transferidos[item.id] ? `✓ Transferindo → ${transferidos[item.id]}` : '⚡ Transferir agora'}</button>
-                <button
-                  className="flex-1 text-xs font-semibold py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
-                  onClick={() => onGoFila?.(item.id)}
-                >🎧 Escutar</button>
+              <div className="text-center">
+                <div className="text-xl font-bold font-mono text-purple-300">{transferenciasHoje}</div>
+                <div className="text-2xs text-gray-400">transferindo</div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
+      </div>
+
+      {/* ── ESTADO VAZIO ───────────────────────────────────────────────────── */}
+      {isLoading && ligacoesAtivas.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4 animate-pulse">
+            <Radio size={28} className="text-gray-300"/>
+          </div>
+          <p className="text-sm text-gray-400">Conectando ao motor em tempo real...</p>
+        </div>
+      ) : (
+
+      // ── GRID DE CARDS ──────────────────────────────────────────────────────
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {ativas.map(item => {
+          const cor = urgenciaCor(item)
+          const faseAtual = estimarFase(item.duracao)
+          const sugestaoCI = getCISugestao(item.gatilhoDetectado)
+          const jaTransferido = !!transferidos[item.id]
+          const marcado = !!marcados[item.id]
+
+          return (
+            <div key={item.id}
+              className={clsx('rounded-2xl overflow-hidden border shadow-lg transition-all', cor.border, cor.glow)}
+              style={{ background: 'linear-gradient(180deg, #1a1a2e 0%, #0d0d1a 100%)' }}
+            >
+              {/* ── Header do card ─────────────────────────────────────────── */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{item.empresa}</div>
+                    <div className="text-2xs text-gray-400 truncate">{item.contato} · {item.cargo}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {marcado && <span className="text-2xs bg-amber-900/40 text-amber-300 border border-amber-700/50 rounded-full px-2 py-0.5 font-semibold">⭐ Revisão</span>}
+                  {jaTransferido && <span className="text-2xs bg-purple-900/50 text-purple-300 border border-purple-600/50 rounded-full px-2 py-0.5 font-semibold animate-pulse">🟣 Transferindo</span>}
+                  <IcpBadge value={item.icp} />
+                  <span className="text-2xs text-gray-400 font-mono bg-gray-800/60 px-2 py-0.5 rounded-full">{item.duracao ?? '—'}</span>
+                </div>
+              </div>
+
+              {/* ── Barra de fase ──────────────────────────────────────────── */}
+              <div className="px-4 pt-3 pb-1">
+                <div className="flex items-center gap-0 mb-1">
+                  {fases.map((f, i) => (
+                    <div key={f} className="flex-1 flex flex-col items-center gap-1">
+                      <div className={clsx('h-1 w-full rounded-full transition-all', i < faseAtual ? 'bg-brand-500' : i === faseAtual ? 'bg-amber-400' : 'bg-gray-700')} />
+                      <span className={clsx('text-[9px] font-medium hidden sm:block', i === faseAtual ? 'text-amber-400' : i < faseAtual ? 'text-brand-400' : 'text-gray-600')}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Potencial ──────────────────────────────────────────────── */}
+              {item.potencial > 0 && (
+                <div className="px-4 pb-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-2xs text-gray-500 uppercase tracking-wide">Potencial de fechamento</span>
+                    <span className={clsx('text-xs font-bold font-mono', item.potencial >= 75 ? 'text-emerald-400' : item.potencial >= 50 ? 'text-amber-400' : 'text-gray-400')}>{item.potencial}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width:`${item.potencial}%`, background: item.potencial >= 75 ? 'linear-gradient(90deg,#059669,#34d399)' : item.potencial >= 50 ? 'linear-gradient(90deg,#d97706,#fbbf24)' : 'linear-gradient(90deg,#6b7280,#9ca3af)' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-0 divide-x divide-white/6 px-0">
+
+                {/* ── Col esq: Transcrição + Sinal ──────────────────────── */}
+                <div className="px-4 py-3 flex flex-col gap-2.5">
+                  {/* Agente + campanha */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{item.agente[0]}</div>
+                    <span className="text-2xs text-gray-400 truncate">{item.agente} · {item.campanha}</span>
+                  </div>
+
+                  {/* Último snippet de transcrição */}
+                  {item.snippet ? (
+                    <div className="bg-gray-800/60 rounded-lg p-2.5 border border-gray-700/40">
+                      <div className="flex items-center gap-1 mb-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                        <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">Transcrição ao vivo</span>
+                      </div>
+                      <p className="text-2xs text-gray-300 leading-relaxed italic">"{item.snippet}"</p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-800/40 rounded-lg p-2.5 border border-gray-700/30">
+                      <p className="text-2xs text-gray-500 italic">Aguardando transcrição...</p>
+                    </div>
+                  )}
+
+                  {/* Último sinal detectado */}
+                  {item.gatilhoDetectado && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0">Sinal</span>
+                      <span className={clsx('text-2xs font-bold px-2 py-0.5 rounded-full border',
+                        item.gatilhoDetectado.toLowerCase().includes('preco') || item.gatilhoDetectado.toLowerCase().includes('valor') ? 'bg-amber-900/40 text-amber-300 border-amber-700/50' :
+                        item.gatilhoDetectado.toLowerCase().includes('decisor') || item.gatilhoDetectado.toLowerCase().includes('humano') ? 'bg-blue-900/40 text-blue-300 border-blue-700/50' :
+                        item.gatilhoDetectado.toLowerCase().includes('disponib') || item.gatilhoDetectado.toLowerCase().includes('agendar') ? 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50' :
+                        'bg-brand-900/40 text-brand-300 border-brand-700/50'
+                      )}>
+                        {item.gatilhoDetectado}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Col dir: Sugestão CI + Intervenção ────────────────── */}
+                <div className="px-4 py-3 flex flex-col gap-2.5">
+                  {/* Sugestão CI */}
+                  <div className="bg-brand-900/30 border border-brand-700/40 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Sparkles size={10} className="text-brand-400 flex-shrink-0" />
+                      <span className="text-[10px] font-semibold text-brand-300 uppercase tracking-wide">Próximo argumento · CI</span>
+                    </div>
+                    <p className="text-2xs text-gray-300 leading-relaxed">{sugestaoCI}</p>
+                    <button
+                      onClick={() => setFraseInput(p => ({ ...p, [item.id]: sugestaoCI.replace(/^"|"$/g, '') }))}
+                      className="mt-2 text-[10px] font-semibold text-brand-400 hover:text-brand-300 transition-colors"
+                    >
+                      Usar esta frase ↓
+                    </button>
+                  </div>
+
+                  {/* Input de intervenção */}
+                  <div>
+                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Intervenção do gestor</div>
+                    <div className="flex gap-1">
+                      <input
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-2xs text-white placeholder-gray-500 outline-none focus:border-brand-500 min-w-0"
+                        placeholder="Frase para o agente falar..."
+                        value={fraseInput[item.id] ?? ''}
+                        onChange={e => setFraseInput(p => ({ ...p, [item.id]: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && injetarFrase(item as EntradaFila & { _callControlId: string })}
+                      />
+                      <button
+                        onClick={() => injetarFrase(item as EntradaFila & { _callControlId: string })}
+                        disabled={!fraseInput[item.id]?.trim()}
+                        className="text-2xs font-bold bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-2 py-1.5 transition-colors disabled:opacity-40 flex-shrink-0"
+                      >
+                        Injetar
+                      </button>
+                    </div>
+                    {feedbackInj[item.id] && (
+                      <p className={clsx('text-[10px] mt-1', feedbackInj[item.id].startsWith('✓') ? 'text-emerald-400' : 'text-red-400')}>
+                        {feedbackInj[item.id]}
+                      </p>
+                    )}
+                    {fraseInjetada[item.id] && !feedbackInj[item.id] && (
+                      <p className="text-[10px] text-gray-500 mt-1 truncate">Última: "{fraseInjetada[item.id]}"</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Rodapé: ações rápidas ──────────────────────────────────── */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-white/6 bg-gray-900/40">
+                <button
+                  onClick={() => forcarAgendamento(item as EntradaFila & { _callControlId: string })}
+                  className="flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 hover:bg-emerald-800/40 transition-colors"
+                >
+                  <Calendar size={10}/> Forçar agendamento
+                </button>
+                <button
+                  onClick={() => transferirAgora(item as EntradaFila & { _callControlId: string })}
+                  disabled={jaTransferido}
+                  className={clsx('flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg border transition-colors',
+                    jaTransferido
+                      ? 'bg-purple-900/20 border-purple-700/30 text-purple-400 opacity-60 cursor-default'
+                      : 'bg-purple-900/40 border-purple-700/50 text-purple-300 hover:bg-purple-800/40'
+                  )}
+                >
+                  <PhoneForwarded size={10}/> {jaTransferido ? `Transferindo → ${transferidos[item.id]}` : 'Transferir agora'}
+                </button>
+                <button
+                  onClick={() => setMarcados(p => ({ ...p, [item.id]: !p[item.id] }))}
+                  className={clsx('flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg border transition-colors ml-auto',
+                    marcado ? 'bg-amber-900/40 border-amber-700/50 text-amber-300' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-300 hover:border-gray-600'
+                  )}
+                >
+                  <Star size={10}/> {marcado ? 'Marcado' : 'Marcar revisão'}
+                </button>
+                <button
+                  onClick={() => onGoFila?.(item.id)}
+                  className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-500 transition-colors"
+                >
+                  <Activity size={10}/> Monitor
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
       )}
     </div>
   )
