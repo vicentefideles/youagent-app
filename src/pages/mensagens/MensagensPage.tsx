@@ -94,7 +94,10 @@ export default function MensagensPage() {
   const fileInputRef                       = useRef<HTMLInputElement>(null)
   const mediaRecorderRef                   = useRef<MediaRecorder | null>(null)
   const audioChunksRef                     = useRef<Blob[]>([])
+  const recordingStartRef                  = useRef<number>(0)
   const [gravando, setGravando]            = useState(false)
+  const [gravSecs, setGravSecs]            = useState(0)
+  const gravTimerRef                       = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function toast(m: string) { setToastMsg(m); setTimeout(() => setToastMsg(null), 4000) }
 
@@ -169,7 +172,6 @@ export default function MensagensPage() {
     if (!conversa) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // Prefere ogg/opus (Firefox) ou cai para webm/opus (Chrome)
       const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
         ? 'audio/ogg;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -180,16 +182,24 @@ export default function MensagensPage() {
       mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
+        if (gravTimerRef.current) { clearInterval(gravTimerRef.current); gravTimerRef.current = null }
+        setGravSecs(0)
         const finalMime = mr.mimeType || mimeType
         const blob = new Blob(audioChunksRef.current, { type: finalMime })
-        if (blob.size < 100) { toast('Áudio muito curto, tente novamente'); return }
+        if (blob.size < 500) { toast('Áudio muito curto, grave por pelo menos 1 segundo'); return }
         const ext  = finalMime.includes('ogg') ? 'ogg' : 'webm'
         const file = new File([blob], `audio.${ext}`, { type: finalMime })
         await enviarMidia(file)
       }
-      mr.start(250) // coleta chunks a cada 250ms
+      mr.start(100) // chunks a cada 100ms para capturar bem
+      recordingStartRef.current = Date.now()
       mediaRecorderRef.current = mr
       setGravando(true)
+      setGravSecs(0)
+      // Timer visual de segundos
+      gravTimerRef.current = setInterval(() => {
+        setGravSecs(Math.floor((Date.now() - recordingStartRef.current) / 1000))
+      }, 500)
     } catch {
       toast('Permissão de microfone negada')
     }
@@ -197,6 +207,17 @@ export default function MensagensPage() {
 
   function pararGravacao() {
     if (!mediaRecorderRef.current) return
+    const elapsed = Date.now() - recordingStartRef.current
+    if (elapsed < 800) {
+      // Mínimo 0.8s — cancela se muito curto
+      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current = null
+      if (gravTimerRef.current) { clearInterval(gravTimerRef.current); gravTimerRef.current = null }
+      setGravando(false)
+      setGravSecs(0)
+      toast('Grave por pelo menos 1 segundo')
+      return
+    }
     mediaRecorderRef.current.stop()
     mediaRecorderRef.current = null
     setGravando(false)
@@ -590,13 +611,16 @@ export default function MensagensPage() {
                     disabled={enviando || waStatus !== 'conectado'}
                     title={gravando ? 'Parar gravação' : 'Gravar áudio'}
                     className={clsx(
-                      'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                      'rounded-xl flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-40 disabled:cursor-not-allowed',
                       gravando
-                        ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
-                        : 'border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-700'
+                        ? 'px-2.5 h-10 bg-red-500 hover:bg-red-600 text-white gap-1.5'
+                        : 'w-10 h-10 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-700'
                     )}
                   >
-                    {gravando ? <Square size={13} fill="currentColor"/> : <Mic size={15}/>}
+                    {gravando
+                      ? <><Square size={11} fill="currentColor"/><span className="text-2xs font-bold tabular-nums">{gravSecs}s</span></>
+                      : <Mic size={15}/>
+                    }
                   </button>
                   <button
                     onClick={enviar}
