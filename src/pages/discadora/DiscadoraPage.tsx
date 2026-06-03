@@ -2562,10 +2562,15 @@ function TabManual() {
 function TabAgenda() {
   const navigate = useNavigate()
   const [vendedorSel, setVendedorSel] = useState('')
-  const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string; meetLink?: string; vendedor?: string } | null>(null)
-  // Offset de semanas: 0 = semana atual, -1 = anterior, +1 = próxima
+  const [viewMode, setViewMode] = useState<'hoje' | 'semana' | 'mes'>('semana')
   const [semanaOffset, setSemanaOffset] = useState(0)
-  const horas = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00']
+  const [mesOffset, setMesOffset] = useState(0)
+  const [diaSel, setDiaSel] = useState('')          // para view Mês: dia clicado
+  const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string; meetLink?: string; vendedor?: string } | null>(null)
+  const horas = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
+
+  // Cores de avatar por índice de vendedor
+  const vendedorCores = ['bg-brand-500','bg-emerald-500','bg-amber-500','bg-rose-500','bg-cyan-500','bg-violet-500']
 
   // Vendedores reais
   const { data: equipeRaw = [] } = useQuery({
@@ -2578,234 +2583,431 @@ function TabAgenda() {
   const { data: reunioesRaw = [] } = useQuery({
     queryKey: ['reunioes-agenda'],
     queryFn: () => reunioesApi.list().then(r => r.data as any[]),
+    refetchInterval: 30000,
   })
 
-  // Monta semana (seg–sex) com offset de semanas
   const hoje = new Date()
-  const diaSemana = hoje.getDay() // 0=dom
+  const hojeIso = hoje.toISOString().split('T')[0]
+
+  // ── Semana ──────────────────────────────────────────────────────────────────
+  const diaSemana = hoje.getDay()
   const segBase = new Date(hoje); segBase.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
   const seg = new Date(segBase); seg.setDate(segBase.getDate() + semanaOffset * 7)
   const dias = Array.from({ length: 5 }, (_, i) => {
     const d = new Date(seg); d.setDate(seg.getDate() + i)
     return { label: d.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit' }), iso: d.toISOString().split('T')[0] }
   })
-  const hojeIso = hoje.toISOString().split('T')[0]
+  const labelSemana = `${dias[0].label.replace(/\./,'')} – ${dias[4].label.replace(/\./,'')}`
 
-  // Filtra reuniões por vendedor selecionado
+  // ── Mês ─────────────────────────────────────────────────────────────────────
+  const mesRef = new Date(hoje.getFullYear(), hoje.getMonth() + mesOffset, 1)
+  const labelMes = mesRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  const primeiroDia = mesRef.getDay() // 0=dom
+  const diasNoMes = new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 0).getDate()
+  // Grade: começa no domingo anterior ao 1º do mês
+  const totalCelulas = Math.ceil((primeiroDia + diasNoMes) / 7) * 7
+  const celulas = Array.from({ length: totalCelulas }, (_, i) => {
+    const offset = i - primeiroDia
+    if (offset < 0 || offset >= diasNoMes) return null
+    const d = new Date(mesRef.getFullYear(), mesRef.getMonth(), offset + 1)
+    return d.toISOString().split('T')[0]
+  })
+
+  // Filtra reuniões por vendedor
   const reunioesFiltradas = (reunioesRaw as any[]).filter((r: any) => {
     if (!vendedorSel) return true
     return r.vendedor_id === vendedorSel || r.vendedor_nome === vendedorAtual?.nome
   })
 
-  // Cor por status real da reunião
   function corPorStatus(status: string): 'brand' | 'emerald' | 'amber' {
     if (status === 'realizada' || status === 'concluida') return 'emerald'
     if (status === 'pendente' || status === 'nao_confirmada') return 'amber'
-    return 'brand' // confirmada, agendada, default
+    return 'brand'
   }
 
-  // Monta eventos por dia — evento aparece na linha da hora que inclui o minuto (ex: 09:30 → linha 09:00)
-  type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber'; meetLink?: string; vendedor?: string; minuto: number }
+  type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber'; meetLink?: string; vendedor?: string; minuto: number; status?: string }
   const eventosPorDia: Record<string, Evento[]> = {}
   reunioesFiltradas.forEach((r: any) => {
-    const inicio = r.inicio ?? r.data_hora
-    if (!inicio) return
+    const inicio = r.inicio ?? r.data_hora; if (!inicio) return
     const d = new Date(inicio)
     const diaKey = d.toISOString().split('T')[0]
     const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
     const fimD = new Date(d.getTime() + (r.duracao_minutos ?? 30) * 60000)
     const fim  = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
     if (!eventosPorDia[diaKey]) eventosPorDia[diaKey] = []
-    eventosPorDia[diaKey].push({
-      hora, fim,
-      empresa: r.empresa ?? r.empresa_nome ?? '—',
-      contato: r.contato ?? r.contato_nome ?? '—',
-      cor: corPorStatus(r.status ?? ''),
-      meetLink: r.meet_link ?? r.meetLink,
-      vendedor: r.vendedor_nome,
-      minuto: d.getHours() * 60 + d.getMinutes(),
-    })
+    eventosPorDia[diaKey].push({ hora, fim, empresa: r.empresa ?? r.empresa_nome ?? '—', contato: r.contato ?? r.contato_nome ?? '—', cor: corPorStatus(r.status ?? ''), meetLink: r.meet_link ?? r.meetLink, vendedor: r.vendedor_nome, minuto: d.getHours() * 60 + d.getMinutes(), status: r.status })
   })
 
-  // Para cada célula da grade, encontra eventos cuja hora cai dentro daquela linha de hora
   function getEventoNaLinha(diaIso: string, horaLabel: string): Evento | undefined {
     const [hh] = horaLabel.split(':').map(Number)
-    const minInicio = hh * 60
-    const minFim = minInicio + 60
-    return eventosPorDia[diaIso]?.find(e => e.minuto >= minInicio && e.minuto < minFim)
+    return eventosPorDia[diaIso]?.find(e => e.minuto >= hh * 60 && e.minuto < hh * 60 + 60)
   }
 
   const corMap = { brand:'bg-brand-100 border-l-brand-500 text-brand-700', emerald:'bg-emerald-50 border-l-emerald-500 text-emerald-700', amber:'bg-amber-50 border-l-amber-500 text-amber-700' }
 
-  // KPIs filtrados por vendedor selecionado
-  const totalHoje = reunioesFiltradas.filter((r: any) => {
-    const d = r.inicio ?? r.data_hora; return d && new Date(d).toDateString() === hoje.toDateString()
-  }).length
-  const totalSemana = reunioesFiltradas.filter((r: any) => {
-    const d = r.inicio ?? r.data_hora; if (!d) return false
-    const dt = new Date(d); return dt >= seg && dt <= new Date(seg.getTime() + 4 * 86400000)
-  }).length
-  const totalMes = reunioesFiltradas.filter((r: any) => {
-    const d = r.inicio ?? r.data_hora; if (!d) return false
-    const dt = new Date(d); return dt.getMonth() === hoje.getMonth() && dt.getFullYear() === hoje.getFullYear()
-  }).length
+  // KPIs sempre sobre reuniões filtradas
+  const totalHoje = reunioesFiltradas.filter((r: any) => { const d = r.inicio ?? r.data_hora; return d && new Date(d).toDateString() === hoje.toDateString() }).length
+  const totalSemana = reunioesFiltradas.filter((r: any) => { const d = r.inicio ?? r.data_hora; if (!d) return false; const dt = new Date(d); return dt >= seg && dt <= new Date(seg.getTime() + 4 * 86400000) }).length
+  const totalMes = reunioesFiltradas.filter((r: any) => { const d = r.inicio ?? r.data_hora; if (!d) return false; const dt = new Date(d); return dt.getMonth() === hoje.getMonth() && dt.getFullYear() === hoje.getFullYear() }).length
+
+  // Reuniões do dia selecionado (view mês) ou hoje (view hoje)
+  const diaFoco = viewMode === 'mes' ? diaSel : hojeIso
+  const reunioesDiaFoco = (eventosPorDia[diaFoco] ?? []).sort((a, b) => a.minuto - b.minuto)
+
+  // Próximas reuniões para painel lateral
+  const proximasReunioes = reunioesFiltradas
+    .filter((r: any) => { const d = r.inicio ?? r.data_hora; return d && new Date(d) >= new Date() })
+    .sort((a: any, b: any) => new Date(a.inicio ?? a.data_hora).getTime() - new Date(b.inicio ?? b.data_hora).getTime())
+    .slice(0, 6)
+
+  // Label do período navegado
+  const labelPeriodo = viewMode === 'hoje'
+    ? hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+    : viewMode === 'semana' ? labelSemana
+    : labelMes
+
+  function navAnterior() {
+    if (viewMode === 'semana') setSemanaOffset(o => o - 1)
+    else if (viewMode === 'mes') setMesOffset(o => o - 1)
+  }
+  function navProximo() {
+    if (viewMode === 'semana') setSemanaOffset(o => o + 1)
+    else if (viewMode === 'mes') setMesOffset(o => o + 1)
+  }
+  function navHoje() {
+    setSemanaOffset(0); setMesOffset(0)
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Seletor de vendedor (visão gerente) */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {vendedorAtual ? (
-            <div className="w-10 h-10 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-sm">
-              {((vendedorAtual.nome ?? 'V') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2)}
-            </div>
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-sm">
-              All
-            </div>
-          )}
-          <div>
-            <div className="text-sm font-bold text-gray-900">{vendedorAtual?.nome ?? 'Todos os vendedores'}</div>
-            <div className="text-xs text-gray-500">{vendedorAtual?.cargo ?? vendedorAtual?.funcao ?? (vendedorAtual ? 'Vendedor' : 'Visão consolidada')}</div>
-          </div>
-          <select className="input text-xs py-1.5" value={vendedorSel} onChange={e => setVendedorSel(e.target.value)}>
-            <option value="">Todos os vendedores</option>
-            {(equipeRaw as any[]).map((v: any) => <option key={v.id} value={v.id}>{v.nome}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-4">
-            {[{label:'Hoje',value:String(totalHoje),color:'text-brand-600'},{label:'Esta semana',value:String(totalSemana),color:'text-gray-900'},{label:'Este mês',value:String(totalMes),color:'text-gray-900'}].map(k => (
-              <div key={k.label} className="text-center">
-                <div className={clsx('text-xl font-bold font-mono', k.color)}>{k.value}</div>
-                <div className="text-2xs text-gray-400">{k.label}</div>
-              </div>
+    <div className="flex flex-col gap-5">
+
+      {/* ── BARRA DE FILTROS REDESENHADA ──────────────────────────────────────── */}
+      <div className="card p-4 flex flex-col gap-4">
+        {/* Linha 1: KPIs + botão sync */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            {[
+              { label: 'Hoje', value: totalHoje, color: 'text-brand-600', bg: 'bg-brand-50', click: () => setViewMode('hoje') },
+              { label: 'Esta semana', value: totalSemana, color: 'text-gray-900', bg: 'bg-gray-50', click: () => setViewMode('semana') },
+              { label: 'Este mês', value: totalMes, color: 'text-gray-900', bg: 'bg-gray-50', click: () => setViewMode('mes') },
+            ].map(k => (
+              <button key={k.label} onClick={k.click}
+                className={clsx('flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm', k.bg,
+                  (viewMode === 'hoje' && k.label === 'Hoje') || (viewMode === 'semana' && k.label === 'Esta semana') || (viewMode === 'mes' && k.label === 'Este mês')
+                    ? 'border-brand-300 shadow-sm' : 'border-transparent hover:border-gray-200'
+                )}>
+                <span className={clsx('text-2xl font-bold font-mono leading-none', k.color)}>{k.value}</span>
+                <span className="text-xs text-gray-500 leading-tight text-left">{k.label}</span>
+              </button>
             ))}
           </div>
+          <div className="flex items-center gap-2">
+            {/* Toggle Hoje / Semana / Mês */}
+            <div className="flex bg-gray-100 rounded-lg p-1 gap-0.5">
+              {(['hoje','semana','mes'] as const).map(v => (
+                <button key={v} onClick={() => setViewMode(v)}
+                  className={clsx('px-3 py-1.5 rounded-md text-xs font-semibold transition-all capitalize',
+                    viewMode === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  )}>
+                  {v === 'hoje' ? 'Hoje' : v === 'semana' ? 'Semana' : 'Mês'}
+                </button>
+              ))}
+            </div>
+            <button className="btn-secondary text-xs py-1.5 gap-1.5" onClick={() => navigate('/config', { state: { tab: 'integracoes' } })}>
+              <Calendar size={12}/> Sync Google Agenda
+            </button>
+          </div>
+        </div>
+
+        {/* Linha 2: chips de vendedores */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mr-1">Vendedor</span>
+          {/* Chip "Todos" */}
           <button
-            className="btn-secondary text-xs py-1.5 gap-1.5"
-            onClick={() => navigate('/config', { state: { tab: 'integracoes' } })}
-          ><Calendar size={12}/> Sync Google Agenda</button>
+            onClick={() => setVendedorSel('')}
+            className={clsx(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+              !vendedorSel
+                ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            )}
+          >
+            <div className={clsx('w-5 h-5 rounded-full flex items-center justify-center text-2xs font-bold flex-shrink-0', !vendedorSel ? 'bg-white/20' : 'bg-gray-100')}>
+              <span className={!vendedorSel ? 'text-white' : 'text-gray-500'}>✦</span>
+            </div>
+            Todos
+            {!vendedorSel && <span className="bg-white/20 text-white text-2xs font-bold px-1.5 py-0.5 rounded-full">{reunioesRaw.length}</span>}
+          </button>
+          {/* Chip por vendedor */}
+          {(equipeRaw as any[]).map((v: any, idx: number) => {
+            const isAtivo = vendedorSel === v.id
+            const corBg = vendedorCores[idx % vendedorCores.length]
+            const iniciais = ((v.nome ?? 'V') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()
+            const total = (reunioesRaw as any[]).filter((r: any) => r.vendedor_id === v.id || r.vendedor_nome === v.nome).length
+            return (
+              <button
+                key={v.id}
+                onClick={() => setVendedorSel(isAtivo ? '' : v.id)}
+                className={clsx(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                  isAtivo
+                    ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                )}
+              >
+                <div className={clsx('w-5 h-5 rounded-full flex items-center justify-center text-2xs font-bold text-white flex-shrink-0', corBg)}>
+                  {iniciais}
+                </div>
+                {(v.nome as string).split(' ')[0]}
+                <span className={clsx('text-2xs font-bold px-1.5 py-0.5 rounded-full', isAtivo ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500')}>{total}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      <div className="flex gap-4">
-        {/* Calendário */}
+      {/* ── CONTEÚDO + PAINEL LATERAL ───────────────────────────────────────── */}
+      <div className="flex gap-4 items-start">
+
+        {/* CALENDÁRIO */}
         <div className="flex-1 card overflow-hidden">
-          {/* Navegação + dias */}
-          <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-gray-100">
-            <div className="p-2 flex items-center justify-between col-span-1">
-              <div className="flex gap-1">
-                <button
-                  className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100"
-                  onClick={() => setSemanaOffset(o => o - 1)}
-                >‹</button>
-                <button
-                  className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100"
-                  onClick={() => setSemanaOffset(0)}
-                >Hoje</button>
-                <button
-                  className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100"
-                  onClick={() => setSemanaOffset(o => o + 1)}
-                >›</button>
-              </div>
+
+          {/* Header do calendário: navegação + legenda */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <button onClick={navAnterior} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">‹</button>
+              <button onClick={navHoje} className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">Hoje</button>
+              <button onClick={navProximo} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">›</button>
+              <span className="text-sm font-semibold text-gray-800 ml-1 capitalize">{labelPeriodo}</span>
             </div>
-            {dias.map(d => (
-              <div key={d.iso} className={clsx('p-3 text-center border-l border-gray-100', d.iso === hojeIso && 'bg-brand-50')}>
-                <div className={clsx('text-xs font-semibold capitalize', d.iso === hojeIso ? 'text-brand-600' : 'text-gray-600')}>{d.label}</div>
-              </div>
-            ))}
+            <div className="flex items-center gap-3">
+              {[{cor:'bg-brand-500',label:'Confirmada'},{cor:'bg-amber-400',label:'Pendente'},{cor:'bg-emerald-500',label:'Concluída'}].map(l => (
+                <div key={l.label} className="flex items-center gap-1.5">
+                  <div className={clsx('w-2 h-2 rounded-full', l.cor)}/>
+                  <span className="text-2xs text-gray-400">{l.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Grid de horas */}
-          <div className="overflow-y-auto max-h-[400px]">
-            {horas.map(hora => (
-              <div key={hora} className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-gray-100 min-h-[52px]">
-                <div className="px-2 py-1 text-2xs text-gray-400 font-mono border-r border-gray-100 pt-1.5">{hora}</div>
-                {dias.map(dia => {
-                  const ev = getEventoNaLinha(dia.iso, hora)
-                  return (
-                    <div key={dia.iso} className="border-l border-gray-100 p-1 relative">
+          {/* ── VIEW HOJE ──────────────────────────────────────────────────── */}
+          {viewMode === 'hoje' && (
+            <div className="overflow-y-auto max-h-[480px]">
+              {horas.map(hora => {
+                const ev = getEventoNaLinha(hojeIso, hora)
+                return (
+                  <div key={hora} className="flex border-b border-gray-100 min-h-[56px]">
+                    <div className="w-16 flex-shrink-0 px-3 py-2 text-2xs text-gray-400 font-mono border-r border-gray-100 pt-3">{hora}</div>
+                    <div className="flex-1 p-1.5 relative">
                       {ev && (
-                        <div
-                          className={clsx('rounded-md px-1.5 py-1 text-2xs border-l-2 cursor-pointer hover:opacity-80 transition-opacity', corMap[ev.cor])}
-                          onClick={() => setDetalhe(ev)}
-                        >
-                          <div className="font-bold">{ev.hora}–{ev.fim}</div>
-                          <div className="font-medium leading-tight">{ev.empresa}</div>
-                          <div className="opacity-70">{ev.contato}</div>
-                          {ev.vendedor && <div className="opacity-60 truncate">{ev.vendedor}</div>}
+                        <div className={clsx('rounded-lg px-3 py-2 text-xs border-l-3 cursor-pointer hover:opacity-90 transition-opacity flex items-start gap-3', corMap[ev.cor])} onClick={() => setDetalhe(ev)}>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-xs">{ev.hora} – {ev.fim}</div>
+                            <div className="font-semibold truncate">{ev.empresa}</div>
+                            <div className="opacity-70 truncate text-2xs">{ev.contato}</div>
+                          </div>
+                          {ev.vendedor && (
+                            <div className="text-2xs opacity-60 text-right flex-shrink-0">{ev.vendedor}</div>
+                          )}
                         </div>
                       )}
                     </div>
+                  </div>
+                )
+              })}
+              {reunioesDiaFoco.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <Calendar size={28} className="mb-2 opacity-30"/>
+                  <p className="text-sm">Nenhuma reunião hoje</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── VIEW SEMANA ────────────────────────────────────────────────── */}
+          {viewMode === 'semana' && (
+            <>
+              <div className="grid grid-cols-[64px_repeat(5,1fr)] border-b border-gray-100 bg-gray-50">
+                <div/>
+                {dias.map(d => (
+                  <div key={d.iso} className={clsx('p-3 text-center border-l border-gray-100', d.iso === hojeIso && 'bg-brand-50')}>
+                    <div className={clsx('text-xs font-semibold capitalize', d.iso === hojeIso ? 'text-brand-600' : 'text-gray-600')}>{d.label}</div>
+                    {eventosPorDia[d.iso] && (
+                      <div className="flex justify-center gap-0.5 mt-1">
+                        {eventosPorDia[d.iso].slice(0,4).map((e,i) => (
+                          <div key={i} className={clsx('w-1.5 h-1.5 rounded-full', e.cor === 'brand' ? 'bg-brand-400' : e.cor === 'emerald' ? 'bg-emerald-400' : 'bg-amber-400')}/>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="overflow-y-auto max-h-[420px]">
+                {horas.map(hora => (
+                  <div key={hora} className="grid grid-cols-[64px_repeat(5,1fr)] border-b border-gray-100 min-h-[52px]">
+                    <div className="px-2 py-1 text-2xs text-gray-400 font-mono border-r border-gray-100 pt-2">{hora}</div>
+                    {dias.map(dia => {
+                      const ev = getEventoNaLinha(dia.iso, hora)
+                      return (
+                        <div key={dia.iso} className={clsx('border-l border-gray-100 p-1 relative', dia.iso === hojeIso && 'bg-brand-50/30')}>
+                          {ev && (
+                            <div className={clsx('rounded-md px-1.5 py-1 text-2xs border-l-2 cursor-pointer hover:opacity-80 transition-opacity', corMap[ev.cor])} onClick={() => setDetalhe(ev)}>
+                              <div className="font-bold leading-tight">{ev.hora}</div>
+                              <div className="font-medium leading-tight truncate">{ev.empresa}</div>
+                              <div className="opacity-70 truncate">{ev.contato}</div>
+                              {ev.vendedor && <div className="opacity-50 truncate text-[10px]">{ev.vendedor}</div>}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── VIEW MÊS ───────────────────────────────────────────────────── */}
+          {viewMode === 'mes' && (
+            <div className="p-4">
+              {/* Cabeçalho dias da semana */}
+              <div className="grid grid-cols-7 mb-1">
+                {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d => (
+                  <div key={d} className="text-center text-2xs font-semibold text-gray-400 py-1">{d}</div>
+                ))}
+              </div>
+              {/* Grade de células */}
+              <div className="grid grid-cols-7 gap-1">
+                {celulas.map((iso, i) => {
+                  if (!iso) return <div key={i} className="h-16"/>
+                  const eventos = eventosPorDia[iso] ?? []
+                  const isHoje = iso === hojeIso
+                  const isSel = iso === diaSel
+                  return (
+                    <button
+                      key={iso}
+                      onClick={() => { setDiaSel(iso === diaSel ? '' : iso) }}
+                      className={clsx(
+                        'h-16 rounded-xl p-1.5 text-left transition-all border flex flex-col',
+                        isSel ? 'border-brand-400 bg-brand-50 shadow-sm' :
+                        isHoje ? 'border-brand-200 bg-brand-50/60' :
+                        'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                      )}
+                    >
+                      <div className={clsx('text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full leading-none mb-1',
+                        isHoje ? 'bg-brand-600 text-white' : 'text-gray-700'
+                      )}>
+                        {new Date(iso + 'T12:00:00').getDate()}
+                      </div>
+                      <div className="flex flex-wrap gap-0.5">
+                        {eventos.slice(0,3).map((e, ei) => (
+                          <div key={ei} className={clsx('h-1.5 rounded-full flex-1 min-w-[6px] max-w-[16px]',
+                            e.cor === 'brand' ? 'bg-brand-400' : e.cor === 'emerald' ? 'bg-emerald-400' : 'bg-amber-400'
+                          )}/>
+                        ))}
+                        {eventos.length > 3 && (
+                          <span className="text-[9px] font-bold text-gray-400">+{eventos.length - 3}</span>
+                        )}
+                      </div>
+                      {eventos.length > 0 && (
+                        <div className="text-[10px] text-gray-500 mt-auto leading-none">
+                          {eventos.length} {eventos.length === 1 ? 'reunião' : 'reuniões'}
+                        </div>
+                      )}
+                    </button>
                   )
                 })}
               </div>
-            ))}
-          </div>
 
-          {/* Legenda */}
-          <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-100">
-            {[{cor:'bg-brand-500', label:'Confirmada'},{cor:'bg-amber-400', label:'Pendente'},{cor:'bg-emerald-500', label:'Concluída'}].map(l => (
-              <div key={l.label} className="flex items-center gap-1.5">
-                <div className={clsx('w-2.5 h-2.5 rounded-sm', l.cor)}/>
-                <span className="text-2xs text-gray-500">{l.label}</span>
-              </div>
-            ))}
-          </div>
+              {/* Detalhe do dia selecionado no mês */}
+              {diaSel && reunioesDiaFoco.length > 0 && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-gray-700">
+                      {new Date(diaSel + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' })}
+                    </h4>
+                    <button onClick={() => setDiaSel('')} className="text-gray-400 hover:text-gray-600"><X size={13}/></button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {reunioesDiaFoco.map((ev, i) => (
+                      <div key={i} className={clsx('flex items-start gap-3 p-2.5 rounded-xl border-l-2 cursor-pointer hover:opacity-80 transition-opacity', corMap[ev.cor])} onClick={() => setDetalhe(ev)}>
+                        <div className="flex-shrink-0">
+                          <div className="text-xs font-bold">{ev.hora}</div>
+                          <div className="text-2xs opacity-60">–{ev.fim}</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold truncate">{ev.empresa}</div>
+                          <div className="text-2xs opacity-70 truncate">{ev.contato}</div>
+                          {ev.vendedor && <div className="text-2xs opacity-50">{ev.vendedor}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Painel lateral */}
-        <div className="w-64 flex flex-col gap-3">
+        {/* PAINEL LATERAL */}
+        <div className="w-60 flex-shrink-0 flex flex-col gap-3">
+          {/* Próximas */}
           <div className="card p-4">
             <h4 className="text-xs font-semibold text-gray-700 mb-3">Próximas reuniões</h4>
             <div className="flex flex-col gap-2">
-              {reunioesFiltradas
-                .filter((r: any) => {
-                  const d = r.inicio ?? r.data_hora; if (!d) return false
-                  return new Date(d) >= new Date()
-                })
-                .sort((a: any, b: any) => new Date(a.inicio ?? a.data_hora).getTime() - new Date(b.inicio ?? b.data_hora).getTime())
-                .slice(0, 5)
-                .map((r: any, i: number) => {
-                  const d = new Date(r.inicio ?? r.data_hora)
-                  const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
-                  const fimD = new Date(d.getTime() + (r.duracao_minutos ?? 30) * 60000)
-                  const fim = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
-                  const corCls = corPorStatus(r.status ?? '') === 'emerald' ? 'border-l-emerald-500' : corPorStatus(r.status ?? '') === 'amber' ? 'border-l-amber-500' : 'border-l-brand-500'
-                  return (
-                    <div key={r.id ?? i} className={clsx('border-l-2 pl-2 cursor-pointer hover:bg-gray-50 rounded-r-lg py-1', corCls)}
-                      onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', hora, fim, meetLink: r.meet_link ?? r.meetLink, vendedor: r.vendedor_nome })}>
-                      <div className="text-2xs font-mono text-gray-500">{hora}</div>
-                      <div className="text-xs font-semibold text-gray-900">{r.empresa ?? '—'}</div>
-                      <div className="text-2xs text-gray-500">{r.contato ?? r.contato_nome ?? '—'}</div>
-                      {r.vendedor_nome && <div className="text-2xs text-gray-400">{r.vendedor_nome}</div>}
-                    </div>
-                  )
-                })
-              }
-              {reunioesFiltradas.filter((r: any) => new Date(r.inicio ?? r.data_hora) >= new Date()).length === 0 && (
+              {proximasReunioes.length === 0 && (
                 <p className="text-2xs text-gray-400 text-center py-2">Nenhuma reunião futura</p>
               )}
+              {proximasReunioes.map((r: any, i: number) => {
+                const d = new Date(r.inicio ?? r.data_hora)
+                const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+                const fimD = new Date(d.getTime() + (r.duracao_minutos ?? 30) * 60000)
+                const fim = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+                const cor = corPorStatus(r.status ?? '')
+                const corCls = cor === 'emerald' ? 'border-l-emerald-500' : cor === 'amber' ? 'border-l-amber-500' : 'border-l-brand-500'
+                const isToday = d.toDateString() === hoje.toDateString()
+                return (
+                  <div key={r.id ?? i} className={clsx('border-l-2 pl-2 cursor-pointer hover:bg-gray-50 rounded-r-lg py-1 transition-colors', corCls)}
+                    onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', hora, fim, meetLink: r.meet_link ?? r.meetLink, vendedor: r.vendedor_nome })}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-2xs font-mono text-gray-500">{hora}</span>
+                      {isToday && <span className="text-2xs font-bold text-brand-600 bg-brand-50 px-1 rounded">hoje</span>}
+                    </div>
+                    <div className="text-xs font-semibold text-gray-900 truncate">{r.empresa ?? '—'}</div>
+                    <div className="text-2xs text-gray-500 truncate">{r.contato ?? r.contato_nome ?? '—'}</div>
+                    {r.vendedor_nome && <div className="text-2xs text-gray-400 truncate">{r.vendedor_nome}</div>}
+                  </div>
+                )
+              })}
             </div>
           </div>
 
+          {/* Detalhe ao clicar num evento */}
           {detalhe && (
             <div className="card p-4">
               <div className="flex items-start justify-between mb-3">
-                <h4 className="text-xs font-semibold text-gray-700">Detalhe da reunião</h4>
-                <button onClick={() => setDetalhe(null)}><X size={13} className="text-gray-400"/></button>
+                <h4 className="text-xs font-semibold text-gray-700">Reunião</h4>
+                <button onClick={() => setDetalhe(null)}><X size={13} className="text-gray-400 hover:text-gray-600"/></button>
               </div>
-              <div className="text-sm font-bold text-gray-900">{detalhe.empresa}</div>
+              <div className="text-sm font-bold text-gray-900 mb-0.5">{detalhe.empresa}</div>
               <div className="text-xs text-gray-500 mb-1">{detalhe.contato}</div>
-              {detalhe.vendedor && <div className="text-2xs text-brand-600 mb-1 font-medium">👤 {detalhe.vendedor}</div>}
-              <div className="text-xs font-mono text-brand-600 mb-3">{detalhe.hora} – {detalhe.fim}</div>
+              {detalhe.vendedor && (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-[9px] font-bold text-white">
+                    {detalhe.vendedor.split(' ').map(n => n[0]).join('').slice(0,2)}
+                  </div>
+                  <span className="text-2xs text-gray-600 font-medium">{detalhe.vendedor}</span>
+                </div>
+              )}
+              <div className="text-xs font-mono text-brand-600 bg-brand-50 rounded-lg px-2 py-1.5 mb-3 inline-block">
+                {detalhe.hora} – {detalhe.fim}
+              </div>
               <div className="flex flex-col gap-1.5">
                 <button
                   className="btn-primary text-xs py-1.5 gap-1.5 justify-center"
                   onClick={() => detalhe.meetLink ? window.open(`https://${detalhe.meetLink}`, '_blank') : undefined}
                   disabled={!detalhe.meetLink}
-                ><Video size={11}/> {detalhe.meetLink ? 'Entrar no Meet' : 'Link não disponível'}</button>
+                ><Video size={11}/> {detalhe.meetLink ? 'Entrar no Meet' : 'Sem link'}</button>
                 <button className="btn-secondary text-xs py-1.5 gap-1.5 justify-center"><Phone size={11}/> Ligar</button>
                 <button className="btn-secondary text-xs py-1.5 gap-1.5 justify-center"><RotateCcw size={11}/> Reagendar</button>
               </div>
