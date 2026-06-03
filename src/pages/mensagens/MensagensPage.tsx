@@ -4,7 +4,7 @@ import { whatsappUsuarioApi } from '@/services/api'
 import {
   MessageSquare, Search, Send, RefreshCw, Phone, User,
   CheckCheck, Clock, Wifi, WifiOff, Trash2, X, AlertCircle,
-  Settings, Paperclip, FileText
+  Settings, Paperclip, FileText, Mic, Square
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
@@ -92,6 +92,9 @@ export default function MensagensPage() {
   const [apagando, setApagando]           = useState(false)
   const [hoverTel, setHoverTel]           = useState<string | null>(null)
   const fileInputRef                       = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef                   = useRef<MediaRecorder | null>(null)
+  const audioChunksRef                     = useRef<Blob[]>([])
+  const [gravando, setGravando]            = useState(false)
 
   function toast(m: string) { setToastMsg(m); setTimeout(() => setToastMsg(null), 4000) }
 
@@ -161,6 +164,34 @@ export default function MensagensPage() {
       .then(() => qc.invalidateQueries({ queryKey: ['wa-conversas'] }))
       .catch(() => {})
   }, [conversa?.telefone]) // eslint-disable-line
+
+  async function iniciarGravacao() {
+    if (!conversa) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const mimeType = mr.mimeType || 'audio/webm'
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        const file = new File([blob], 'audio.webm', { type: mimeType })
+        await enviarMidia(file)
+      }
+      mr.start()
+      mediaRecorderRef.current = mr
+      setGravando(true)
+    } catch {
+      toast('Permissão de microfone negada')
+    }
+  }
+
+  function pararGravacao() {
+    mediaRecorderRef.current?.stop()
+    mediaRecorderRef.current = null
+    setGravando(false)
+  }
 
   async function enviar() {
     if (!conversa || !texto.trim()) return
@@ -484,7 +515,7 @@ export default function MensagensPage() {
                             )
                           })()}
                           {/* Texto da mensagem — oculta labels automáticas quando há mídia */}
-                          {(!m.media_url || !['[Imagem enviada]','[Áudio enviado]','[Vídeo enviado]'].includes(m.mensagem)) && (
+                          {(!m.media_url || !['[Imagem enviada]','[Áudio enviado]','[Vídeo enviado]','[Imagem recebida]','[Áudio recebido]','[Vídeo recebido]','[Mídia recebida]'].includes(m.mensagem)) && (
                             <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.mensagem}</p>
                           )}
                           <div className={clsx(
@@ -542,6 +573,20 @@ export default function MensagensPage() {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() }
                     }}
                   />
+                  {/* Botão gravar áudio */}
+                  <button
+                    onClick={gravando ? pararGravacao : iniciarGravacao}
+                    disabled={enviando || waStatus !== 'conectado'}
+                    title={gravando ? 'Parar gravação' : 'Gravar áudio'}
+                    className={clsx(
+                      'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                      gravando
+                        ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                        : 'border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-700'
+                    )}
+                  >
+                    {gravando ? <Square size={13} fill="currentColor"/> : <Mic size={15}/>}
+                  </button>
                   <button
                     onClick={enviar}
                     disabled={enviando || !texto.trim() || waStatus !== 'conectado'}
