@@ -3107,12 +3107,38 @@ function estimarFase(duracao?: string): number {
   return 5                    // Encerramento
 }
 
-function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
+interface AlertaICP {
+  id: string
+  empresa: string
+  contato: string
+  icp: number
+  potencial: number
+  gatilho?: string
+  ts: number      // Date.now() ao disparar
+  visto: boolean
+}
+
+function TabAoVivo({
+  onGoFila,
+  limiarICP = 85,
+  onLimiarChange,
+  onNovoAlerta,
+}: {
+  onGoFila?: (id: string) => void
+  limiarICP?: number
+  onLimiarChange?: (v: number) => void
+  onNovoAlerta?: (qtd: number) => void
+}) {
   const [fraseInjetada, setFraseInjetada] = useState<Record<string, string>>({})
   const [fraseInput, setFraseInput]       = useState<Record<string, string>>({})
   const [feedbackInj, setFeedbackInj]     = useState<Record<string, string>>({})
   const [transferidos, setTransferidos]   = useState<Record<string, string>>({})
   const [marcados, setMarcados]           = useState<Record<string, boolean>>({})
+
+  // ── Sistema de alertas ICP ─────────────────────────────────────────────────
+  const [alertas, setAlertas]             = useState<AlertaICP[]>([])
+  const alertadosRef                      = useRef<Set<string>>(new Set())  // IDs já alertados nesta sessão
+  const [painelAlertaAberto, setPainelAlertaAberto] = useState(true)
 
   // Dados reais da API com polling 4s
   const { data: ligacoesAtivas = [], isLoading } = useQuery({
@@ -3151,9 +3177,42 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
   ]
   const ativas = ligacoesAtivas.length > 0 ? ligacoesAtivas : DEMO
 
+  // ── Detecção de alertas ICP ────────────────────────────────────────────────
+  useEffect(() => {
+    const novas: AlertaICP[] = []
+    ativas.forEach(item => {
+      if (item.icp >= limiarICP && !alertadosRef.current.has(item.id)) {
+        alertadosRef.current.add(item.id)
+        novas.push({
+          id: item.id,
+          empresa: item.empresa,
+          contato: item.contato,
+          icp: item.icp,
+          potencial: item.potencial,
+          gatilho: item.gatilhoDetectado,
+          ts: Date.now(),
+          visto: false,
+        })
+      }
+    })
+    if (novas.length > 0) {
+      setAlertas(prev => [...novas, ...prev].slice(0, 20)) // mantém últimos 20
+      setPainelAlertaAberto(true)
+      onNovoAlerta?.(novas.length)
+    }
+  }, [ativas, limiarICP])
+
   // Métricas do cabeçalho
-  const precisamAtencao = ativas.filter(a => a.icp >= 80 || a.gatilhoDetectado).length
+  const alertasNaoVistos   = alertas.filter(a => !a.visto).length
+  const precisamAtencao    = ativas.filter(a => a.icp >= limiarICP || a.gatilhoDetectado).length
   const transferenciasHoje = ativas.filter(a => a.transferindo).length
+
+  function marcarAlertaVisto(id: string) {
+    setAlertas(prev => prev.map(a => a.id === id ? { ...a, visto: true } : a))
+  }
+  function descartarTodosAlertas() {
+    setAlertas(prev => prev.map(a => ({ ...a, visto: true })))
+  }
 
   async function injetarFrase(item: EntradaFila & { _callControlId: string }) {
     const frase = fraseInput[item.id]?.trim()
@@ -3193,7 +3252,8 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
   // Cor do card por urgência
   function urgenciaCor(item: EntradaFila): { border: string; glow: string } {
     if (item.transferindo || transferidos[item.id]) return { border:'border-purple-500/60', glow:'shadow-purple-900/30' }
-    if (item.icp >= 85 && item.potencial >= 75) return { border:'border-amber-500/50', glow:'shadow-amber-900/20' }
+    if (item.icp >= limiarICP) return { border:'border-red-500/70', glow:'shadow-red-900/30' }   // alerta ativo
+    if (item.icp >= 80 && item.potencial >= 70) return { border:'border-amber-500/50', glow:'shadow-amber-900/20' }
     if (item.gatilhoDetectado) return { border:'border-brand-500/40', glow:'shadow-brand-900/10' }
     return { border:'border-gray-700/60', glow:'' }
   }
@@ -3203,18 +3263,36 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
 
       {/* ── HEADER WAR ROOM ────────────────────────────────────────────────── */}
       <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' }}>
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
               <Zap size={18} className="text-amber-400" />
             </div>
             <div>
               <div className="text-sm font-bold text-white">Centro de Comando — Ao Vivo</div>
-              <div className="text-2xs text-indigo-300">Cada ligação ativa é monitorada pelo CI em tempo real · intervenha antes que o momento passe</div>
+              <div className="text-2xs text-indigo-300">CI monitora cada ligação · alerta automático quando ICP ≥ limiar configurado</div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Pulse indicador */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Seletor de limiar ICP */}
+            <div className="flex items-center gap-2">
+              <span className="text-2xs text-gray-400 font-medium">Alertar a partir de ICP</span>
+              <div className="flex gap-1">
+                {[80, 85, 90, 95].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => { onLimiarChange?.(v); alertadosRef.current.clear() /* reseta ao mudar limiar */ }}
+                    className={clsx(
+                      'text-2xs font-bold px-2.5 py-1 rounded-lg border transition-all',
+                      limiarICP === v
+                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-amber-600 hover:text-amber-400'
+                    )}
+                  >{v}+</button>
+                ))}
+              </div>
+            </div>
+            {/* Métricas */}
             <div className="flex items-center gap-2 bg-emerald-900/40 border border-emerald-600/40 rounded-full px-3 py-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
               <span className="text-xs font-bold text-emerald-300">{ativas.length} ativas agora</span>
@@ -3222,7 +3300,7 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <div className="text-xl font-bold font-mono text-amber-400">{precisamAtencao}</div>
-                <div className="text-2xs text-gray-400">precisam atenção</div>
+                <div className="text-2xs text-gray-400">≥ ICP {limiarICP}</div>
               </div>
               <div className="text-center">
                 <div className="text-xl font-bold font-mono text-purple-300">{transferenciasHoje}</div>
@@ -3232,6 +3310,115 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
           </div>
         </div>
       </div>
+
+      {/* ── PAINEL DE ALERTAS ──────────────────────────────────────────────── */}
+      {alertas.length > 0 && (
+        <div className={clsx(
+          'rounded-2xl border overflow-hidden transition-all',
+          alertasNaoVistos > 0
+            ? 'border-red-500/50 shadow-lg shadow-red-900/20'
+            : 'border-gray-200'
+        )}>
+          {/* Header do painel */}
+          <div className={clsx(
+            'flex items-center justify-between px-4 py-3 cursor-pointer',
+            alertasNaoVistos > 0 ? 'bg-red-950/80' : 'bg-gray-50'
+          )} onClick={() => setPainelAlertaAberto(o => !o)}>
+            <div className="flex items-center gap-2.5">
+              {alertasNaoVistos > 0 && (
+                <span className="relative flex-shrink-0">
+                  <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-60" />
+                  <span className="relative w-2.5 h-2.5 rounded-full bg-red-500 block" />
+                </span>
+              )}
+              <span className={clsx('text-sm font-bold', alertasNaoVistos > 0 ? 'text-red-300' : 'text-gray-700')}>
+                {alertasNaoVistos > 0
+                  ? `⚡ ${alertasNaoVistos} alerta${alertasNaoVistos > 1 ? 's' : ''} — ligaç${alertasNaoVistos > 1 ? 'ões' : 'ão'} de alto valor detectada${alertasNaoVistos > 1 ? 's' : ''}!`
+                  : `✓ Alertas — ${alertas.length} registrado${alertas.length > 1 ? 's' : ''} nesta sessão`
+                }
+              </span>
+              <span className={clsx(
+                'text-2xs font-bold px-2 py-0.5 rounded-full',
+                alertasNaoVistos > 0 ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'
+              )}>{alertas.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {alertasNaoVistos > 0 && (
+                <button
+                  onClick={e => { e.stopPropagation(); descartarTodosAlertas() }}
+                  className="text-2xs font-semibold text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-900/40 transition-colors"
+                >Marcar todos como vistos</button>
+              )}
+              <span className={clsx('text-2xs', alertasNaoVistos > 0 ? 'text-red-400' : 'text-gray-400')}>
+                {painelAlertaAberto ? '▲' : '▼'}
+              </span>
+            </div>
+          </div>
+
+          {/* Lista de alertas */}
+          {painelAlertaAberto && (
+            <div className={clsx('divide-y', alertasNaoVistos > 0 ? 'divide-red-900/30 bg-red-950/40' : 'divide-gray-100 bg-white')}>
+              {alertas.map(al => (
+                <div key={al.id + al.ts}
+                  className={clsx(
+                    'flex items-center gap-3 px-4 py-3 transition-all',
+                    al.visto ? 'opacity-50' : ''
+                  )}
+                >
+                  {/* ICP badge */}
+                  <div className={clsx(
+                    'w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold',
+                    al.icp >= 90 ? 'bg-red-900/60 border border-red-600/50' :
+                    al.icp >= 85 ? 'bg-amber-900/60 border border-amber-600/50' :
+                    'bg-brand-900/60 border border-brand-600/50'
+                  )}>
+                    <span className={clsx('text-lg font-mono leading-none', al.icp >= 90 ? 'text-red-300' : al.icp >= 85 ? 'text-amber-300' : 'text-brand-300')}>{al.icp}</span>
+                    <span className="text-[9px] text-gray-400">ICP</span>
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={clsx('text-sm font-bold', al.visto ? 'text-gray-500' : alertasNaoVistos > 0 ? 'text-white' : 'text-gray-900')}>{al.empresa}</span>
+                      {!al.visto && <span className="text-2xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">NOVO</span>}
+                    </div>
+                    <div className={clsx('text-xs', al.visto ? 'text-gray-500' : 'text-gray-400')}>{al.contato}</div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {al.potencial > 0 && (
+                        <span className="text-2xs font-semibold text-purple-400">📞 {al.potencial}% potencial</span>
+                      )}
+                      {al.gatilho && (
+                        <span className="text-2xs font-semibold text-amber-400">💡 {al.gatilho}</span>
+                      )}
+                      <span className="text-2xs text-gray-500">
+                        {new Date(al.ts).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Ações */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!al.visto && (
+                      <button
+                        onClick={() => marcarAlertaVisto(al.id)}
+                        className="text-2xs font-semibold px-3 py-1.5 rounded-lg bg-red-900/40 border border-red-700/50 text-red-300 hover:bg-red-800/40 transition-colors"
+                      >
+                        Acompanhando ✓
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { /* scroll para o card correspondente */ }}
+                      className="text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      Ver card ↓
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── ESTADO VAZIO ───────────────────────────────────────────────────── */}
       {isLoading && ligacoesAtivas.length === 0 ? (
@@ -3251,12 +3438,24 @@ function TabAoVivo({ onGoFila }: { onGoFila?: (id: string) => void }) {
           const sugestaoCI = getCISugestao(item.gatilhoDetectado)
           const jaTransferido = !!transferidos[item.id]
           const marcado = !!marcados[item.id]
+          const temAlerta = item.icp >= limiarICP
 
           return (
             <div key={item.id}
               className={clsx('rounded-2xl overflow-hidden border shadow-lg transition-all', cor.border, cor.glow)}
               style={{ background: 'linear-gradient(180deg, #1a1a2e 0%, #0d0d1a 100%)' }}
             >
+              {/* Faixa de alerta ICP no topo do card */}
+              {temAlerta && (
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-red-950/80 border-b border-red-700/40">
+                  <span className="relative flex-shrink-0">
+                    <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50" />
+                    <span className="relative w-2 h-2 rounded-full bg-red-500 block" />
+                  </span>
+                  <span className="text-2xs font-bold text-red-300">⚡ ALERTA CI — ICP {item.icp} ≥ {limiarICP} · Ligação de alto valor</span>
+                </div>
+              )}
+
               {/* ── Header do card ─────────────────────────────────────────── */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -4074,7 +4273,7 @@ function TabReativacao() {
 
 // ─── TABS CONFIG ──────────────────────────────────────────────────────────────
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
+const TABS_BASE: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
   { id:'fila',      label:'Fila de Chamadas', icon:<PhoneCall size={13}/> },
   { id:'agendados', label:'Agendados',         icon:<Calendar size={13}/> },
   { id:'gravacoes', label:'Gravações',         icon:<Mic size={13}/> },
@@ -4089,7 +4288,25 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 
 export default function DiscadoraPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('fila')
+  const [activeTab, setActiveTab]         = useState<Tab>('fila')
+  // Alertas ICP — estado global da página para badge no tab
+  const [alertasNaoLidos, setAlertasNaoLidos] = useState(0)
+  const [limiarICP, setLimiarICP]             = useState(85)
+
+  function handleNovoAlerta(qtd: number) {
+    // Só incrementa badge se o usuário não estiver na aba
+    if (activeTab !== 'aovivo') setAlertasNaoLidos(prev => prev + qtd)
+  }
+  function handleAbrirAoVivo() {
+    setActiveTab('aovivo')
+    setAlertasNaoLidos(0)
+  }
+
+  const TABS = TABS_BASE.map(t =>
+    t.id === 'aovivo' && alertasNaoLidos > 0
+      ? { ...t, badge: alertasNaoLidos, _alerta: true }
+      : t
+  )
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto animate-fade-in">
@@ -4109,19 +4326,31 @@ export default function DiscadoraPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-0 border-b border-gray-200 mb-6 overflow-x-auto">
-        {TABS.map(tab => (
+        {TABS.map((tab: any) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => tab.id === 'aovivo' ? handleAbrirAoVivo() : setActiveTab(tab.id)}
             className={clsx(
-              'flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-all -mb-px',
+              'flex items-center gap-1.5 px-3 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-all -mb-px relative',
               activeTab === tab.id ? 'border-brand-500 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             )}
           >
-            {tab.icon}
+            {/* Pulse no ícone quando há alertas não lidos */}
+            {tab._alerta ? (
+              <span className="relative flex-shrink-0">
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-ping opacity-75" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500" />
+                {tab.icon}
+              </span>
+            ) : tab.icon}
             {tab.label}
             {tab.badge !== undefined && (
-              <span className={clsx('text-2xs px-1.5 py-0.5 rounded-full font-bold', activeTab === tab.id ? 'bg-brand-100 text-brand-600' : 'bg-gray-200 text-gray-500')}>{tab.badge}</span>
+              <span className={clsx(
+                'text-2xs px-1.5 py-0.5 rounded-full font-bold',
+                tab._alerta
+                  ? 'bg-red-500 text-white animate-pulse'
+                  : activeTab === tab.id ? 'bg-brand-100 text-brand-600' : 'bg-gray-200 text-gray-500'
+              )}>{tab.badge}</span>
             )}
           </button>
         ))}
@@ -4133,7 +4362,14 @@ export default function DiscadoraPage() {
       {activeTab === 'gravacoes' && <TabGravacoes />}
       {activeTab === 'manual'    && <TabManual />}
       {activeTab === 'agenda'    && <TabAgenda />}
-      {activeTab === 'aovivo'    && <TabAoVivo onGoFila={() => setActiveTab('fila')} />}
+      {activeTab === 'aovivo'    && (
+        <TabAoVivo
+          onGoFila={() => setActiveTab('fila')}
+          limiarICP={limiarICP}
+          onLimiarChange={setLimiarICP}
+          onNovoAlerta={handleNovoAlerta}
+        />
+      )}
       {activeTab === 'historico' && <TabHistorico />}
       {activeTab === 'ramal'      && <TabRamal />}
       {activeTab === 'reativacao' && <TabReativacao />}
