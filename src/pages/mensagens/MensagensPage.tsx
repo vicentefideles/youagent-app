@@ -48,22 +48,42 @@ export default function MensagensPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const bottomRef = useRef<HTMLDivElement>(null)
-  const prevNaoLidasRef = useRef<number>(0)
+  const prevNaoLidasRef = useRef<number>(-1)
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
-  // Som de notificação via Web Audio API (sem arquivo externo)
+  // Inicializa AudioContext após primeira interação do usuário (requisito do browser)
+  useEffect(() => {
+    const init = () => {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      }
+    }
+    document.addEventListener('click', init)
+    document.addEventListener('keydown', init)
+    return () => { document.removeEventListener('click', init); document.removeEventListener('keydown', init) }
+  }, [])
+
+  // Som de notificação — dois "pops" rápidos
   function playNotificationSound() {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.frequency.setValueAtTime(880, ctx.currentTime)
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1)
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
-      osc.start(ctx.currentTime)
-      osc.stop(ctx.currentTime + 0.3)
+      const ctx = audioCtxRef.current
+      if (!ctx) return
+      if (ctx.state === 'suspended') ctx.resume()
+      const playPop = (delay: number) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(1200, ctx.currentTime + delay)
+        osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + delay + 0.08)
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + delay)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.12)
+        osc.start(ctx.currentTime + delay)
+        osc.stop(ctx.currentTime + delay + 0.12)
+      }
+      playPop(0)
+      playPop(0.15)
     } catch (_) {}
   }
 
@@ -107,7 +127,7 @@ export default function MensagensPage() {
   // Toca som quando chega nova mensagem não lida
   useEffect(() => {
     const total = conversas.reduce((acc: number, c: Conversa) => acc + (c.nao_lidas || 0), 0)
-    if (total > prevNaoLidasRef.current && prevNaoLidasRef.current >= 0) {
+    if (prevNaoLidasRef.current >= 0 && total > prevNaoLidasRef.current) {
       playNotificationSound()
     }
     prevNaoLidasRef.current = total
