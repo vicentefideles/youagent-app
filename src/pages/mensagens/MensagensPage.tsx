@@ -4,7 +4,7 @@ import { whatsappUsuarioApi } from '@/services/api'
 import {
   MessageSquare, Search, Send, RefreshCw, Phone, User,
   CheckCheck, Clock, Wifi, WifiOff, Trash2, X, AlertCircle,
-  Settings
+  Settings, Paperclip, FileText
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useNavigate } from 'react-router-dom'
@@ -36,6 +36,7 @@ interface Mensagem {
   id:              string
   telefone:        string
   mensagem:        string
+  media_url?:      string
   direcao:         'enviada' | 'recebida'
   criado_em:       string
   lida?:           boolean
@@ -90,8 +91,35 @@ export default function MensagensPage() {
   const [confirmApagar, setConfirmApagar] = useState<Conversa | null>(null)
   const [apagando, setApagando]           = useState(false)
   const [hoverTel, setHoverTel]           = useState<string | null>(null)
+  const fileInputRef                       = useRef<HTMLInputElement>(null)
 
   function toast(m: string) { setToastMsg(m); setTimeout(() => setToastMsg(null), 4000) }
+
+  async function enviarMidia(file: File) {
+    if (!conversa) return
+    setEnviando(true)
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload  = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo'))
+        reader.readAsDataURL(file)
+      })
+      await whatsappUsuarioApi.enviarMidia({
+        telefone: conversa.telefone,
+        base64,
+        mimeType: file.type,
+        fileName: file.name,
+      })
+      qc.invalidateQueries({ queryKey: ['wa-historico', conversa.telefone] })
+      qc.invalidateQueries({ queryKey: ['wa-conversas'] })
+    } catch (e: any) {
+      toast('Erro ao enviar arquivo: ' + (e?.response?.data?.error ?? e?.message ?? 'desconhecido'))
+    } finally {
+      setEnviando(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   useEffect(() => {
     whatsappUsuarioApi.status()
@@ -425,7 +453,40 @@ export default function MensagensPage() {
                             ? 'bg-brand-600 text-white rounded-br-sm'
                             : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
                         )}>
-                          <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.mensagem}</p>
+                          {/* Renderização de mídia */}
+                          {m.media_url && (() => {
+                            const url = m.media_url
+                            const isImg  = /^data:image|\.jpe?g$|\.png$|\.gif$|\.webp$/i.test(url)
+                            const isAud  = /^data:audio|\.mp3$|\.ogg$|\.wav$|\.m4a$/i.test(url)
+                            const isVid  = /^data:video|\.mp4$|\.webm$/i.test(url)
+                            if (isImg) return (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
+                                <img src={url} alt="mídia" className="max-w-full rounded-lg max-h-64 object-cover"/>
+                              </a>
+                            )
+                            if (isAud) return (
+                              <audio controls src={url} className="w-full mb-1.5" style={{ maxWidth: 240 }}/>
+                            )
+                            if (isVid) return (
+                              <video controls src={url} className="max-w-full rounded-lg max-h-48 mb-1.5"/>
+                            )
+                            // Documento genérico
+                            const nome = url.split('/').pop()?.split('?')[0] || 'arquivo'
+                            return (
+                              <a href={url} download={nome} target="_blank" rel="noopener noreferrer"
+                                className={clsx(
+                                  'flex items-center gap-2 mb-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors',
+                                  enviada ? 'bg-brand-500 hover:bg-brand-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                )}>
+                                <FileText size={14} className="flex-shrink-0"/>
+                                <span className="truncate max-w-[160px]">{nome}</span>
+                              </a>
+                            )
+                          })()}
+                          {/* Texto da mensagem — oculta labels automáticas quando há mídia */}
+                          {(!m.media_url || !['[Imagem enviada]','[Áudio enviado]','[Vídeo enviado]'].includes(m.mensagem)) && (
+                            <p className="text-xs leading-relaxed whitespace-pre-wrap">{m.mensagem}</p>
+                          )}
                           <div className={clsx(
                             'flex items-center justify-end gap-1 mt-1',
                             enviada ? 'text-brand-200' : 'text-gray-400'
@@ -454,7 +515,24 @@ export default function MensagensPage() {
                     </button>
                   ))}
                 </div>
+                {/* Input file oculto */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) enviarMidia(f) }}
+                />
                 <div className="flex items-end gap-2.5">
+                  {/* Botão anexar */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={enviando || waStatus !== 'conectado'}
+                    title="Enviar arquivo"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Paperclip size={15}/>
+                  </button>
                   <textarea
                     className="flex-1 px-3.5 py-2.5 text-xs bg-gray-50 border border-gray-200 rounded-xl resize-none min-h-[42px] max-h-28 focus:outline-none focus:border-brand-400 focus:bg-white transition-colors"
                     placeholder={waStatus === 'conectado' ? 'Digite uma mensagem…' : 'WhatsApp desconectado'}
@@ -472,7 +550,7 @@ export default function MensagensPage() {
                     {enviando ? <RefreshCw size={15} className="animate-spin"/> : <Send size={15}/>}
                   </button>
                 </div>
-                <p className="text-2xs text-gray-400 mt-1.5">Enter para enviar · Shift+Enter para nova linha</p>
+                <p className="text-2xs text-gray-400 mt-1.5">Enter para enviar · Shift+Enter para nova linha · 📎 para anexar</p>
               </div>
             </div>
           )}

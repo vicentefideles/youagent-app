@@ -162,6 +162,9 @@ export const whatsappUsuarioApi = {
   /** Apaga todas as mensagens de uma conversa pelo telefone */
   apagarConversa: (telefone: string) =>
     api.delete(`/whatsapp/eu/conversa/${encodeURIComponent(telefone)}`),
+  /** Envia imagem, documento ou áudio como base64 */
+  enviarMidia: (data: { telefone: string; base64: string; mimeType: string; fileName?: string; caption?: string }) =>
+    api.post('/whatsapp/eu/enviar-midia', data, { timeout: 60000 }),
 }
 
 // WhatsApp inbox do vendedor (isolado por instância vendedor_{id})
