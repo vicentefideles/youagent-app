@@ -169,17 +169,25 @@ export default function MensagensPage() {
     if (!conversa) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mr = new MediaRecorder(stream)
+      // Prefere ogg/opus (Firefox) ou cai para webm/opus (Chrome)
+      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType })
       audioChunksRef.current = []
       mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
-        const mimeType = mr.mimeType || 'audio/webm'
-        const blob = new Blob(audioChunksRef.current, { type: mimeType })
-        const file = new File([blob], 'audio.webm', { type: mimeType })
+        const finalMime = mr.mimeType || mimeType
+        const blob = new Blob(audioChunksRef.current, { type: finalMime })
+        if (blob.size < 100) { toast('Áudio muito curto, tente novamente'); return }
+        const ext  = finalMime.includes('ogg') ? 'ogg' : 'webm'
+        const file = new File([blob], `audio.${ext}`, { type: finalMime })
         await enviarMidia(file)
       }
-      mr.start()
+      mr.start(250) // coleta chunks a cada 250ms
       mediaRecorderRef.current = mr
       setGravando(true)
     } catch {
@@ -188,7 +196,8 @@ export default function MensagensPage() {
   }
 
   function pararGravacao() {
-    mediaRecorderRef.current?.stop()
+    if (!mediaRecorderRef.current) return
+    mediaRecorderRef.current.stop()
     mediaRecorderRef.current = null
     setGravando(false)
   }
