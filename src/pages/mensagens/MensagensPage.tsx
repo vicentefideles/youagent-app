@@ -48,6 +48,24 @@ export default function MensagensPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const prevNaoLidasRef = useRef<number>(0)
+
+  // Som de notificação via Web Audio API (sem arquivo externo)
+  function playNotificationSound() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.setValueAtTime(880, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.3)
+    } catch (_) {}
+  }
 
   const [conversa, setConversa]           = useState<Conversa | null>(null)
   const [busca, setBusca]                 = useState('')
@@ -85,6 +103,15 @@ export default function MensagensPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensagens.length])
+
+  // Toca som quando chega nova mensagem não lida
+  useEffect(() => {
+    const total = conversas.reduce((acc: number, c: Conversa) => acc + (c.nao_lidas || 0), 0)
+    if (total > prevNaoLidasRef.current && prevNaoLidasRef.current >= 0) {
+      playNotificationSound()
+    }
+    prevNaoLidasRef.current = total
+  }, [conversas])
 
   useEffect(() => {
     if (!conversa) return
