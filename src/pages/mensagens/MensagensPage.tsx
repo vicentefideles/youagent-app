@@ -49,41 +49,35 @@ export default function MensagensPage() {
   const navigate = useNavigate()
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevNaoLidasRef = useRef<number>(-1)
-  const audioCtxRef = useRef<AudioContext | null>(null)
 
-  // Inicializa AudioContext após primeira interação do usuário (requisito do browser)
-  useEffect(() => {
-    const init = () => {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
-      }
-    }
-    document.addEventListener('click', init)
-    document.addEventListener('keydown', init)
-    return () => { document.removeEventListener('click', init); document.removeEventListener('keydown', init) }
-  }, [])
-
-  // Som de notificação — dois "pops" rápidos
+  // Som de notificação usando Audio element (mais confiável que Web Audio API)
+  // WAV mínimo 440Hz gerado inline
   function playNotificationSound() {
     try {
-      const ctx = audioCtxRef.current
-      if (!ctx) return
-      if (ctx.state === 'suspended') ctx.resume()
-      const playPop = (delay: number) => {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(1200, ctx.currentTime + delay)
-        osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + delay + 0.08)
-        gain.gain.setValueAtTime(0.25, ctx.currentTime + delay)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.12)
-        osc.start(ctx.currentTime + delay)
-        osc.stop(ctx.currentTime + delay + 0.12)
+      const sampleRate = 8000
+      const duration   = 0.25
+      const freq       = 880
+      const numSamples = Math.floor(sampleRate * duration)
+      const buf        = new ArrayBuffer(44 + numSamples)
+      const view       = new DataView(buf)
+      const write      = (off: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)) }
+      write(0, 'RIFF'); view.setUint32(4, 36 + numSamples, true)
+      write(8, 'WAVE'); write(12, 'fmt ')
+      view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true)
+      view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate, true)
+      view.setUint16(32, 1, true); view.setUint16(34, 8, true)
+      write(36, 'data'); view.setUint32(40, numSamples, true)
+      for (let i = 0; i < numSamples; i++) {
+        const envelope = i < numSamples * 0.1 ? i / (numSamples * 0.1)
+          : i > numSamples * 0.7 ? 1 - (i - numSamples * 0.7) / (numSamples * 0.3) : 1
+        view.setUint8(44 + i, Math.round(128 + 80 * envelope * Math.sin(2 * Math.PI * freq * i / sampleRate)))
       }
-      playPop(0)
-      playPop(0.15)
+      const blob = new Blob([buf], { type: 'audio/wav' })
+      const url  = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.volume = 0.5
+      audio.play().catch(() => {})
+      audio.onended = () => URL.revokeObjectURL(url)
     } catch (_) {}
   }
 
