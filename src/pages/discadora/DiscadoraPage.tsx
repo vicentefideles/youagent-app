@@ -2562,15 +2562,17 @@ function TabManual() {
 function TabAgenda() {
   const navigate = useNavigate()
   const [vendedorSel, setVendedorSel] = useState('')
-  const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string } | null>(null)
-  const horas = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00']
+  const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string; meetLink?: string; vendedor?: string } | null>(null)
+  // Offset de semanas: 0 = semana atual, -1 = anterior, +1 = próxima
+  const [semanaOffset, setSemanaOffset] = useState(0)
+  const horas = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00']
 
   // Vendedores reais
   const { data: equipeRaw = [] } = useQuery({
     queryKey: ['equipe'],
     queryFn: () => equipeApi.list().then(r => r.data as any[]),
   })
-  const vendedorAtual = (equipeRaw as any[]).find((v: any) => v.id === vendedorSel) ?? equipeRaw[0]
+  const vendedorAtual = (equipeRaw as any[]).find((v: any) => v.id === vendedorSel) ?? null
 
   // Reuniões reais
   const { data: reunioesRaw = [] } = useQuery({
@@ -2578,44 +2580,72 @@ function TabAgenda() {
     queryFn: () => reunioesApi.list().then(r => r.data as any[]),
   })
 
-  // Monta semana atual (seg–sex)
+  // Monta semana (seg–sex) com offset de semanas
   const hoje = new Date()
   const diaSemana = hoje.getDay() // 0=dom
-  const seg = new Date(hoje); seg.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
+  const segBase = new Date(hoje); segBase.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
+  const seg = new Date(segBase); seg.setDate(segBase.getDate() + semanaOffset * 7)
   const dias = Array.from({ length: 5 }, (_, i) => {
     const d = new Date(seg); d.setDate(seg.getDate() + i)
     return { label: d.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit' }), iso: d.toISOString().split('T')[0] }
   })
+  const hojeIso = hoje.toISOString().split('T')[0]
 
-  // Filtra reuniões por vendedor e monta eventos
-  type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber' }
-  const cores: Array<'brand' | 'emerald' | 'amber'> = ['brand', 'emerald', 'amber']
+  // Filtra reuniões por vendedor selecionado
+  const reunioesFiltradas = (reunioesRaw as any[]).filter((r: any) => {
+    if (!vendedorSel) return true
+    return r.vendedor_id === vendedorSel || r.vendedor_nome === vendedorAtual?.nome
+  })
+
+  // Cor por status real da reunião
+  function corPorStatus(status: string): 'brand' | 'emerald' | 'amber' {
+    if (status === 'realizada' || status === 'concluida') return 'emerald'
+    if (status === 'pendente' || status === 'nao_confirmada') return 'amber'
+    return 'brand' // confirmada, agendada, default
+  }
+
+  // Monta eventos por dia — evento aparece na linha da hora que inclui o minuto (ex: 09:30 → linha 09:00)
+  type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber'; meetLink?: string; vendedor?: string; minuto: number }
   const eventosPorDia: Record<string, Evento[]> = {}
-  ;(reunioesRaw as any[])
-    .filter((r: any) => !vendedorSel || r.vendedor_id === vendedorSel || r.vendedor_nome?.includes(vendedorAtual?.nome ?? ''))
-    .forEach((r: any, idx: number) => {
-      const inicio = r.inicio ?? r.data_hora
-      if (!inicio) return
-      const d = new Date(inicio)
-      const diaKey = d.toISOString().split('T')[0]
-      const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
-      const fimD = new Date(d.getTime() + 30 * 60000)
-      const fim  = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
-      if (!eventosPorDia[diaKey]) eventosPorDia[diaKey] = []
-      eventosPorDia[diaKey].push({ hora, fim, empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', cor: cores[idx % 3] })
+  reunioesFiltradas.forEach((r: any) => {
+    const inicio = r.inicio ?? r.data_hora
+    if (!inicio) return
+    const d = new Date(inicio)
+    const diaKey = d.toISOString().split('T')[0]
+    const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+    const fimD = new Date(d.getTime() + (r.duracao_minutos ?? 30) * 60000)
+    const fim  = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+    if (!eventosPorDia[diaKey]) eventosPorDia[diaKey] = []
+    eventosPorDia[diaKey].push({
+      hora, fim,
+      empresa: r.empresa ?? r.empresa_nome ?? '—',
+      contato: r.contato ?? r.contato_nome ?? '—',
+      cor: corPorStatus(r.status ?? ''),
+      meetLink: r.meet_link ?? r.meetLink,
+      vendedor: r.vendedor_nome,
+      minuto: d.getHours() * 60 + d.getMinutes(),
     })
+  })
+
+  // Para cada célula da grade, encontra eventos cuja hora cai dentro daquela linha de hora
+  function getEventoNaLinha(diaIso: string, horaLabel: string): Evento | undefined {
+    const [hh] = horaLabel.split(':').map(Number)
+    const minInicio = hh * 60
+    const minFim = minInicio + 60
+    return eventosPorDia[diaIso]?.find(e => e.minuto >= minInicio && e.minuto < minFim)
+  }
 
   const corMap = { brand:'bg-brand-100 border-l-brand-500 text-brand-700', emerald:'bg-emerald-50 border-l-emerald-500 text-emerald-700', amber:'bg-amber-50 border-l-amber-500 text-amber-700' }
 
-  // KPIs reais
-  const totalHoje = (reunioesRaw as any[]).filter((r: any) => {
-    const d = r.inicio ?? r.data_hora; return d && new Date(d).toDateString() === new Date().toDateString()
+  // KPIs filtrados por vendedor selecionado
+  const totalHoje = reunioesFiltradas.filter((r: any) => {
+    const d = r.inicio ?? r.data_hora; return d && new Date(d).toDateString() === hoje.toDateString()
   }).length
-  const totalSemana = (reunioesRaw as any[]).filter((r: any) => {
+  const totalSemana = reunioesFiltradas.filter((r: any) => {
     const d = r.inicio ?? r.data_hora; if (!d) return false
     const dt = new Date(d); return dt >= seg && dt <= new Date(seg.getTime() + 4 * 86400000)
   }).length
-  const totalMes = (reunioesRaw as any[]).filter((r: any) => {
+  const totalMes = reunioesFiltradas.filter((r: any) => {
     const d = r.inicio ?? r.data_hora; if (!d) return false
     const dt = new Date(d); return dt.getMonth() === hoje.getMonth() && dt.getFullYear() === hoje.getFullYear()
   }).length
@@ -2625,14 +2655,18 @@ function TabAgenda() {
       {/* Seletor de vendedor (visão gerente) */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {vendedorAtual && (
+          {vendedorAtual ? (
             <div className="w-10 h-10 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-sm">
-              {((vendedorAtual?.nome ?? 'V') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+              {((vendedorAtual.nome ?? 'V') as string).split(' ').map((n: string) => n[0]).join('').slice(0,2)}
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-sm">
+              All
             </div>
           )}
           <div>
-            <div className="text-sm font-bold text-gray-900">{vendedorAtual?.nome ?? '—'}</div>
-            <div className="text-xs text-gray-500">{vendedorAtual?.cargo ?? vendedorAtual?.funcao ?? 'Vendedor'}</div>
+            <div className="text-sm font-bold text-gray-900">{vendedorAtual?.nome ?? 'Todos os vendedores'}</div>
+            <div className="text-xs text-gray-500">{vendedorAtual?.cargo ?? vendedorAtual?.funcao ?? (vendedorAtual ? 'Vendedor' : 'Visão consolidada')}</div>
           </div>
           <select className="input text-xs py-1.5" value={vendedorSel} onChange={e => setVendedorSel(e.target.value)}>
             <option value="">Todos os vendedores</option>
@@ -2662,14 +2696,23 @@ function TabAgenda() {
           <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-gray-100">
             <div className="p-2 flex items-center justify-between col-span-1">
               <div className="flex gap-1">
-                <button className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100">‹</button>
-                <button className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100">Hoje</button>
-                <button className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100">›</button>
+                <button
+                  className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100"
+                  onClick={() => setSemanaOffset(o => o - 1)}
+                >‹</button>
+                <button
+                  className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100"
+                  onClick={() => setSemanaOffset(0)}
+                >Hoje</button>
+                <button
+                  className="text-2xs text-gray-500 hover:text-gray-700 px-1.5 py-1 rounded hover:bg-gray-100"
+                  onClick={() => setSemanaOffset(o => o + 1)}
+                >›</button>
               </div>
             </div>
             {dias.map(d => (
-              <div key={d.iso} className={clsx('p-3 text-center border-l border-gray-100', d.iso === new Date().toISOString().split('T')[0] && 'bg-brand-50')}>
-                <div className={clsx('text-xs font-semibold capitalize', d.iso === new Date().toISOString().split('T')[0] ? 'text-brand-600' : 'text-gray-600')}>{d.label}</div>
+              <div key={d.iso} className={clsx('p-3 text-center border-l border-gray-100', d.iso === hojeIso && 'bg-brand-50')}>
+                <div className={clsx('text-xs font-semibold capitalize', d.iso === hojeIso ? 'text-brand-600' : 'text-gray-600')}>{d.label}</div>
               </div>
             ))}
           </div>
@@ -2680,7 +2723,7 @@ function TabAgenda() {
               <div key={hora} className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-gray-100 min-h-[52px]">
                 <div className="px-2 py-1 text-2xs text-gray-400 font-mono border-r border-gray-100 pt-1.5">{hora}</div>
                 {dias.map(dia => {
-                  const ev = eventosPorDia[dia.iso]?.find(e => e.hora === hora)
+                  const ev = getEventoNaLinha(dia.iso, hora)
                   return (
                     <div key={dia.iso} className="border-l border-gray-100 p-1 relative">
                       {ev && (
@@ -2691,6 +2734,7 @@ function TabAgenda() {
                           <div className="font-bold">{ev.hora}–{ev.fim}</div>
                           <div className="font-medium leading-tight">{ev.empresa}</div>
                           <div className="opacity-70">{ev.contato}</div>
+                          {ev.vendedor && <div className="opacity-60 truncate">{ev.vendedor}</div>}
                         </div>
                       )}
                     </div>
@@ -2716,28 +2760,31 @@ function TabAgenda() {
           <div className="card p-4">
             <h4 className="text-xs font-semibold text-gray-700 mb-3">Próximas reuniões</h4>
             <div className="flex flex-col gap-2">
-              {(reunioesRaw as any[])
+              {reunioesFiltradas
                 .filter((r: any) => {
                   const d = r.inicio ?? r.data_hora; if (!d) return false
                   return new Date(d) >= new Date()
                 })
+                .sort((a: any, b: any) => new Date(a.inicio ?? a.data_hora).getTime() - new Date(b.inicio ?? b.data_hora).getTime())
                 .slice(0, 5)
                 .map((r: any, i: number) => {
                   const d = new Date(r.inicio ?? r.data_hora)
                   const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
-                  const corIdx = i % 3
-                  const corCls = corIdx === 0 ? 'border-l-brand-500' : corIdx === 1 ? 'border-l-amber-500' : 'border-l-emerald-500'
+                  const fimD = new Date(d.getTime() + (r.duracao_minutos ?? 30) * 60000)
+                  const fim = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+                  const corCls = corPorStatus(r.status ?? '') === 'emerald' ? 'border-l-emerald-500' : corPorStatus(r.status ?? '') === 'amber' ? 'border-l-amber-500' : 'border-l-brand-500'
                   return (
                     <div key={r.id ?? i} className={clsx('border-l-2 pl-2 cursor-pointer hover:bg-gray-50 rounded-r-lg py-1', corCls)}
-                      onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? '—', hora, fim: hora })}>
+                      onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', hora, fim, meetLink: r.meet_link ?? r.meetLink, vendedor: r.vendedor_nome })}>
                       <div className="text-2xs font-mono text-gray-500">{hora}</div>
                       <div className="text-xs font-semibold text-gray-900">{r.empresa ?? '—'}</div>
                       <div className="text-2xs text-gray-500">{r.contato ?? r.contato_nome ?? '—'}</div>
+                      {r.vendedor_nome && <div className="text-2xs text-gray-400">{r.vendedor_nome}</div>}
                     </div>
                   )
                 })
               }
-              {(reunioesRaw as any[]).filter((r: any) => new Date(r.inicio ?? r.data_hora) >= new Date()).length === 0 && (
+              {reunioesFiltradas.filter((r: any) => new Date(r.inicio ?? r.data_hora) >= new Date()).length === 0 && (
                 <p className="text-2xs text-gray-400 text-center py-2">Nenhuma reunião futura</p>
               )}
             </div>
@@ -2751,9 +2798,14 @@ function TabAgenda() {
               </div>
               <div className="text-sm font-bold text-gray-900">{detalhe.empresa}</div>
               <div className="text-xs text-gray-500 mb-1">{detalhe.contato}</div>
+              {detalhe.vendedor && <div className="text-2xs text-brand-600 mb-1 font-medium">👤 {detalhe.vendedor}</div>}
               <div className="text-xs font-mono text-brand-600 mb-3">{detalhe.hora} – {detalhe.fim}</div>
               <div className="flex flex-col gap-1.5">
-                <button className="btn-primary text-xs py-1.5 gap-1.5 justify-center"><Video size={11}/> Entrar no Meet</button>
+                <button
+                  className="btn-primary text-xs py-1.5 gap-1.5 justify-center"
+                  onClick={() => detalhe.meetLink ? window.open(`https://${detalhe.meetLink}`, '_blank') : undefined}
+                  disabled={!detalhe.meetLink}
+                ><Video size={11}/> {detalhe.meetLink ? 'Entrar no Meet' : 'Link não disponível'}</button>
                 <button className="btn-secondary text-xs py-1.5 gap-1.5 justify-center"><Phone size={11}/> Ligar</button>
                 <button className="btn-secondary text-xs py-1.5 gap-1.5 justify-center"><RotateCcw size={11}/> Reagendar</button>
               </div>
