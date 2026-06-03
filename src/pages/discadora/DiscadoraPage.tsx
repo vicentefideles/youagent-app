@@ -2566,7 +2566,7 @@ function TabAgenda() {
   const [semanaOffset, setSemanaOffset] = useState(0)
   const [mesOffset, setMesOffset] = useState(0)
   const [diaSel, setDiaSel] = useState('')          // para view Mês: dia clicado
-  const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string; meetLink?: string; vendedor?: string } | null>(null)
+  const [detalhe, setDetalhe] = useState<{ empresa: string; contato: string; hora: string; fim: string; meetLink?: string; linkMaps?: string; vendedor?: string; modalidade?: string; endereco?: string } | null>(null)
   const horas = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
 
   // Cores de avatar por índice de vendedor
@@ -2625,7 +2625,7 @@ function TabAgenda() {
     return 'brand'
   }
 
-  type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber'; meetLink?: string; vendedor?: string; minuto: number; status?: string }
+  type Evento = { hora: string; fim: string; empresa: string; contato: string; cor: 'brand' | 'emerald' | 'amber'; meetLink?: string; linkMaps?: string; vendedor?: string; modalidade?: string; endereco?: string; minuto: number; status?: string }
   const eventosPorDia: Record<string, Evento[]> = {}
   reunioesFiltradas.forEach((r: any) => {
     const inicio = r.inicio ?? r.data_hora; if (!inicio) return
@@ -2635,7 +2635,7 @@ function TabAgenda() {
     const fimD = new Date(d.getTime() + (r.duracao_minutos ?? 30) * 60000)
     const fim  = fimD.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
     if (!eventosPorDia[diaKey]) eventosPorDia[diaKey] = []
-    eventosPorDia[diaKey].push({ hora, fim, empresa: r.empresa ?? r.empresa_nome ?? '—', contato: r.contato ?? r.contato_nome ?? '—', cor: corPorStatus(r.status ?? ''), meetLink: r.meet_link ?? r.meetLink, vendedor: r.vendedor_nome, minuto: d.getHours() * 60 + d.getMinutes(), status: r.status })
+    eventosPorDia[diaKey].push({ hora, fim, empresa: r.empresa ?? r.empresa_nome ?? '—', contato: r.contato ?? r.contato_nome ?? '—', cor: corPorStatus(r.status ?? ''), meetLink: r.meet_link ?? r.meetLink, linkMaps: r.link_maps, vendedor: r.vendedor_nome, modalidade: r.modalidade, endereco: r.endereco, minuto: d.getHours() * 60 + d.getMinutes(), status: r.status })
   })
 
   function getEventoNaLinha(diaIso: string, horaLabel: string): Evento | undefined {
@@ -2805,6 +2805,12 @@ function TabAgenda() {
                             <div className="font-bold text-xs">{ev.hora} – {ev.fim}</div>
                             <div className="font-semibold truncate">{ev.empresa}</div>
                             <div className="opacity-70 truncate text-2xs">{ev.contato}</div>
+                            {ev.modalidade && ev.modalidade !== 'online' && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <MapPin size={9} className="opacity-60 flex-shrink-0"/>
+                                <span className="text-[10px] opacity-70 truncate">{ev.modalidade === 'presencial' ? 'Presencial' : 'Híbrida'}{ev.endereco ? ` · ${ev.endereco}` : ''}</span>
+                              </div>
+                            )}
                           </div>
                           {ev.vendedor && (
                             <div className="text-2xs opacity-60 text-right flex-shrink-0">{ev.vendedor}</div>
@@ -2968,7 +2974,7 @@ function TabAgenda() {
                 const isToday = d.toDateString() === hoje.toDateString()
                 return (
                   <div key={r.id ?? i} className={clsx('border-l-2 pl-2 cursor-pointer hover:bg-gray-50 rounded-r-lg py-1 transition-colors', corCls)}
-                    onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', hora, fim, meetLink: r.meet_link ?? r.meetLink, vendedor: r.vendedor_nome })}>
+                    onClick={() => setDetalhe({ empresa: r.empresa ?? '—', contato: r.contato ?? r.contato_nome ?? '—', hora, fim, meetLink: r.meet_link ?? r.meetLink, linkMaps: r.link_maps, vendedor: r.vendedor_nome, modalidade: r.modalidade, endereco: r.endereco })}>
                     <div className="flex items-center gap-1.5">
                       <span className="text-2xs font-mono text-gray-500">{hora}</span>
                       {isToday && <span className="text-2xs font-bold text-brand-600 bg-brand-50 px-1 rounded">hoje</span>}
@@ -2989,25 +2995,71 @@ function TabAgenda() {
                 <h4 className="text-xs font-semibold text-gray-700">Reunião</h4>
                 <button onClick={() => setDetalhe(null)}><X size={13} className="text-gray-400 hover:text-gray-600"/></button>
               </div>
+
               <div className="text-sm font-bold text-gray-900 mb-0.5">{detalhe.empresa}</div>
-              <div className="text-xs text-gray-500 mb-1">{detalhe.contato}</div>
+              <div className="text-xs text-gray-500 mb-2">{detalhe.contato}</div>
+
+              {/* Vendedor */}
               {detalhe.vendedor && (
                 <div className="flex items-center gap-1.5 mb-2">
                   <div className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-[9px] font-bold text-white">
-                    {detalhe.vendedor.split(' ').map(n => n[0]).join('').slice(0,2)}
+                    {detalhe.vendedor.split(' ').map((n: string) => n[0]).join('').slice(0,2)}
                   </div>
                   <span className="text-2xs text-gray-600 font-medium">{detalhe.vendedor}</span>
                 </div>
               )}
-              <div className="text-xs font-mono text-brand-600 bg-brand-50 rounded-lg px-2 py-1.5 mb-3 inline-block">
+
+              {/* Horário */}
+              <div className="text-xs font-mono text-brand-600 bg-brand-50 rounded-lg px-2 py-1.5 mb-2 inline-block">
                 {detalhe.hora} – {detalhe.fim}
               </div>
+
+              {/* Badge modalidade */}
+              {detalhe.modalidade && (
+                <div className="mb-3">
+                  <span className={clsx('text-2xs font-semibold px-2 py-1 rounded-full',
+                    detalhe.modalidade === 'online'     ? 'bg-brand-50 text-brand-700 border border-brand-200' :
+                    detalhe.modalidade === 'presencial' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                    'bg-purple-50 text-purple-700 border border-purple-200'
+                  )}>
+                    {detalhe.modalidade === 'online' ? '🎥 Online' : detalhe.modalidade === 'presencial' ? '📍 Presencial' : '🔀 Híbrida'}
+                  </span>
+                </div>
+              )}
+
+              {/* Endereço — apenas para presencial ou híbrida */}
+              {detalhe.endereco && (detalhe.modalidade === 'presencial' || detalhe.modalidade === 'hibrido') && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-3">
+                  <p className="text-2xs font-semibold text-gray-500 mb-1">📍 Endereço</p>
+                  <p className="text-xs text-gray-800 leading-snug">{detalhe.endereco}</p>
+                  {detalhe.linkMaps && (
+                    <button
+                      onClick={() => window.open(detalhe.linkMaps, '_blank')}
+                      className="mt-1.5 text-2xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                    >
+                      <MapPin size={10}/> Ver no Google Maps
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Ações adaptadas à modalidade */}
               <div className="flex flex-col gap-1.5">
-                <button
-                  className="btn-primary text-xs py-1.5 gap-1.5 justify-center"
-                  onClick={() => detalhe.meetLink ? window.open(`https://${detalhe.meetLink}`, '_blank') : undefined}
-                  disabled={!detalhe.meetLink}
-                ><Video size={11}/> {detalhe.meetLink ? 'Entrar no Meet' : 'Sem link'}</button>
+                {/* Meet — apenas para online ou híbrida */}
+                {(detalhe.modalidade === 'online' || detalhe.modalidade === 'hibrido' || !detalhe.modalidade) && (
+                  <button
+                    className="btn-primary text-xs py-1.5 gap-1.5 justify-center"
+                    onClick={() => detalhe.meetLink ? window.open(`https://${detalhe.meetLink}`, '_blank') : undefined}
+                    disabled={!detalhe.meetLink}
+                  ><Video size={11}/> {detalhe.meetLink ? 'Entrar no Meet' : 'Sem link Meet'}</button>
+                )}
+                {/* Maps — apenas para presencial ou híbrida */}
+                {(detalhe.modalidade === 'presencial' || detalhe.modalidade === 'hibrido') && detalhe.linkMaps && (
+                  <button
+                    className="btn-primary text-xs py-1.5 gap-1.5 justify-center"
+                    onClick={() => window.open(detalhe.linkMaps, '_blank')}
+                  ><MapPin size={11}/> Ver no Maps</button>
+                )}
                 <button className="btn-secondary text-xs py-1.5 gap-1.5 justify-center"><Phone size={11}/> Ligar</button>
                 <button className="btn-secondary text-xs py-1.5 gap-1.5 justify-center"><RotateCcw size={11}/> Reagendar</button>
               </div>
