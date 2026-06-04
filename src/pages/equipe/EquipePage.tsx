@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { equipeApi } from '@/services/api'
 import {
   Users, BarChart2, Target, Pencil, X, UserPlus, CheckCircle2,
-  MessageCircle, Wifi, WifiOff, RefreshCw, Link2,
+  MessageCircle, Wifi, WifiOff, RefreshCw, Link2, Radio,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -453,6 +453,31 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
   const [editando, setEditando] = useState<Vendedor | null>(null)
   const [whatsappModal, setWhatsappModal] = useState<{ id: string; nome: string } | null>(null)
   const [linkCopiado, setLinkCopiado] = useState<string | null>(null)
+  const [sipProvisionando, setSipProvisionando] = useState(false)
+  const [sipResultado, setSipResultado] = useState<string | null>(null)
+
+  async function provisionarSipBackfill() {
+    setSipProvisionando(true)
+    setSipResultado(null)
+    try {
+      const token = localStorage.getItem('etz_token') || localStorage.getItem('youagent_jwt') || ''
+      const r = await fetch('https://app.etztech.com/api/v1/equipe/provisionar-sip', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error)
+      setSipResultado(
+        data.provisionados > 0
+          ? `✅ ${data.provisionados} ramal(is) SIP provisionado(s) com sucesso!`
+          : data.msg || 'Todos os membros já têm credenciais SIP.'
+      )
+    } catch (e: unknown) {
+      setSipResultado(`❌ Erro: ${(e as Error).message}`)
+    } finally {
+      setSipProvisionando(false)
+    }
+  }
 
   async function gerarLinkWhatsApp(vendedorId: string) {
     try {
@@ -494,15 +519,29 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
 
       {/* Table card */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-wrap gap-2">
           <h2 className="text-sm font-semibold text-gray-900">Vendedores</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <UserPlus size={14} />
-            Adicionar Vendedor
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {sipResultado && (
+              <span className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">{sipResultado}</span>
+            )}
+            <button
+              onClick={provisionarSipBackfill}
+              disabled={sipProvisionando}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 border border-brand-200 rounded-lg hover:bg-brand-50 disabled:opacity-50 transition-colors"
+              title="Provisionar credenciais SIP para membros que ainda não têm ramal Telnyx ativo"
+            >
+              <Radio size={13} className={sipProvisionando ? 'animate-pulse' : ''}/>
+              {sipProvisionando ? 'Provisionando...' : 'Provisionar Ramais SIP'}
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <UserPlus size={14} />
+              Adicionar Vendedor
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

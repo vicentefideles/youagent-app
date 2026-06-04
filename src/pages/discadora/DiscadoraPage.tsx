@@ -3784,7 +3784,11 @@ function TabHistorico() {
 // ─── ABA RAMAL ───────────────────────────────────────────────────────────────
 
 function TabRamal() {
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast]           = useState<string | null>(null)
+  const [sipModal, setSipModal]     = useState<any | null>(null)   // membro selecionado
+  const [sipConfig, setSipConfig]   = useState<any | null>(null)   // dados retornados da API
+  const [sipLoading, setSipLoading] = useState(false)
+  const [copiado, setCopiado]       = useState<string | null>(null)
 
   const { data: equipeRaw = [], isLoading } = useQuery({
     queryKey: ['equipe-ramal'],
@@ -3792,11 +3796,35 @@ function TabRamal() {
     refetchInterval: 30000,
   })
 
-  const todos    = (equipeRaw as any[])
-  const membros  = todos.filter(m => m.ativo !== false)
-  const total    = todos.length
-  const online   = membros.length
-  const offline  = total - online
+  const todos   = (equipeRaw as any[])
+  const membros = todos.filter(m => m.ativo !== false)
+  const total   = todos.length
+  const online  = membros.length
+  const offline = total - online
+
+  async function abrirSipConfig(membro: any) {
+    setSipModal(membro)
+    setSipConfig(null)
+    setSipLoading(true)
+    try {
+      const token = localStorage.getItem('etz_token') || localStorage.getItem('youagent_jwt') || ''
+      const r = await fetch(`/api/v1/equipe/${membro.id}/sip-config`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await r.json()
+      setSipConfig(r.ok ? data : { erro: data.error, backfill: data.backfill_needed })
+    } catch {
+      setSipConfig({ erro: 'Erro ao buscar configuração SIP.' })
+    } finally {
+      setSipLoading(false)
+    }
+  }
+
+  function copiar(texto: string, chave: string) {
+    navigator.clipboard.writeText(texto).catch(() => {})
+    setCopiado(chave)
+    setTimeout(() => setCopiado(null), 2000)
+  }
 
   function ligarParaMembro(nome: string, ramal: string) {
     setToast(`Iniciando chamada interna para ${nome} — ramal ${ramal}`)
@@ -3818,6 +3846,91 @@ function TabRamal() {
         </div>
       )}
 
+      {/* Modal SIP config */}
+      {sipModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className={clsx('w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center', COR_AVATAR[(todos.findIndex((m:any)=>m.id===sipModal.id)) % COR_AVATAR.length])}>
+                  {iniciais(sipModal.nome)}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{sipModal.nome}</p>
+                  <p className="text-xs text-gray-400">Ramal {sipModal.ramal} · Configuração SIP</p>
+                </div>
+              </div>
+              <button onClick={() => { setSipModal(null); setSipConfig(null) }} className="text-gray-400 hover:text-gray-600">
+                <X size={18}/>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4">
+              {sipLoading && (
+                <div className="flex items-center justify-center py-8 gap-2 text-gray-400 text-sm">
+                  <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin"/>
+                  Buscando credenciais...
+                </div>
+              )}
+
+              {!sipLoading && sipConfig?.erro && (
+                <div className="flex flex-col items-center gap-3 py-6 text-center">
+                  <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                    <Radio size={22} className="text-amber-500"/>
+                  </div>
+                  <p className="text-sm font-medium text-gray-700">{sipConfig.erro}</p>
+                  {sipConfig.backfill && (
+                    <p className="text-xs text-gray-400">Acesse <strong>Configurações → Equipe</strong> e clique em <strong>"Provisionar Ramais SIP"</strong> para gerar as credenciais.</p>
+                  )}
+                </div>
+              )}
+
+              {!sipLoading && sipConfig && !sipConfig.erro && (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs text-gray-500">Configure um softphone (Zoiper, Linphone, Bria) com estas credenciais para usar o ramal:</p>
+
+                  {[
+                    { label: 'Servidor SIP', value: sipConfig.sip_server, chave: 'server' },
+                    { label: 'Usuário SIP',  value: sipConfig.sip_username, chave: 'user' },
+                    { label: 'Senha SIP',    value: sipConfig.sip_password, chave: 'pass', oculto: true },
+                  ].map(f => (
+                    <div key={f.chave}>
+                      <label className="text-2xs font-semibold text-gray-400 uppercase tracking-wide block mb-1">{f.label}</label>
+                      <div className="flex gap-2">
+                        <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-700 select-all">
+                          {f.oculto ? '••••••••••••' : f.value}
+                        </div>
+                        <button
+                          onClick={() => copiar(f.value, f.chave)}
+                          className={clsx('text-xs font-semibold px-3 rounded-lg border transition-colors',
+                            copiado === f.chave ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          )}
+                        >
+                          {copiado === f.chave ? '✓' : 'Copiar'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="mt-1 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2.5">
+                    <p className="text-2xs text-brand-700 font-semibold mb-0.5">Para chamadas internas:</p>
+                    <p className="text-2xs text-brand-600">Disque o número do ramal do colega (ex: <span className="font-mono font-bold">2202</span>). Todos os membros da equipe estão no mesmo servidor.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end">
+              <button onClick={() => { setSipModal(null); setSipConfig(null) }} className="btn-secondary text-xs py-1.5">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
         <div className="kpi-card">
@@ -3834,56 +3947,49 @@ function TabRamal() {
         </div>
       </div>
 
-      {/* Info SIP */}
-      <div className="flex items-start gap-3 bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
-        <Radio size={15} className="text-brand-500 mt-0.5 flex-shrink-0"/>
-        <div>
-          <p className="text-xs font-semibold text-brand-700">Configuração SIP pessoal</p>
-          <p className="text-xs text-brand-600 mt-0.5">
-            Para configurar seu ramal SIP pessoal (endereço, softphone e gravação), acesse <strong>Configurações → Meu Ramal</strong>.
-          </p>
-        </div>
-      </div>
-
       {/* Diretório em cards */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900">Diretório da equipe</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Clique em um card para iniciar uma chamada interna via ramal</p>
+          <p className="text-xs text-gray-500 mt-0.5">Clique em um card para ligar · clique no ramal para ver a configuração SIP</p>
         </div>
 
         {isLoading && (
           <div className="px-4 py-10 text-center text-xs text-gray-400">Carregando equipe...</div>
         )}
 
-        {!isLoading && membros.length === 0 && (
+        {!isLoading && todos.length === 0 && (
           <div className="px-4 py-10 text-center">
             <p className="text-sm text-gray-500 font-medium">Nenhum membro na equipe</p>
             <p className="text-xs text-gray-400 mt-1">Adicione membros em <strong>Configurações → Equipe</strong></p>
           </div>
         )}
 
-        {membros.length > 0 && (
+        {todos.length > 0 && (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {(equipeRaw as any[]).map((m: any, idx: number) => {
+            {todos.map((m: any, idx: number) => {
               const cor = COR_AVATAR[idx % COR_AVATAR.length]
-              const online = m.ativo !== false
+              const isOnline = m.ativo !== false
               return (
-                <button
+                <div
                   key={m.id}
-                  disabled={!online}
-                  onClick={() => online && m.ramal && ligarParaMembro(m.nome, m.ramal)}
                   className={clsx(
                     'flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all',
-                    online
-                      ? 'bg-white border-gray-200 hover:border-brand-300 hover:shadow-sm hover:bg-brand-50/30 cursor-pointer'
-                      : 'bg-gray-50 border-gray-100 cursor-default opacity-60'
+                    isOnline ? 'bg-white border-gray-200 hover:border-brand-300 hover:shadow-sm' : 'bg-gray-50 border-gray-100 opacity-60'
                   )}
                 >
-                  {/* Avatar */}
-                  <div className={clsx('w-12 h-12 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0', cor)}>
-                    {iniciais(m.nome)}
-                  </div>
+                  {/* Avatar — clica para ligar */}
+                  <button
+                    disabled={!isOnline}
+                    onClick={() => isOnline && m.ramal && ligarParaMembro(m.nome, m.ramal)}
+                    className="focus:outline-none"
+                  >
+                    <div className={clsx('w-12 h-12 rounded-full text-white text-sm font-bold flex items-center justify-center', cor,
+                      isOnline && 'hover:opacity-80 transition-opacity cursor-pointer'
+                    )}>
+                      {iniciais(m.nome)}
+                    </div>
+                  </button>
 
                   {/* Nome */}
                   <div className="w-full">
@@ -3891,18 +3997,22 @@ function TabRamal() {
                     <p className="text-2xs text-gray-400 truncate mt-0.5">{m.cargo || m.funcao || '—'}</p>
                   </div>
 
-                  {/* Ramal */}
-                  <div className="flex items-center gap-1 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 w-full justify-center">
+                  {/* Ramal — clica para ver config SIP */}
+                  <button
+                    onClick={() => abrirSipConfig(m)}
+                    className="flex items-center gap-1 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 w-full justify-center hover:bg-brand-100 transition-colors"
+                    title="Ver configuração SIP"
+                  >
                     <PhoneCall size={10} className="text-brand-500 flex-shrink-0"/>
                     <span className="text-xs font-mono font-bold text-brand-600">{m.ramal || '—'}</span>
-                  </div>
+                  </button>
 
                   {/* Status */}
                   <div className="flex items-center gap-1">
-                    <span className={clsx('w-1.5 h-1.5 rounded-full', online ? 'bg-emerald-500' : 'bg-gray-300')}/>
-                    <span className="text-2xs text-gray-400">{online ? 'Disponível' : 'Offline'}</span>
+                    <span className={clsx('w-1.5 h-1.5 rounded-full', isOnline ? 'bg-emerald-500' : 'bg-gray-300')}/>
+                    <span className="text-2xs text-gray-400">{isOnline ? 'Disponível' : 'Offline'}</span>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
