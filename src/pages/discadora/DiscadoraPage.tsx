@@ -591,9 +591,9 @@ function TabFila() {
       return
     }
     try {
-      await fetch(`/api/v1/ligacoes/${ccid}/monitorar`, {
+      await fetch(`https://app.etztech.com/api/v1/ligacoes/${ccid}/monitorar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
       })
       alert('Escuta iniciada no seu ramal SIP. Verifique a aba Ramal.')
     } catch {
@@ -1082,9 +1082,9 @@ function TabFila() {
                           const ccid = (item as any)._callControlId
                           if (ccid) {
                             try {
-                              await fetch(`/api/v1/ligacoes/${ccid}/anotacao`, {
+                              await fetch(`https://app.etztech.com/api/v1/ligacoes/${ccid}/anotacao`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
                                 body: JSON.stringify({ anotacao: nota }),
                               })
                             } catch (_) {}
@@ -3808,7 +3808,7 @@ function TabRamal() {
     setSipLoading(true)
     try {
       const token = localStorage.getItem('youagent_jwt') || ''
-      const r = await fetch(`/api/v1/equipe/${membro.id}/sip-config`, {
+      const r = await fetch(`https://app.etztech.com/api/v1/equipe/${membro.id}/sip-config`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await r.json()
@@ -4102,9 +4102,9 @@ function TabReativacao() {
     setReativandoIds(prev => new Set([...prev, id]))
     try {
       // Volta status para 'novo' para entrar na fila novamente
-      await fetch(`/api/v1/contatos/${id}`, {
+      await fetch(`https://app.etztech.com/api/v1/contatos/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
         body: JSON.stringify({ status: 'novo', tentativas: 0 }),
       })
       setReativados(prev => new Set([...prev, id]))
@@ -4117,9 +4117,9 @@ function TabReativacao() {
   }
   async function arquivarLead(id: string) {
     try {
-      await fetch(`/api/v1/contatos/${id}`, {
+      await fetch(`https://app.etztech.com/api/v1/contatos/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
         body: JSON.stringify({ status: 'arquivado' }),
       })
     } catch (_) {}
