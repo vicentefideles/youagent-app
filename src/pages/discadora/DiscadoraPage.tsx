@@ -3261,51 +3261,49 @@ function TabAoVivo({
   return (
     <div className="flex flex-col gap-4">
 
-      {/* ── HEADER WAR ROOM ────────────────────────────────────────────────── */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' }}>
-        <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
-              <Zap size={18} className="text-amber-400" />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-white">Centro de Comando — Ao Vivo</div>
-              <div className="text-2xs text-indigo-300">CI monitora cada ligação · alerta automático quando ICP ≥ limiar configurado</div>
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div className="card p-4 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-brand-100 border border-brand-200 flex items-center justify-center">
+            <Zap size={18} className="text-brand-600" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-gray-900">Centro de Comando — Ao Vivo</div>
+            <div className="text-2xs text-gray-500">CI monitora cada ligação · alerta automático quando ICP ≥ limiar</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Seletor de limiar */}
+          <div className="flex items-center gap-2">
+            <span className="text-2xs text-gray-500 font-medium">Alertar a partir de ICP</span>
+            <div className="flex gap-1">
+              {[80, 85, 90, 95].map(v => (
+                <button
+                  key={v}
+                  onClick={() => { onLimiarChange?.(v); alertadosRef.current.clear() }}
+                  className={clsx(
+                    'text-2xs font-bold px-2.5 py-1 rounded-lg border transition-all',
+                    limiarICP === v
+                      ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-brand-400 hover:text-brand-600'
+                  )}
+                >{v}+</button>
+              ))}
             </div>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Seletor de limiar ICP */}
-            <div className="flex items-center gap-2">
-              <span className="text-2xs text-gray-400 font-medium">Alertar a partir de ICP</span>
-              <div className="flex gap-1">
-                {[80, 85, 90, 95].map(v => (
-                  <button
-                    key={v}
-                    onClick={() => { onLimiarChange?.(v); alertadosRef.current.clear() /* reseta ao mudar limiar */ }}
-                    className={clsx(
-                      'text-2xs font-bold px-2.5 py-1 rounded-lg border transition-all',
-                      limiarICP === v
-                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                        : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-amber-600 hover:text-amber-400'
-                    )}
-                  >{v}+</button>
-                ))}
-              </div>
+          {/* Métricas */}
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-bold text-emerald-700">{ativas.length} ativas agora</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-xl font-bold font-mono text-amber-600">{precisamAtencao}</div>
+              <div className="text-2xs text-gray-400">≥ ICP {limiarICP}</div>
             </div>
-            {/* Métricas */}
-            <div className="flex items-center gap-2 bg-emerald-900/40 border border-emerald-600/40 rounded-full px-3 py-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-              <span className="text-xs font-bold text-emerald-300">{ativas.length} ativas agora</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <div className="text-xl font-bold font-mono text-amber-400">{precisamAtencao}</div>
-                <div className="text-2xs text-gray-400">≥ ICP {limiarICP}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl font-bold font-mono text-purple-300">{transferenciasHoje}</div>
-                <div className="text-2xs text-gray-400">transferindo</div>
-              </div>
+            <div className="text-center">
+              <div className="text-xl font-bold font-mono text-brand-600">{transferenciasHoje}</div>
+              <div className="text-2xs text-gray-400">transferindo</div>
             </div>
           </div>
         </div>
@@ -3314,31 +3312,30 @@ function TabAoVivo({
       {/* ── PAINEL DE ALERTAS ──────────────────────────────────────────────── */}
       {alertas.length > 0 && (
         <div className={clsx(
-          'rounded-2xl border overflow-hidden transition-all',
-          alertasNaoVistos > 0
-            ? 'border-red-500/50 shadow-lg shadow-red-900/20'
-            : 'border-gray-200'
+          'card overflow-hidden transition-all',
+          alertasNaoVistos > 0 ? 'ring-2 ring-red-400 ring-offset-1' : ''
         )}>
-          {/* Header do painel */}
-          <div className={clsx(
-            'flex items-center justify-between px-4 py-3 cursor-pointer',
-            alertasNaoVistos > 0 ? 'bg-red-950/80' : 'bg-gray-50'
-          )} onClick={() => setPainelAlertaAberto(o => !o)}>
+          {/* Header */}
+          <div
+            className={clsx('flex items-center justify-between px-4 py-3 cursor-pointer border-b',
+              alertasNaoVistos > 0 ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'
+            )}
+            onClick={() => setPainelAlertaAberto(o => !o)}
+          >
             <div className="flex items-center gap-2.5">
               {alertasNaoVistos > 0 && (
                 <span className="relative flex-shrink-0">
-                  <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-60" />
+                  <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50" />
                   <span className="relative w-2.5 h-2.5 rounded-full bg-red-500 block" />
                 </span>
               )}
-              <span className={clsx('text-sm font-bold', alertasNaoVistos > 0 ? 'text-red-300' : 'text-gray-700')}>
+              <span className={clsx('text-sm font-bold', alertasNaoVistos > 0 ? 'text-red-700' : 'text-gray-700')}>
                 {alertasNaoVistos > 0
                   ? `⚡ ${alertasNaoVistos} alerta${alertasNaoVistos > 1 ? 's' : ''} — ligaç${alertasNaoVistos > 1 ? 'ões' : 'ão'} de alto valor detectada${alertasNaoVistos > 1 ? 's' : ''}!`
                   : `✓ Alertas — ${alertas.length} registrado${alertas.length > 1 ? 's' : ''} nesta sessão`
                 }
               </span>
-              <span className={clsx(
-                'text-2xs font-bold px-2 py-0.5 rounded-full',
+              <span className={clsx('text-2xs font-bold px-2 py-0.5 rounded-full',
                 alertasNaoVistos > 0 ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'
               )}>{alertas.length}</span>
             </div>
@@ -3346,72 +3343,50 @@ function TabAoVivo({
               {alertasNaoVistos > 0 && (
                 <button
                   onClick={e => { e.stopPropagation(); descartarTodosAlertas() }}
-                  className="text-2xs font-semibold text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-900/40 transition-colors"
+                  className="text-2xs font-semibold text-red-600 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-100 transition-colors"
                 >Marcar todos como vistos</button>
               )}
-              <span className={clsx('text-2xs', alertasNaoVistos > 0 ? 'text-red-400' : 'text-gray-400')}>
-                {painelAlertaAberto ? '▲' : '▼'}
-              </span>
+              <span className="text-2xs text-gray-400">{painelAlertaAberto ? '▲' : '▼'}</span>
             </div>
           </div>
 
-          {/* Lista de alertas */}
+          {/* Lista */}
           {painelAlertaAberto && (
-            <div className={clsx('divide-y', alertasNaoVistos > 0 ? 'divide-red-900/30 bg-red-950/40' : 'divide-gray-100 bg-white')}>
+            <div className="divide-y divide-gray-100 bg-white">
               {alertas.map(al => (
-                <div key={al.id + al.ts}
-                  className={clsx(
-                    'flex items-center gap-3 px-4 py-3 transition-all',
-                    al.visto ? 'opacity-50' : ''
-                  )}
-                >
+                <div key={al.id + al.ts} className={clsx('flex items-center gap-3 px-4 py-3', al.visto && 'opacity-40')}>
                   {/* ICP badge */}
-                  <div className={clsx(
-                    'w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold',
-                    al.icp >= 90 ? 'bg-red-900/60 border border-red-600/50' :
-                    al.icp >= 85 ? 'bg-amber-900/60 border border-amber-600/50' :
-                    'bg-brand-900/60 border border-brand-600/50'
+                  <div className={clsx('w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold border',
+                    al.icp >= 90 ? 'bg-red-50 border-red-200' :
+                    al.icp >= 85 ? 'bg-amber-50 border-amber-200' :
+                    'bg-brand-50 border-brand-200'
                   )}>
-                    <span className={clsx('text-lg font-mono leading-none', al.icp >= 90 ? 'text-red-300' : al.icp >= 85 ? 'text-amber-300' : 'text-brand-300')}>{al.icp}</span>
-                    <span className="text-[9px] text-gray-400">ICP</span>
+                    <span className={clsx('text-lg font-mono leading-none',
+                      al.icp >= 90 ? 'text-red-600' : al.icp >= 85 ? 'text-amber-600' : 'text-brand-600'
+                    )}>{al.icp}</span>
+                    <span className="text-[9px] text-gray-400 font-medium">ICP</span>
                   </div>
-
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={clsx('text-sm font-bold', al.visto ? 'text-gray-500' : alertasNaoVistos > 0 ? 'text-white' : 'text-gray-900')}>{al.empresa}</span>
+                      <span className="text-sm font-bold text-gray-900">{al.empresa}</span>
                       {!al.visto && <span className="text-2xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">NOVO</span>}
                     </div>
-                    <div className={clsx('text-xs', al.visto ? 'text-gray-500' : 'text-gray-400')}>{al.contato}</div>
+                    <div className="text-xs text-gray-500">{al.contato}</div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {al.potencial > 0 && (
-                        <span className="text-2xs font-semibold text-purple-400">📞 {al.potencial}% potencial</span>
-                      )}
-                      {al.gatilho && (
-                        <span className="text-2xs font-semibold text-amber-400">💡 {al.gatilho}</span>
-                      )}
-                      <span className="text-2xs text-gray-500">
-                        {new Date(al.ts).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
-                      </span>
+                      {al.potencial > 0 && <span className="text-2xs font-semibold text-brand-600">📞 {al.potencial}% potencial</span>}
+                      {al.gatilho && <span className="text-2xs font-semibold text-amber-600">💡 {al.gatilho}</span>}
+                      <span className="text-2xs text-gray-400">{new Date(al.ts).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}</span>
                     </div>
                   </div>
-
                   {/* Ações */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {!al.visto && (
-                      <button
-                        onClick={() => marcarAlertaVisto(al.id)}
-                        className="text-2xs font-semibold px-3 py-1.5 rounded-lg bg-red-900/40 border border-red-700/50 text-red-300 hover:bg-red-800/40 transition-colors"
-                      >
+                      <button onClick={() => marcarAlertaVisto(al.id)} className="btn-secondary text-2xs py-1.5 px-3">
                         Acompanhando ✓
                       </button>
                     )}
-                    <button
-                      onClick={() => { /* scroll para o card correspondente */ }}
-                      className="text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
-                    >
-                      Ver card ↓
-                    </button>
+                    <button className="btn-secondary text-2xs py-1.5 px-3">Ver card ↓</button>
                   </div>
                 </div>
               ))}
@@ -3433,107 +3408,123 @@ function TabAoVivo({
       // ── GRID DE CARDS ──────────────────────────────────────────────────────
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {ativas.map(item => {
-          const cor = urgenciaCor(item)
           const faseAtual = estimarFase(item.duracao)
           const sugestaoCI = getCISugestao(item.gatilhoDetectado)
           const jaTransferido = !!transferidos[item.id]
           const marcado = !!marcados[item.id]
           const temAlerta = item.icp >= limiarICP
 
+          // Cor da borda por urgência — design claro
+          const bordaCor = jaTransferido || transferidos[item.id]
+            ? 'border-brand-400 ring-1 ring-brand-200'
+            : temAlerta
+            ? 'border-red-400 ring-1 ring-red-100'
+            : item.icp >= 80 && item.potencial >= 70
+            ? 'border-amber-300'
+            : item.gatilhoDetectado
+            ? 'border-brand-200'
+            : 'border-gray-200'
+
           return (
-            <div key={item.id}
-              className={clsx('rounded-2xl overflow-hidden border shadow-lg transition-all', cor.border, cor.glow)}
-              style={{ background: 'linear-gradient(180deg, #1a1a2e 0%, #0d0d1a 100%)' }}
-            >
-              {/* Faixa de alerta ICP no topo do card */}
+            <div key={item.id} className={clsx('card overflow-hidden transition-all border-2', bordaCor)}>
+
+              {/* Faixa de alerta ICP */}
               {temAlerta && (
-                <div className="flex items-center gap-2 px-4 py-1.5 bg-red-950/80 border-b border-red-700/40">
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-red-50 border-b border-red-100">
                   <span className="relative flex-shrink-0">
-                    <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-50" />
+                    <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-40" />
                     <span className="relative w-2 h-2 rounded-full bg-red-500 block" />
                   </span>
-                  <span className="text-2xs font-bold text-red-300">⚡ ALERTA CI — ICP {item.icp} ≥ {limiarICP} · Ligação de alto valor</span>
+                  <span className="text-2xs font-bold text-red-700">⚡ ALERTA CI — ICP {item.icp} ≥ {limiarICP} · Ligação de alto valor</span>
                 </div>
               )}
 
-              {/* ── Header do card ─────────────────────────────────────────── */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-sm font-bold text-white truncate">{item.empresa}</div>
-                    <div className="text-2xs text-gray-400 truncate">{item.contato} · {item.cargo}</div>
+                    <div className="text-sm font-bold text-gray-900 truncate">{item.empresa}</div>
+                    <div className="text-2xs text-gray-500 truncate">{item.contato} · {item.cargo}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {marcado && <span className="text-2xs bg-amber-900/40 text-amber-300 border border-amber-700/50 rounded-full px-2 py-0.5 font-semibold">⭐ Revisão</span>}
-                  {jaTransferido && <span className="text-2xs bg-purple-900/50 text-purple-300 border border-purple-600/50 rounded-full px-2 py-0.5 font-semibold animate-pulse">🟣 Transferindo</span>}
+                  {marcado && <span className="badge badge-amber text-2xs">⭐ Revisão</span>}
+                  {jaTransferido && <span className="badge badge-brand text-2xs animate-pulse">🔀 Transferindo</span>}
                   <IcpBadge value={item.icp} />
-                  <span className="text-2xs text-gray-400 font-mono bg-gray-800/60 px-2 py-0.5 rounded-full">{item.duracao ?? '—'}</span>
+                  <span className="text-2xs text-gray-400 font-mono bg-gray-100 px-2 py-0.5 rounded-full">{item.duracao ?? '—'}</span>
                 </div>
               </div>
 
-              {/* ── Barra de fase ──────────────────────────────────────────── */}
+              {/* Barra de fase */}
               <div className="px-4 pt-3 pb-1">
-                <div className="flex items-center gap-0 mb-1">
+                <div className="flex gap-0.5 mb-1">
                   {fases.map((f, i) => (
                     <div key={f} className="flex-1 flex flex-col items-center gap-1">
-                      <div className={clsx('h-1 w-full rounded-full transition-all', i < faseAtual ? 'bg-brand-500' : i === faseAtual ? 'bg-amber-400' : 'bg-gray-700')} />
-                      <span className={clsx('text-[9px] font-medium hidden sm:block', i === faseAtual ? 'text-amber-400' : i < faseAtual ? 'text-brand-400' : 'text-gray-600')}>{f}</span>
+                      <div className={clsx('h-1 w-full rounded-full transition-all',
+                        i < faseAtual ? 'bg-brand-500' : i === faseAtual ? 'bg-amber-400' : 'bg-gray-200'
+                      )} />
+                      <span className={clsx('text-[9px] font-medium hidden sm:block',
+                        i === faseAtual ? 'text-amber-600' : i < faseAtual ? 'text-brand-500' : 'text-gray-400'
+                      )}>{f}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* ── Potencial ──────────────────────────────────────────────── */}
+              {/* Potencial */}
               {item.potencial > 0 && (
                 <div className="px-4 pb-2">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-2xs text-gray-500 uppercase tracking-wide">Potencial de fechamento</span>
-                    <span className={clsx('text-xs font-bold font-mono', item.potencial >= 75 ? 'text-emerald-400' : item.potencial >= 50 ? 'text-amber-400' : 'text-gray-400')}>{item.potencial}%</span>
+                    <span className={clsx('text-xs font-bold font-mono',
+                      item.potencial >= 75 ? 'text-emerald-600' : item.potencial >= 50 ? 'text-amber-600' : 'text-gray-400'
+                    )}>{item.potencial}%</span>
                   </div>
-                  <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all"
-                      style={{ width:`${item.potencial}%`, background: item.potencial >= 75 ? 'linear-gradient(90deg,#059669,#34d399)' : item.potencial >= 50 ? 'linear-gradient(90deg,#d97706,#fbbf24)' : 'linear-gradient(90deg,#6b7280,#9ca3af)' }}
-                    />
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{
+                      width:`${item.potencial}%`,
+                      background: item.potencial >= 75 ? 'linear-gradient(90deg,#059669,#34d399)' : item.potencial >= 50 ? 'linear-gradient(90deg,#d97706,#fbbf24)' : 'linear-gradient(90deg,#9ca3af,#d1d5db)'
+                    }} />
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-0 divide-x divide-white/6 px-0">
+              {/* Colunas: Transcrição | CI */}
+              <div className="grid grid-cols-2 divide-x divide-gray-100">
 
-                {/* ── Col esq: Transcrição + Sinal ──────────────────────── */}
+                {/* Col esq: Transcrição + Sinal */}
                 <div className="px-4 py-3 flex flex-col gap-2.5">
-                  {/* Agente + campanha */}
                   <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{item.agente[0]}</div>
-                    <span className="text-2xs text-gray-400 truncate">{item.agente} · {item.campanha}</span>
+                    <div className="w-5 h-5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{item.agente[0]}</div>
+                    <span className="text-2xs text-gray-500 truncate">{item.agente} · {item.campanha}</span>
                   </div>
 
-                  {/* Último snippet de transcrição */}
                   {item.snippet ? (
-                    <div className="bg-gray-800/60 rounded-lg p-2.5 border border-gray-700/40">
+                    <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
                       <div className="flex items-center gap-1 mb-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                        <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">Transcrição ao vivo</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                        <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">Transcrição ao vivo</span>
                       </div>
-                      <p className="text-2xs text-gray-300 leading-relaxed italic">"{item.snippet}"</p>
+                      <p className="text-2xs text-gray-700 leading-relaxed italic">"{item.snippet}"</p>
                     </div>
                   ) : (
-                    <div className="bg-gray-800/40 rounded-lg p-2.5 border border-gray-700/30">
-                      <p className="text-2xs text-gray-500 italic">Aguardando transcrição...</p>
+                    <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                      <p className="text-2xs text-gray-400 italic">Aguardando transcrição...</p>
                     </div>
                   )}
 
-                  {/* Último sinal detectado */}
                   {item.gatilhoDetectado && (
                     <div className="flex items-center gap-2">
                       <span className="text-2xs font-semibold text-gray-400 uppercase tracking-wide flex-shrink-0">Sinal</span>
                       <span className={clsx('text-2xs font-bold px-2 py-0.5 rounded-full border',
-                        item.gatilhoDetectado.toLowerCase().includes('preco') || item.gatilhoDetectado.toLowerCase().includes('valor') ? 'bg-amber-900/40 text-amber-300 border-amber-700/50' :
-                        item.gatilhoDetectado.toLowerCase().includes('decisor') || item.gatilhoDetectado.toLowerCase().includes('humano') ? 'bg-blue-900/40 text-blue-300 border-blue-700/50' :
-                        item.gatilhoDetectado.toLowerCase().includes('disponib') || item.gatilhoDetectado.toLowerCase().includes('agendar') ? 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50' :
-                        'bg-brand-900/40 text-brand-300 border-brand-700/50'
+                        item.gatilhoDetectado.toLowerCase().includes('preco') || item.gatilhoDetectado.toLowerCase().includes('valor')
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : item.gatilhoDetectado.toLowerCase().includes('decisor') || item.gatilhoDetectado.toLowerCase().includes('humano')
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : item.gatilhoDetectado.toLowerCase().includes('disponib') || item.gatilhoDetectado.toLowerCase().includes('agendar')
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-brand-50 text-brand-700 border-brand-200'
                       )}>
                         {item.gatilhoDetectado}
                       </span>
@@ -3541,29 +3532,25 @@ function TabAoVivo({
                   )}
                 </div>
 
-                {/* ── Col dir: Sugestão CI + Intervenção ────────────────── */}
+                {/* Col dir: Sugestão CI + Intervenção */}
                 <div className="px-4 py-3 flex flex-col gap-2.5">
-                  {/* Sugestão CI */}
-                  <div className="bg-brand-900/30 border border-brand-700/40 rounded-lg p-2.5">
+                  <div className="bg-brand-50 border border-brand-200 rounded-lg p-2.5">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <Sparkles size={10} className="text-brand-400 flex-shrink-0" />
-                      <span className="text-[10px] font-semibold text-brand-300 uppercase tracking-wide">Próximo argumento · CI</span>
+                      <Sparkles size={10} className="text-brand-600 flex-shrink-0" />
+                      <span className="text-[10px] font-semibold text-brand-700 uppercase tracking-wide">Próximo argumento · CI</span>
                     </div>
-                    <p className="text-2xs text-gray-300 leading-relaxed">{sugestaoCI}</p>
+                    <p className="text-2xs text-gray-700 leading-relaxed">{sugestaoCI}</p>
                     <button
                       onClick={() => setFraseInput(p => ({ ...p, [item.id]: sugestaoCI.replace(/^"|"$/g, '') }))}
-                      className="mt-2 text-[10px] font-semibold text-brand-400 hover:text-brand-300 transition-colors"
-                    >
-                      Usar esta frase ↓
-                    </button>
+                      className="mt-2 text-[10px] font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+                    >Usar esta frase ↓</button>
                   </div>
 
-                  {/* Input de intervenção */}
                   <div>
-                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Intervenção do gestor</div>
+                    <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Intervenção do gestor</div>
                     <div className="flex gap-1">
                       <input
-                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-2xs text-white placeholder-gray-500 outline-none focus:border-brand-500 min-w-0"
+                        className="input flex-1 py-1.5 text-2xs min-w-0"
                         placeholder="Frase para o agente falar..."
                         value={fraseInput[item.id] ?? ''}
                         onChange={e => setFraseInput(p => ({ ...p, [item.id]: e.target.value }))}
@@ -3572,28 +3559,26 @@ function TabAoVivo({
                       <button
                         onClick={() => injetarFrase(item as EntradaFila & { _callControlId: string })}
                         disabled={!fraseInput[item.id]?.trim()}
-                        className="text-2xs font-bold bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-2 py-1.5 transition-colors disabled:opacity-40 flex-shrink-0"
-                      >
-                        Injetar
-                      </button>
+                        className="btn-primary text-2xs py-1.5 px-2.5 disabled:opacity-40 flex-shrink-0"
+                      >Injetar</button>
                     </div>
                     {feedbackInj[item.id] && (
-                      <p className={clsx('text-[10px] mt-1', feedbackInj[item.id].startsWith('✓') ? 'text-emerald-400' : 'text-red-400')}>
+                      <p className={clsx('text-[10px] mt-1', feedbackInj[item.id].startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
                         {feedbackInj[item.id]}
                       </p>
                     )}
                     {fraseInjetada[item.id] && !feedbackInj[item.id] && (
-                      <p className="text-[10px] text-gray-500 mt-1 truncate">Última: "{fraseInjetada[item.id]}"</p>
+                      <p className="text-[10px] text-gray-400 mt-1 truncate">Última: "{fraseInjetada[item.id]}"</p>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* ── Rodapé: ações rápidas ──────────────────────────────────── */}
-              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-white/6 bg-gray-900/40">
+              {/* Rodapé: ações */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-gray-100 bg-gray-50">
                 <button
                   onClick={() => forcarAgendamento(item as EntradaFila & { _callControlId: string })}
-                  className="flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 hover:bg-emerald-800/40 transition-colors"
+                  className="flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors"
                 >
                   <Calendar size={10}/> Forçar agendamento
                 </button>
@@ -3602,8 +3587,8 @@ function TabAoVivo({
                   disabled={jaTransferido}
                   className={clsx('flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg border transition-colors',
                     jaTransferido
-                      ? 'bg-purple-900/20 border-purple-700/30 text-purple-400 opacity-60 cursor-default'
-                      : 'bg-purple-900/40 border-purple-700/50 text-purple-300 hover:bg-purple-800/40'
+                      ? 'bg-brand-50 border-brand-200 text-brand-500 opacity-60 cursor-default'
+                      : 'bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100'
                   )}
                 >
                   <PhoneForwarded size={10}/> {jaTransferido ? `Transferindo → ${transferidos[item.id]}` : 'Transferir agora'}
@@ -3611,14 +3596,16 @@ function TabAoVivo({
                 <button
                   onClick={() => setMarcados(p => ({ ...p, [item.id]: !p[item.id] }))}
                   className={clsx('flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg border transition-colors ml-auto',
-                    marcado ? 'bg-amber-900/40 border-amber-700/50 text-amber-300' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-300 hover:border-gray-600'
+                    marcado
+                      ? 'bg-amber-50 border-amber-200 text-amber-700'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-amber-300 hover:text-amber-600'
                   )}
                 >
                   <Star size={10}/> {marcado ? 'Marcado' : 'Marcar revisão'}
                 </button>
                 <button
                   onClick={() => onGoFila?.(item.id)}
-                  className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-500 transition-colors"
+                  className="btn-secondary text-2xs py-1.5 px-3 gap-1.5"
                 >
                   <Activity size={10}/> Monitor
                 </button>
