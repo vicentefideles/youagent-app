@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, Calendar, CheckCircle, ChevronDown } from 'lucide-react'
 import { reunioesApi } from '@/services/api'
+import { PainelReativacao } from '@/pages/discadora/DiscadoraPage'
 
-type TabId = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens'
+type TabId = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens' | 'reativacao'
 type ResultadoKey = 'fechou' | 'reagendou' | 'perdeu' | 'noshow'
 type MsgSubTab = 'recebidas' | 'enviadas'
 
@@ -768,7 +769,8 @@ const tabs: { id: TabId; label: string; badge?: string; badgeColor?: string }[] 
   { id: 'resultados', label: '✅ Registrar Resultados' },
   { id: 'email', label: '✉️ E-mails', badge: '2', badgeColor: 'bg-amber-500' },
   { id: 'gcal', label: '📆 Meu Google Calendar' },
-  { id: 'mensagens', label: '💬 Mensagens', badge: '2', badgeColor: 'bg-blue-600' },
+  { id: 'mensagens',   label: '💬 Mensagens',  badge: '2', badgeColor: 'bg-blue-600' },
+  { id: 'reativacao', label: '🔄 Reativação' },
 ]
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -886,7 +888,8 @@ export default function VendedorPage() {
         )}
         {activeTab === 'email' && <TabEmail />}
         {activeTab === 'gcal' && <TabGcal />}
-        {activeTab === 'mensagens' && <TabMensagens />}
+        {activeTab === 'mensagens'   && <TabMensagens />}
+        {activeTab === 'reativacao'  && <PainelReativacao />}
       </div>
     </div>
   )

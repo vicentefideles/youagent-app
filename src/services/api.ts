@@ -75,8 +75,10 @@ export const contatosApi = {
     api.get(`/contatos?busca=${encodeURIComponent(busca)}&limit=10`),
   byStatus:   (status: string, limit = 100) =>
     api.get(`/contatos?status=${status}&limit=${limit}`),
-  bulkInsert: (data: unknown) => api.post('/contatos/bulk', data),
-  patch:      (id: string, data: unknown) => api.patch(`/contatos/${id}`, data),
+  bulkInsert:   (data: unknown) => api.post('/contatos/bulk', data),
+  patch:        (id: string, data: unknown) => api.patch(`/contatos/${id}`, data),
+  reativacao:   (tipo: string, dias: number) => api.get(`/contatos/reativacao?tipo=${tipo}&dias=${dias}`),
+  reativarLote: (data: { ids: string[]; canal: string; mensagem: string }) => api.post('/contatos/reativar-lote', data),
 }
 
 /** @deprecated Use campanhasApi */

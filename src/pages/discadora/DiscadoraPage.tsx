@@ -6,7 +6,7 @@ import { useWebRTCPhone } from '@/hooks/useWebRTCPhone'
 import { useAuthStore } from '@/store/authStore'
 import {
   PhoneCall, Calendar, Mic, MicOff, Phone, PhoneOff, Radio, History, Antenna,
-  Activity, Brain, Search, Download, Filter,
+  Activity, Brain, Search, Download,
   User, Building2, MapPin, MessageSquare, X,
   Play, Pause, PauseCircle, CheckCircle2, XCircle, RotateCcw,
   Volume2, Video, Hash, Sparkles, Send, Save,
@@ -4052,265 +4052,332 @@ function TabRamal() {
 
 // ─── ABA REATIVAÇÃO ──────────────────────────────────────────────────────────
 
-interface LeadReativacao {
-  id: string
-  nome: string
-  empresa: string
-  ultimoContato: string
-  tentativas: number
-  motivo: 'nao_atendeu' | 'sem_interesse' | 'retornar' | 'tempo_expirado'
-  campanha: string
+const TEMPLATES_REATIVACAO: Record<string, string> = {
+  pipeline:
+    'Olá [NOME], aqui é [AGENTE] da [EMPRESA].\n\nNotei que faz um tempo desde nosso último contato e gostaria de entender se ainda faz sentido conversarmos.\n\nTemos novidades que podem ser relevantes para o seu negócio. Quando teria 15 minutos esta semana?',
+  noshow:
+    'Olá [NOME], tudo bem?\n\nPercebemos que não conseguimos nos conectar na reunião que tínhamos agendado. Entendo que imprevistos acontecem!\n\nGostaria de propor um novo horário que seja melhor para você. Qual seria a sua disponibilidade?',
+  sem_compra:
+    'Olá [NOME], aqui é [AGENTE] da [EMPRESA].\n\nFicamos felizes em ter trabalhado com você anteriormente e gostaríamos de entender como podemos continuar agregando valor ao seu negócio.\n\nPodemos conversar brevemente?',
+  todos:
+    'Olá [NOME], aqui é [AGENTE] da [EMPRESA].\n\nGostaria de retomar nosso contato e entender como posso ajudar seu negócio hoje.\n\nQuando seria um bom momento para conversarmos?',
 }
 
-const MOTIVO_LABEL: Record<LeadReativacao['motivo'], string> = {
-  nao_atendeu:     'Não atendeu',
-  sem_interesse:   'Sem interesse',
-  retornar:        'Retornar',
-  tempo_expirado:  'Tempo expirado',
+const TIPO_LABEL: Record<string, string> = {
+  pipeline:  'Leads perdidos no pipeline',
+  noshow:    'Leads no-show (não compareceram)',
+  sem_compra:'Clientes sem compra recente',
+  todos:     'Todos os inativos',
 }
 
-const MOTIVO_CLS: Record<LeadReativacao['motivo'], string> = {
-  nao_atendeu:    'badge-amber',
-  sem_interesse:  'badge-danger',
-  retornar:       'badge-brand',
-  tempo_expirado: 'badge-neutral',
-}
+export function PainelReativacao() {
+  // ── Config ─────────────────────────────────────────────────────────────────
+  const [tipo, setTipo]         = useState('pipeline')
+  const [dias, setDias]         = useState(30)
+  const [canal, setCanal]       = useState<'email'|'whatsapp'|'ambos'>('email')
+  const [mensagem, setMensagem] = useState(TEMPLATES_REATIVACAO['pipeline'])
 
-
-function TabReativacao() {
+  // ── Lista ──────────────────────────────────────────────────────────────────
+  const [leads, setLeads]           = useState<any[]>([])
+  const [carregando, setCarregando] = useState(false)
+  const [listaGerada, setListaGerada] = useState(false)
   const [selecionados, setSelecionados] = useState<string[]>([])
-  const [filtroMotivo, setFiltroMotivo] = useState('todos')
-  const [reativados, setReativados] = useState<Set<string>>(new Set())
   const [arquivados, setArquivados] = useState<Set<string>>(new Set())
-  const [_reativandoIds, setReativandoIds] = useState<Set<string>>(new Set())
 
-  // Busca contatos esgotados e sem resposta da API
-  const { data: esgotadosRaw = [], refetch } = useQuery({
-    queryKey: ['contatos-reativacao'],
-    queryFn: async () => {
-      const [r1, r2] = await Promise.all([
-        contatosApi.byStatus('esgotado', 200),
-        contatosApi.byStatus('nao_atendeu', 200),
-      ])
-      const d1 = (r1.data as any)?.data ?? r1.data ?? []
-      const d2 = (r2.data as any)?.data ?? r2.data ?? []
-      return [...d1, ...d2]
-    },
-  })
+  // ── Envio ──────────────────────────────────────────────────────────────────
+  const [enviando, setEnviando]     = useState(false)
+  const [resultado, setResultado]   = useState<any | null>(null)
 
-  const motivoMap: Record<string, LeadReativacao['motivo']> = {
-    esgotado: 'nao_atendeu',
-    nao_atendeu: 'nao_atendeu',
+  function onTipoChange(novoTipo: string) {
+    setTipo(novoTipo)
+    setMensagem(TEMPLATES_REATIVACAO[novoTipo] || TEMPLATES_REATIVACAO['todos'])
+    setLeads([])
+    setListaGerada(false)
+    setSelecionados([])
+    setResultado(null)
   }
 
-  const leadsApi: LeadReativacao[] = (esgotadosRaw as any[]).map((c: any) => ({
-    id: String(c.id),
-    nome: c.nome ?? '—',
-    empresa: c.razao_social ?? c.empresa ?? '—',
-    ultimoContato: c.atualizado_em ? new Date(c.atualizado_em).toLocaleDateString('pt-BR') : c.criado_em ? new Date(c.criado_em).toLocaleDateString('pt-BR') : '—',
-    tentativas: c.tentativas ?? 0,
-    motivo: (motivoMap[c.status] ?? 'nao_atendeu') as LeadReativacao['motivo'],
-    campanha: c.campanha_id ?? '',
-  }))
+  async function gerarLista() {
+    setCarregando(true)
+    setLeads([])
+    setListaGerada(false)
+    setSelecionados([])
+    setResultado(null)
+    try {
+      const r = await contatosApi.reativacao(tipo, dias)
+      const data = (r.data as any[]) ?? []
+      setLeads(data)
+      setListaGerada(true)
+    } catch {
+      setLeads([])
+      setListaGerada(true)
+    } finally {
+      setCarregando(false)
+    }
+  }
 
-  const leadsVisiveis = leadsApi.filter(l => {
-    if (arquivados.has(l.id)) return false
-    if (reativados.has(l.id)) return false
-    if (filtroMotivo !== 'todos' && l.motivo !== filtroMotivo) return false
-    return true
-  })
+  async function iniciarReativacao() {
+    const ids = selecionados.length > 0 ? selecionados : leads.filter(l => !arquivados.has(l.id)).map(l => String(l.id))
+    if (ids.length === 0) return
+    setEnviando(true)
+    setResultado(null)
+    try {
+      const r = await contatosApi.reativarLote({ ids, canal, mensagem })
+      setResultado(r.data)
+      // Remove enviados da lista
+      setLeads(prev => prev.filter(l => !ids.includes(String(l.id))))
+      setSelecionados([])
+    } catch (e: any) {
+      setResultado({ erro: e?.response?.data?.error || 'Erro ao iniciar reativação' })
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  function arquivarLead(id: string) {
+    setArquivados(prev => new Set([...prev, id]))
+    setSelecionados(prev => prev.filter(x => x !== id))
+    contatosApi.patch(id, { status: 'arquivado' }).catch(() => {})
+  }
 
   function toggleSel(id: string) {
     setSelecionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
-  function toggleAll(checked: boolean) {
-    setSelecionados(checked ? leadsVisiveis.map(l => l.id) : [])
-  }
-  async function reativarLead(id: string) {
-    setReativandoIds(prev => new Set([...prev, id]))
-    try {
-      // Volta status para 'novo' para entrar na fila novamente
-      await fetch(`https://app.etztech.com/api/v1/contatos/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
-        body: JSON.stringify({ status: 'novo', tentativas: 0 }),
-      })
-      setReativados(prev => new Set([...prev, id]))
-      refetch()
-    } catch (_) {
-      setReativados(prev => new Set([...prev, id]))
-    } finally {
-      setReativandoIds(prev => { const n = new Set(prev); n.delete(id); return n })
-    }
-  }
-  async function arquivarLead(id: string) {
-    try {
-      await fetch(`https://app.etztech.com/api/v1/contatos/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('youagent_jwt')}` },
-        body: JSON.stringify({ status: 'arquivado' }),
-      })
-    } catch (_) {}
-    setArquivados(prev => new Set([...prev, id]))
-    setSelecionados(prev => prev.filter(x => x !== id))
-  }
-  function reativarSelecionados() {
-    selecionados.forEach(id => reativarLead(id))
-    setSelecionados([])
-  }
-  function arquivarSelecionados() {
-    selecionados.forEach(id => arquivarLead(id))
-    setSelecionados([])
-  }
+
+  const leadsVisiveis = leads.filter(l => !arquivados.has(String(l.id)))
+  const todosSelec    = leadsVisiveis.length > 0 && selecionados.length === leadsVisiveis.length
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Descrição */}
-      <p className="text-sm text-gray-500">
-        Reprocesse leads que não atenderam ou que precisam de nova abordagem.
-      </p>
+    <div className="flex gap-5 items-start">
 
-      {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Leads disponíveis',   value: String(leadsVisiveis.length),                color: 'text-gray-900'    },
-          { label: 'Reativados agora',    value: String(reativados.size),                    color: 'text-brand-600'   },
-          { label: 'Arquivados',          value: String(arquivados.size),                    color: 'text-gray-400'    },
-          { label: 'Total no banco',      value: String(esgotadosRaw.length),               color: 'text-purple-600'  },
-        ].map(k => (
-          <div key={k.label} className="kpi-card">
-            <span className={clsx('text-2xl font-bold font-mono', k.color)}>{k.value}</span>
-            <span className="text-xs text-gray-500">{k.label}</span>
+      {/* ── Sidebar config ─────────────────────────────────────────────────── */}
+      <div className="w-72 flex-shrink-0 bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <RefreshCw size={14} className="text-brand-600"/>
+          <h3 className="text-sm font-semibold text-gray-900">Configurar Reativação</h3>
+        </div>
+        <p className="text-xs text-gray-400 -mt-2">Leads/clientes inativos</p>
+
+        {/* Dias */}
+        <div>
+          <label className="text-xs font-medium text-gray-700 block mb-1">Inativo há mais de (dias)</label>
+          <input
+            type="number"
+            min={1} max={365}
+            value={dias}
+            onChange={e => setDias(Number(e.target.value))}
+            className="input text-sm py-1.5 w-full"
+          />
+        </div>
+
+        {/* Tipo de lista */}
+        <div>
+          <label className="text-xs font-medium text-gray-700 block mb-1">Tipo de lista</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={tipo}
+            onChange={e => onTipoChange(e.target.value)}
+          >
+            {Object.entries(TIPO_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Canal de envio */}
+        <div>
+          <label className="text-xs font-medium text-gray-700 block mb-2">Canal de envio</label>
+          <div className="flex gap-2">
+            {(['email', 'whatsapp', 'ambos'] as const).map(c => (
+              <button
+                key={c}
+                onClick={() => setCanal(c)}
+                className={clsx(
+                  'flex-1 text-xs font-semibold py-1.5 rounded-lg border transition-colors',
+                  canal === c
+                    ? 'bg-brand-600 text-white border-brand-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                )}
+              >
+                {c === 'email' ? '📧' : c === 'whatsapp' ? '💬' : '📧+💬'}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
+          <p className="text-2xs text-gray-400 mt-1.5">
+            {canal === 'email' ? 'Envia e-mail para contatos com e-mail cadastrado' :
+             canal === 'whatsapp' ? 'Envia WA pelo seu WhatsApp conectado' :
+             'Envia e-mail + WhatsApp para todos'}
+          </p>
+        </div>
 
-      {/* Filtros */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          className="input py-1.5 text-xs"
-          value={filtroMotivo}
-          onChange={e => setFiltroMotivo(e.target.value)}
+        {/* Template de mensagem */}
+        <div>
+          <label className="text-xs font-medium text-gray-700 block mb-1">Mensagem de reativação</label>
+          <textarea
+            rows={7}
+            className="input text-xs py-2 w-full resize-none leading-relaxed"
+            value={mensagem}
+            onChange={e => setMensagem(e.target.value)}
+          />
+          <p className="text-2xs text-gray-400 mt-1">
+            Use <span className="font-mono text-brand-600">[NOME]</span>, <span className="font-mono text-brand-600">[AGENTE]</span>, <span className="font-mono text-brand-600">[EMPRESA]</span>
+          </p>
+        </div>
+
+        {/* Botões */}
+        <button
+          onClick={gerarLista}
+          disabled={carregando}
+          className="btn-secondary text-xs py-2 gap-1.5 w-full"
         >
-          <option value="todos">Todos os motivos</option>
-          <option value="nao_atendeu">Não atendeu</option>
-          <option value="sem_interesse">Sem interesse</option>
-          <option value="retornar">Retornar</option>
-          <option value="tempo_expirado">Tempo expirado</option>
-        </select>
+          {carregando
+            ? <><div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"/>{' '}Carregando...</>
+            : <><Search size={12}/>{' '}Gerar lista</>
+          }
+        </button>
 
-
-
-        <button className="btn-primary text-xs py-1.5 gap-1.5">
-          <Filter size={12}/> Filtrar
+        <button
+          onClick={iniciarReativacao}
+          disabled={enviando || leadsVisiveis.length === 0 || !listaGerada}
+          className="btn-primary text-xs py-2 gap-1.5 w-full disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {enviando
+            ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>{' '}Enviando...</>
+            : <><Zap size={12}/>{' '}Iniciar reativação
+              {(selecionados.length > 0 || leadsVisiveis.length > 0) && (
+                <span className="ml-1 bg-white/20 rounded px-1">
+                  {selecionados.length > 0 ? selecionados.length : leadsVisiveis.length}
+                </span>
+              )}
+            </>
+          }
         </button>
       </div>
 
-      {/* Barra de ação em lote */}
-      {selecionados.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-brand-50 border border-brand-200 rounded-xl">
-          <span className="text-xs font-bold text-brand-600">{selecionados.length} leads selecionados</span>
-          <div className="w-px h-4 bg-brand-300"/>
-          <button
-            onClick={reativarSelecionados}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors"
-          >
-            <RefreshCw size={12}/> Reativar selecionados
-          </button>
-          <button
-            onClick={arquivarSelecionados}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-300 text-red-600 bg-white hover:bg-red-50 transition-colors"
-          >
-            <Archive size={12}/> Arquivar selecionados
-          </button>
-          <button onClick={() => setSelecionados([])} className="ml-auto text-gray-400 hover:text-gray-600">
-            <X size={14}/>
-          </button>
-        </div>
-      )}
-
-      {/* Tabela */}
-      <div className="card overflow-hidden">
-        <div className="grid grid-cols-[28px_2fr_1fr_80px_1fr_1fr_120px] px-4 py-2.5 bg-gray-50 border-b border-gray-100 items-center">
-          <input
-            type="checkbox"
-            className="w-3.5 h-3.5 accent-indigo-500"
-            checked={selecionados.length === leadsVisiveis.length && leadsVisiveis.length > 0}
-            onChange={e => toggleAll(e.target.checked)}
-          />
-          {['Lead', 'Último contato', 'Tentativas', 'Motivo', 'Campanha original', 'Ações'].map(h => (
-            <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
-          ))}
+      {/* ── Painel lista ───────────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <FileText size={14} className="text-gray-500"/>
+            <h3 className="text-sm font-semibold text-gray-900">Lista de leads para reativar</h3>
+          </div>
+          {listaGerada && leadsVisiveis.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">{leadsVisiveis.length} lead{leadsVisiveis.length !== 1 ? 's' : ''}</span>
+              {selecionados.length > 0 && (
+                <span className="text-xs font-semibold text-brand-600 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
+                  {selecionados.length} selecionado{selecionados.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {leadsVisiveis.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <RefreshCw size={24} className="text-gray-300 mb-3"/>
-            <p className="text-sm text-gray-500">Nenhum lead corresponde aos filtros aplicados.</p>
+        {/* Resultado do envio */}
+        {resultado && (
+          <div className={clsx(
+            'mx-4 mt-4 px-4 py-3 rounded-xl text-sm font-medium',
+            resultado.erro ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+          )}>
+            {resultado.erro ? (
+              <span>❌ {resultado.erro}</span>
+            ) : (
+              <span>
+                ✅ Reativação concluída — {resultado.total} contato{resultado.total !== 1 ? 's' : ''} reativado{resultado.total !== 1 ? 's' : ''}.
+                {resultado.email_enviados > 0 && ` ${resultado.email_enviados} e-mail${resultado.email_enviados !== 1 ? 's' : ''} enviado${resultado.email_enviados !== 1 ? 's' : ''}.`}
+                {resultado.wa_enviados > 0 && ` ${resultado.wa_enviados} mensagem${resultado.wa_enviados !== 1 ? 's' : ''} WA enviada${resultado.wa_enviados !== 1 ? 's' : ''}.`}
+                {resultado.erros?.length > 0 && ` ${resultado.erros.length} erro${resultado.erros.length !== 1 ? 's' : ''}.`}
+              </span>
+            )}
           </div>
         )}
 
-        {leadsVisiveis.map((lead, i) => (
-          <div
-            key={lead.id}
-            className={clsx(
-              'grid grid-cols-[28px_2fr_1fr_80px_1fr_1fr_120px] px-4 py-3 border-b border-gray-100 items-center',
-              i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40',
-              reativados.has(lead.id) && 'opacity-50'
-            )}
-          >
-            <div>
+        {/* Empty states */}
+        {!listaGerada && !carregando && (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-gray-400">
+            <Search size={32} className="mb-3 text-gray-200"/>
+            <p className="text-sm">Clique em <strong className="text-gray-600">"Gerar lista"</strong> para ver os leads inativos</p>
+          </div>
+        )}
+
+        {listaGerada && leadsVisiveis.length === 0 && !resultado && (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-gray-400">
+            <CheckCircle2 size={32} className="mb-3 text-emerald-300"/>
+            <p className="text-sm text-gray-500">Nenhum lead inativo encontrado com esses filtros.</p>
+            <p className="text-xs text-gray-400 mt-1">Tente aumentar o período ou mudar o tipo de lista.</p>
+          </div>
+        )}
+
+        {/* Tabela */}
+        {leadsVisiveis.length > 0 && (
+          <>
+            {/* Header */}
+            <div className="grid grid-cols-[28px_2fr_1fr_1fr_80px_80px] px-4 py-2 bg-gray-50 border-b border-gray-100 items-center">
               <input
                 type="checkbox"
                 className="w-3.5 h-3.5 accent-indigo-500"
-                checked={selecionados.includes(lead.id)}
-                onChange={() => toggleSel(lead.id)}
-                disabled={reativados.has(lead.id)}
+                checked={todosSelec}
+                onChange={e => setSelecionados(e.target.checked ? leadsVisiveis.map(l => String(l.id)) : [])}
               />
+              {['Lead', 'Telefone', 'E-mail', 'Tentativas', 'Ações'].map(h => (
+                <span key={h} className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">{h}</span>
+              ))}
             </div>
 
-            <div>
-              <div className="text-sm font-medium text-gray-900">{lead.nome}</div>
-              <div className="text-xs text-gray-500">{lead.empresa}</div>
-            </div>
+            {/* Linhas */}
+            {leadsVisiveis.map((lead, i) => {
+              const id = String(lead.id)
+              const temEmail = !!lead.email
+              const temTel   = !!lead.telefone
+              const dataUlt  = lead.atualizado_em
+                ? new Date(lead.atualizado_em).toLocaleDateString('pt-BR')
+                : lead.criado_em ? new Date(lead.criado_em).toLocaleDateString('pt-BR') : '—'
 
-            <div className="text-xs text-gray-600 font-mono">{lead.ultimoContato}</div>
-
-            <div className="text-xs font-semibold text-gray-700 font-mono">{lead.tentativas}x</div>
-
-            <div>
-              <span className={clsx('badge text-2xs', MOTIVO_CLS[lead.motivo])}>
-                {MOTIVO_LABEL[lead.motivo]}
-              </span>
-            </div>
-
-            <div className="text-xs text-gray-600">{lead.campanha}</div>
-
-            <div className="flex items-center gap-1.5">
-              {reativados.has(lead.id) ? (
-                <span className="text-2xs font-semibold text-emerald-600">✓ Reativado</span>
-              ) : (
-                <>
+              return (
+                <div
+                  key={id}
+                  className={clsx(
+                    'grid grid-cols-[28px_2fr_1fr_1fr_80px_80px] px-4 py-3 border-b border-gray-100 items-center text-xs',
+                    i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30',
+                    selecionados.includes(id) && 'bg-brand-50/40'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="w-3.5 h-3.5 accent-indigo-500"
+                    checked={selecionados.includes(id)}
+                    onChange={() => toggleSel(id)}
+                  />
+                  <div>
+                    <p className="font-medium text-gray-900 truncate">{lead.nome || '—'}</p>
+                    <p className="text-gray-400 truncate text-2xs">{lead.razao_social || '—'} · {dataUlt}</p>
+                  </div>
+                  <div className={clsx('truncate', temTel ? 'text-gray-700 font-mono' : 'text-gray-300')}>
+                    {temTel ? lead.telefone : '—'}
+                  </div>
+                  <div className={clsx('truncate', temEmail ? 'text-gray-700' : 'text-gray-300')}>
+                    {temEmail ? lead.email : '—'}
+                  </div>
+                  <div className="font-mono text-gray-600">{lead.tentativas ?? 0}x</div>
                   <button
-                    onClick={() => reativarLead(lead.id)}
-                    className="flex items-center gap-1 text-2xs font-semibold px-2 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-600 hover:bg-brand-100 transition-colors"
+                    onClick={() => arquivarLead(id)}
+                    title="Arquivar"
+                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-colors"
                   >
-                    <RefreshCw size={10}/> Reativar
+                    <Archive size={12}/>
                   </button>
-                  <button
-                    onClick={() => arquivarLead(lead.id)}
-                    className="flex items-center gap-1 text-2xs font-semibold px-2 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-                  >
-                    <Archive size={10}/>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
+                </div>
+              )
+            })}
+          </>
+        )}
       </div>
     </div>
   )
+}
+
+function TabReativacao() {
+  return <PainelReativacao />
 }
 
 // ─── TABS CONFIG ──────────────────────────────────────────────────────────────
