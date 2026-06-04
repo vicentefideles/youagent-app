@@ -3699,7 +3699,7 @@ function TabHistorico() {
           <div key={k.id} className="kpi-card">
             <span className={clsx('text-2xl font-bold font-mono', k.color)}>{k.value}</span>
             <span className="text-xs text-gray-500">{k.label}</span>
-            <span className="text-2xs text-gray-400">Últimos {periodo || 'todos'} dias</span>
+            <span className="text-2xs text-gray-400">{periodo ? `Últimos ${periodo} dias` : 'Todos os períodos'}</span>
           </div>
         ))}
       </div>
@@ -3726,7 +3726,6 @@ function TabHistorico() {
                     {h.contatos?.nome || h.numero_destino || '—'}
                   </div>
                   <div className="text-xs text-gray-500 font-mono">{h.numero_destino}</div>
-                  <div className="text-2xs text-gray-400">{h.agentes?.nome ? `Agente: ${h.agentes.nome}` : ''}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-700">{h.agentes?.nome || '—'}</div>
@@ -3736,7 +3735,8 @@ function TabHistorico() {
                 <span className={clsx('badge text-2xs w-fit',
                   h.resultado === 'agendada' || h.resultado === 'atendida' ? 'badge-success' :
                   h.resultado === 'transferida' ? 'badge-purple' :
-                  h.resultado === 'nao_atendida' ? 'badge-amber' : 'badge-danger'
+                  h.resultado === 'nao_atendida' ? 'badge-amber' :
+                  h.resultado === 'pendente' || !h.resultado ? 'badge-neutral' : 'badge-danger'
                 )}>{labelResultado(h.resultado)}</span>
                 <div className="flex gap-1.5">
                   {h.transcricao && (
@@ -3774,7 +3774,7 @@ function TabHistorico() {
           ))}
         </div>
         <div id="hist-tabela-rodape" className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-          <span className="text-2xs text-gray-400">{HISTORICO.length} chamadas nos últimos {periodo || 'todos'} dias</span>
+          <span className="text-2xs text-gray-400">{HISTORICO.length} chamadas {periodo ? `nos últimos ${periodo} dias` : 'no total'}</span>
         </div>
       </div>
     </div>
@@ -4258,7 +4258,7 @@ const TABS_BASE: { id: Tab; label: string; icon: React.ReactNode; badge?: number
   { id:'manual',    label:'Chamada Manual',    icon:<Phone size={13}/> },
   { id:'agenda',    label:'Minha Agenda',      icon:<Calendar size={13}/> },
   { id:'aovivo',    label:'Ao Vivo',           icon:<Radio size={13}/> },
-  { id:'historico', label:'Histórico',         icon:<History size={13}/>, badge:3 },
+  { id:'historico', label:'Histórico',         icon:<History size={13}/> },
   { id:'ramal',      label:'Ramal',      icon:<Antenna size={13}/> },
   { id:'reativacao', label:'Reativação', icon:<RefreshCw size={13}/> },
 ]
