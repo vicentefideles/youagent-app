@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { equipeApi } from '@/services/api'
 import {
   Users, BarChart2, Target, Pencil, X, UserPlus, CheckCircle2,
-  MessageCircle, Wifi, WifiOff, RefreshCw, Link2, Radio,
+  MessageCircle, Wifi, WifiOff, RefreshCw, Link2, Radio, Copy, Check,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -199,6 +199,19 @@ function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
           </button>
         </div>
 
+        {/* Aviso de auto-provisionamento — só no modo criação */}
+        {!isEdicao && (
+          <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5">
+            <Radio size={15} className="text-blue-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-blue-700">Ramal SIP gerado automaticamente</p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Ao salvar, o sistema cria automaticamente um ramal e credenciais SIP na Telnyx para este vendedor. As credenciais serão exibidas para configuração do softphone.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Nome completo</label>
@@ -245,6 +258,7 @@ function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">WhatsApp pessoal</label>
             <input
@@ -259,10 +273,7 @@ function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-          >
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">
             Cancelar
           </button>
           <button
@@ -270,7 +281,105 @@ function ModalAdicionar({ inicial, onClose, onSave }: ModalAdicionarProps) {
             disabled={!form.nome.trim() || !form.email.trim()}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            Salvar
+            Salvar e gerar ramal
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal: credenciais SIP pós-criação ────────────────────────────────────────
+interface ModalCredenciaisSIPProps {
+  vendedor: { nome: string; ramal?: string; sip_username?: string; sip_password?: string }
+  onClose: () => void
+}
+
+function ModalCredenciaisSIP({ vendedor, onClose }: ModalCredenciaisSIPProps) {
+  const [copiado, setCopiado] = useState<string | null>(null)
+
+  function copiar(valor: string, chave: string) {
+    navigator.clipboard.writeText(valor).catch(() => {})
+    setCopiado(chave)
+    setTimeout(() => setCopiado(null), 2000)
+  }
+
+  const campos = [
+    { label: 'Servidor SIP',  valor: 'sip.telnyx.com',          chave: 'server', oculto: false },
+    { label: 'Usuário SIP',   valor: vendedor.sip_username || '—', chave: 'user',   oculto: false },
+    { label: 'Senha SIP',     valor: vendedor.sip_password || '—', chave: 'pass',   oculto: true  },
+    { label: 'Ramal interno', valor: vendedor.ramal || '—',        chave: 'ramal',  oculto: false },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={20} className="text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Perfil criado com sucesso!</p>
+            <p className="text-xs text-gray-500">{vendedor.nome} · Ramal {vendedor.ramal}</p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+          {vendedor.sip_username ? (
+            <>
+              <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                <Radio size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-700">
+                  <strong>Credenciais SIP geradas automaticamente via Telnyx.</strong> Compartilhe com {vendedor.nome} para configurar o softphone (Zoiper, Linphone ou Bria).
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {campos.map(f => (
+                  <div key={f.chave}>
+                    <label className="block text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{f.label}</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 select-all">
+                        {f.oculto ? '••••••••••••' : f.valor}
+                      </div>
+                      <button
+                        onClick={() => copiar(f.valor, f.chave)}
+                        className={`flex items-center gap-1 px-3 rounded-lg border text-xs font-medium transition-colors ${
+                          copiado === f.chave
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {copiado === f.chave ? <Check size={12} /> : <Copy size={12} />}
+                        {copiado === f.chave ? 'Copiado' : 'Copiar'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-2xs text-gray-400 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                💡 Para chamadas internas, disque o número do ramal do colega (ex: <span className="font-mono font-bold">2202</span>). O e-mail de boas-vindas com acesso à plataforma foi enviado para {vendedor.nome}.
+              </p>
+            </>
+          ) : (
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+              <Radio size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-700">
+                Perfil criado e ramal <strong>{vendedor.ramal}</strong> atribuído. Credenciais SIP não foram geradas agora (verifique a configuração Telnyx). Use <strong>"Provisionar Ramais SIP"</strong> para retentar.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Entendido
           </button>
         </div>
       </div>
@@ -446,9 +555,11 @@ interface TabVendedoresProps {
   onToggleStatus: (id: string, ativo: boolean) => void
   onAddVendedor: (v: NovoVendedor) => void
   onEditVendedor: (id: string, v: NovoVendedor) => void
+  novoVendedorCriado?: { nome: string; ramal?: string; sip_username?: string; sip_password?: string } | null
+  onFecharCredenciais?: () => void
 }
 
-function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVendedor }: TabVendedoresProps) {
+function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVendedor, novoVendedorCriado, onFecharCredenciais }: TabVendedoresProps) {
   const [showModal, setShowModal] = useState(false)
   const [editando, setEditando] = useState<Vendedor | null>(null)
   const [whatsappModal, setWhatsappModal] = useState<{ id: string; nome: string } | null>(null)
@@ -675,6 +786,13 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
         <ModalWhatsApp
           vendedor={whatsappModal}
           onClose={() => setWhatsappModal(null)}
+        />
+      )}
+
+      {novoVendedorCriado && onFecharCredenciais && (
+        <ModalCredenciaisSIP
+          vendedor={novoVendedorCriado}
+          onClose={onFecharCredenciais}
         />
       )}
     </div>
@@ -915,6 +1033,7 @@ function TabMetas({ vendedores, onSalvarMetas }: TabMetasProps) {
 
 export default function EquipePage() {
   const [activeTab, setActiveTab] = useState<Tab>('vendedores')
+  const [novoVendedorCriado, setNovoVendedorCriado] = useState<{ nome: string; ramal?: string; sip_username?: string; sip_password?: string } | null>(null)
   const qc = useQueryClient()
 
   const { data: rawEquipe = [], isLoading } = useQuery({
@@ -956,7 +1075,18 @@ export default function EquipePage() {
   const criarMutation = useMutation({
     mutationFn: (data: NovoVendedor) =>
       equipeApi.create({ nome: data.nome, email: data.email, cargo: data.cargo }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['equipe'] }),
+    onSuccess: (resp) => {
+      qc.invalidateQueries({ queryKey: ['equipe'] })
+      const vendedor = (resp as any)?.data
+      if (vendedor) {
+        setNovoVendedorCriado({
+          nome:         vendedor.nome,
+          ramal:        vendedor.ramal,
+          sip_username: vendedor.sip_username,
+          sip_password: vendedor.sip_password,
+        })
+      }
+    },
   })
 
   const editarMutation = useMutation({
@@ -1039,6 +1169,8 @@ export default function EquipePage() {
           onToggleStatus={handleToggleStatus}
           onAddVendedor={handleAddVendedor}
           onEditVendedor={handleEditVendedor}
+          novoVendedorCriado={novoVendedorCriado}
+          onFecharCredenciais={() => setNovoVendedorCriado(null)}
         />
       )}
       {activeTab === 'desempenho' && <TabDesempenho vendedores={vendedores} />}
