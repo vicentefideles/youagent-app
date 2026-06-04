@@ -3249,15 +3249,6 @@ function TabAoVivo({
 
   const fases = ['Abertura','Qualificação','Argumento','Objeção','Agendamento','Encerramento']
 
-  // Cor do card por urgência
-  function urgenciaCor(item: EntradaFila): { border: string; glow: string } {
-    if (item.transferindo || transferidos[item.id]) return { border:'border-purple-500/60', glow:'shadow-purple-900/30' }
-    if (item.icp >= limiarICP) return { border:'border-red-500/70', glow:'shadow-red-900/30' }   // alerta ativo
-    if (item.icp >= 80 && item.potencial >= 70) return { border:'border-amber-500/50', glow:'shadow-amber-900/20' }
-    if (item.gatilhoDetectado) return { border:'border-brand-500/40', glow:'shadow-brand-900/10' }
-    return { border:'border-gray-700/60', glow:'' }
-  }
-
   return (
     <div className="flex flex-col gap-4">
 
