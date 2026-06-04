@@ -3784,11 +3784,14 @@ function TabHistorico() {
 // ─── ABA RAMAL ───────────────────────────────────────────────────────────────
 
 function TabRamal() {
-  const [toast, setToast]           = useState<string | null>(null)
-  const [sipModal, setSipModal]     = useState<any | null>(null)   // membro selecionado
-  const [sipConfig, setSipConfig]   = useState<any | null>(null)   // dados retornados da API
-  const [sipLoading, setSipLoading] = useState(false)
-  const [copiado, setCopiado]       = useState<string | null>(null)
+  const [sipModal, setSipModal]         = useState<any | null>(null)
+  const [sipConfig, setSipConfig]       = useState<any | null>(null)
+  const [sipLoading, setSipLoading]     = useState(false)
+  const [copiado, setCopiado]           = useState<string | null>(null)
+  const [chamandoMembro, setChamandoMembro] = useState<any | null>(null)
+
+  // ── WebRTC — chamadas internas direto no browser ─────────────────────────
+  const [phoneState, phoneActions] = useWebRTCPhone()
 
   const { data: equipeRaw = [], isLoading } = useQuery({
     queryKey: ['equipe-ramal'],
@@ -3797,10 +3800,53 @@ function TabRamal() {
   })
 
   const todos   = (equipeRaw as any[])
-  const membros = todos.filter(m => m.ativo !== false)
   const total   = todos.length
-  const online  = membros.length
+  const online  = todos.filter(m => m.ativo !== false).length
   const offline = total - online
+
+  const COR_AVATAR = ['bg-brand-500','bg-emerald-500','bg-amber-500','bg-purple-500','bg-rose-500','bg-cyan-500']
+
+  // Inicia WebRTC automaticamente ao abrir a aba
+  useEffect(() => {
+    if (phoneState.status === 'idle') {
+      phoneActions.init()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Limpa estado 2.5s após encerramento de chamada
+  useEffect(() => {
+    if (phoneState.status === 'hangup') {
+      const t = setTimeout(() => {
+        setChamandoMembro(null)
+        phoneActions.reset()
+      }, 2500)
+      return () => clearTimeout(t)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneState.status])
+
+  async function ligarParaMembro(membro: any) {
+    if (!membro.sip_username) return   // sem credencial SIP — não deve acontecer
+
+    // Re-inicia se necessário
+    if (phoneState.status === 'idle' || phoneState.status === 'error') {
+      const ok = await phoneActions.init()
+      if (!ok) return
+    }
+
+    if (phoneState.status !== 'ready' && phoneState.status !== 'hangup') return
+
+    setChamandoMembro(membro)
+    // Destino: SIP URI do membro na rede Telnyx
+    const destino = `sip:${membro.sip_username}@sip.telnyx.com`
+    await phoneActions.dial(destino, { motivo: `Chamada interna — ramal ${membro.ramal}` })
+  }
+
+  function encerrarChamada() {
+    phoneActions.hangup()
+    // chamandoMembro é limpo pelo useEffect após 2.5s
+  }
 
   async function abrirSipConfig(membro: any) {
     setSipModal(membro)
@@ -3826,39 +3872,31 @@ function TabRamal() {
     setTimeout(() => setCopiado(null), 2000)
   }
 
-  function ligarParaMembro(nome: string, ramal: string) {
-    setToast(`Iniciando chamada interna para ${nome} — ramal ${ramal}`)
-    setTimeout(() => setToast(null), 3000)
-  }
-
   function iniciais(nome: string) {
     return (nome || '').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
   }
 
-  const COR_AVATAR = ['bg-brand-500','bg-emerald-500','bg-amber-500','bg-purple-500','bg-rose-500','bg-cyan-500']
+  const isCalling   = phoneState.status === 'ringing' || phoneState.status === 'active'
+  const timerStr    = `${String(Math.floor(phoneState.timer / 60)).padStart(2, '0')}:${String(phoneState.timer % 60).padStart(2, '0')}`
+  const phoneBusy   = isCalling || phoneState.status === 'initializing' || phoneState.status === 'connecting'
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-6 right-6 z-50 bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg">
-          📡 {toast}
-        </div>
-      )}
 
-      {/* Modal SIP config */}
+      {/* ── Modal SIP config (credenciais para softphone externo) ──────────── */}
       {sipModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className={clsx('w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center', COR_AVATAR[(todos.findIndex((m:any)=>m.id===sipModal.id)) % COR_AVATAR.length])}>
+                <div className={clsx('w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center',
+                  COR_AVATAR[todos.findIndex((m: any) => m.id === sipModal.id) % COR_AVATAR.length]
+                )}>
                   {iniciais(sipModal.nome)}
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{sipModal.nome}</p>
-                  <p className="text-xs text-gray-400">Ramal {sipModal.ramal} · Configuração SIP</p>
+                  <p className="text-xs text-gray-400">Ramal {sipModal.ramal} · Credenciais SIP</p>
                 </div>
               </div>
               <button onClick={() => { setSipModal(null); setSipConfig(null) }} className="text-gray-400 hover:text-gray-600">
@@ -3866,7 +3904,6 @@ function TabRamal() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="px-5 py-4">
               {sipLoading && (
                 <div className="flex items-center justify-center py-8 gap-2 text-gray-400 text-sm">
@@ -3874,27 +3911,27 @@ function TabRamal() {
                   Buscando credenciais...
                 </div>
               )}
-
               {!sipLoading && sipConfig?.erro && (
                 <div className="flex flex-col items-center gap-3 py-6 text-center">
-                  <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
-                    <Radio size={22} className="text-amber-500"/>
-                  </div>
+                  <Radio size={22} className="text-amber-500"/>
                   <p className="text-sm font-medium text-gray-700">{sipConfig.erro}</p>
                   {sipConfig.backfill && (
-                    <p className="text-xs text-gray-400">Acesse <strong>Configurações → Equipe</strong> e clique em <strong>"Provisionar Ramais SIP"</strong> para gerar as credenciais.</p>
+                    <p className="text-xs text-gray-400">Acesse <strong>Configurações → Equipe</strong> e clique em <strong>"Provisionar Ramais SIP"</strong>.</p>
                   )}
                 </div>
               )}
-
               {!sipLoading && sipConfig && !sipConfig.erro && (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs text-gray-500">Configure um softphone (Zoiper, Linphone, Bria) com estas credenciais para usar o ramal:</p>
-
+                  {/* Info: chamadas internas funcionam direto no ETZ */}
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5">
+                    <p className="text-xs text-emerald-800 font-semibold mb-0.5">✅ Chamadas internas via ETZ</p>
+                    <p className="text-xs text-emerald-700">Clique no avatar do colega na Aba Ramal — sem precisar configurar nada.</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Para usar um softphone externo (Zoiper, Bria) em celular ou outro dispositivo:</p>
                   {[
-                    { label: 'Servidor SIP', value: sipConfig.sip_server, chave: 'server' },
-                    { label: 'Usuário SIP',  value: sipConfig.sip_username, chave: 'user' },
-                    { label: 'Senha SIP',    value: sipConfig.sip_password, chave: 'pass', oculto: true },
+                    { label: 'Servidor SIP', value: sipConfig.sip_server,    chave: 'server' },
+                    { label: 'Usuário SIP',  value: sipConfig.sip_username,  chave: 'user'   },
+                    { label: 'Senha SIP',    value: sipConfig.sip_password,  chave: 'pass', oculto: true },
                   ].map(f => (
                     <div key={f.chave}>
                       <label className="text-2xs font-semibold text-gray-400 uppercase tracking-wide block mb-1">{f.label}</label>
@@ -3905,7 +3942,9 @@ function TabRamal() {
                         <button
                           onClick={() => copiar(f.value, f.chave)}
                           className={clsx('text-xs font-semibold px-3 rounded-lg border transition-colors',
-                            copiado === f.chave ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                            copiado === f.chave
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                           )}
                         >
                           {copiado === f.chave ? '✓' : 'Copiar'}
@@ -3913,11 +3952,6 @@ function TabRamal() {
                       </div>
                     </div>
                   ))}
-
-                  <div className="mt-1 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2.5">
-                    <p className="text-2xs text-brand-700 font-semibold mb-0.5">Para chamadas internas:</p>
-                    <p className="text-2xs text-brand-600">Disque o número do ramal do colega (ex: <span className="font-mono font-bold">2202</span>). Todos os membros da equipe estão no mesmo servidor.</p>
-                  </div>
                 </div>
               )}
             </div>
@@ -3931,7 +3965,89 @@ function TabRamal() {
         </div>
       )}
 
-      {/* KPIs */}
+      {/* ── Status da conexão WebRTC ────────────────────────────────────────── */}
+      {(phoneState.status === 'initializing' || phoneState.status === 'connecting') && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+          <div className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin flex-shrink-0"/>
+          Conectando ao sistema de chamadas...
+        </div>
+      )}
+      {phoneState.status === 'ready' && (
+        <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"/>
+          Sistema ativo — clique em um avatar para ligar
+        </div>
+      )}
+      {phoneState.status === 'error' && (
+        <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+          <span className="flex-shrink-0">⚠️</span>
+          <span className="flex-1 truncate">{phoneState.error || 'Erro na conexão de voz'}</span>
+          <button onClick={() => phoneActions.init()} className="ml-auto font-medium text-blue-600 hover:underline whitespace-nowrap">
+            Reconectar
+          </button>
+        </div>
+      )}
+
+      {/* ── Barra de chamada ativa ─────────────────────────────────────────── */}
+      {(isCalling || phoneState.status === 'hangup') && chamandoMembro && (
+        <div className={clsx(
+          'flex items-center gap-3 px-4 py-3 rounded-xl border transition-all',
+          phoneState.status === 'active'  ? 'bg-emerald-50 border-emerald-200' :
+          phoneState.status === 'hangup'  ? 'bg-gray-50 border-gray-100'       :
+                                            'bg-amber-50 border-amber-200'
+        )}>
+          {/* Avatar */}
+          <div className={clsx('w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0',
+            COR_AVATAR[todos.findIndex((m: any) => m.id === chamandoMembro.id) % COR_AVATAR.length]
+          )}>
+            {iniciais(chamandoMembro.nome)}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+              {phoneState.status === 'ringing' && <span className="text-amber-600 text-xs">📡 Chamando...</span>}
+              {phoneState.status === 'active'  && <span className="text-emerald-600 text-xs">🔊 Em chamada</span>}
+              {phoneState.status === 'hangup'  && <span className="text-gray-400 text-xs">Encerrada</span>}
+              <span>{chamandoMembro.nome}</span>
+            </p>
+            <p className="text-xs text-gray-400">Ramal {chamandoMembro.ramal}</p>
+          </div>
+
+          {/* Timer */}
+          {phoneState.status === 'active' && (
+            <span className="text-sm font-mono font-bold text-emerald-700 flex-shrink-0">{timerStr}</span>
+          )}
+
+          {/* Mute */}
+          {phoneState.status === 'active' && (
+            <button
+              onClick={phoneActions.toggleMute}
+              title={phoneState.muted ? 'Ativar microfone' : 'Silenciar'}
+              className={clsx('p-2 rounded-lg border transition-colors flex-shrink-0',
+                phoneState.muted
+                  ? 'bg-red-50 border-red-200 text-red-600'
+                  : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+              )}
+            >
+              {phoneState.muted ? <MicOff size={14}/> : <Mic size={14}/>}
+            </button>
+          )}
+
+          {/* Encerrar */}
+          {(phoneState.status === 'ringing' || phoneState.status === 'active') && (
+            <button
+              onClick={encerrarChamada}
+              title="Encerrar chamada"
+              className="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors flex-shrink-0"
+            >
+              <PhoneOff size={14}/>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── KPIs ───────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         <div className="kpi-card">
           <span className="text-2xl font-bold font-mono text-gray-900">{total}</span>
@@ -3947,11 +4063,13 @@ function TabRamal() {
         </div>
       </div>
 
-      {/* Diretório em cards */}
+      {/* ── Diretório em cards ─────────────────────────────────────────────── */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900">Diretório da equipe</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Clique em um card para ligar · clique no ramal para ver a configuração SIP</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Clique no avatar para ligar · clique no badge do ramal para ver as credenciais SIP
+          </p>
         </div>
 
         {isLoading && (
@@ -3968,49 +4086,76 @@ function TabRamal() {
         {todos.length > 0 && (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {todos.map((m: any, idx: number) => {
-              const cor = COR_AVATAR[idx % COR_AVATAR.length]
-              const isOnline = m.ativo !== false
+              const cor        = COR_AVATAR[idx % COR_AVATAR.length]
+              const isOnline   = m.ativo !== false
+              const hasSip     = !!m.sip_username
+              const isChamando = chamandoMembro?.id === m.id && isCalling
+              // Desabilita card se: offline OU em outra chamada ativa OU sem credencial SIP
+              const disabled   = !isOnline || (phoneBusy && !isChamando) || !hasSip
+
               return (
                 <div
                   key={m.id}
                   className={clsx(
                     'flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all',
-                    isOnline ? 'bg-white border-gray-200 hover:border-brand-300 hover:shadow-sm' : 'bg-gray-50 border-gray-100 opacity-60'
+                    isChamando          ? 'bg-emerald-50 border-emerald-300 shadow-sm' :
+                    !isOnline           ? 'bg-gray-50 border-gray-100 opacity-60'      :
+                    !hasSip             ? 'bg-gray-50 border-gray-100 opacity-50'      :
+                                          'bg-white border-gray-200 hover:border-brand-300 hover:shadow-sm'
                   )}
                 >
                   {/* Avatar — clica para ligar */}
                   <button
-                    disabled={!isOnline}
-                    onClick={() => isOnline && m.ramal && ligarParaMembro(m.nome, m.ramal)}
-                    className="focus:outline-none"
+                    disabled={disabled}
+                    onClick={() => !disabled && ligarParaMembro(m)}
+                    className={clsx('focus:outline-none relative', disabled ? 'cursor-default' : 'cursor-pointer')}
+                    title={!hasSip ? 'Sem credencial SIP' : !isOnline ? 'Offline' : `Ligar para ${m.nome}`}
                   >
-                    <div className={clsx('w-12 h-12 rounded-full text-white text-sm font-bold flex items-center justify-center', cor,
-                      isOnline && 'hover:opacity-80 transition-opacity cursor-pointer'
+                    <div className={clsx(
+                      'w-12 h-12 rounded-full text-white text-sm font-bold flex items-center justify-center transition-opacity',
+                      cor,
+                      !disabled && 'hover:opacity-80'
                     )}>
                       {iniciais(m.nome)}
                     </div>
+                    {/* Pulse quando chamando este membro */}
+                    {isChamando && (
+                      <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse"/>
+                    )}
                   </button>
 
-                  {/* Nome */}
+                  {/* Nome + cargo */}
                   <div className="w-full">
                     <p className="text-xs font-semibold text-gray-900 truncate leading-tight">{m.nome}</p>
                     <p className="text-2xs text-gray-400 truncate mt-0.5">{m.cargo || m.funcao || '—'}</p>
                   </div>
 
-                  {/* Ramal — clica para ver config SIP */}
+                  {/* Badge ramal — clica para ver credenciais SIP */}
                   <button
                     onClick={() => abrirSipConfig(m)}
-                    className="flex items-center gap-1 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 w-full justify-center hover:bg-brand-100 transition-colors"
-                    title="Ver configuração SIP"
+                    className={clsx(
+                      'flex items-center gap-1 rounded-lg px-2.5 py-1 w-full justify-center transition-colors',
+                      hasSip
+                        ? 'bg-brand-50 border border-brand-100 hover:bg-brand-100'
+                        : 'bg-gray-50 border border-gray-200 cursor-default'
+                    )}
+                    title={hasSip ? 'Ver credenciais SIP' : 'Sem ramal configurado'}
+                    disabled={!hasSip}
                   >
-                    <PhoneCall size={10} className="text-brand-500 flex-shrink-0"/>
-                    <span className="text-xs font-mono font-bold text-brand-600">{m.ramal || '—'}</span>
+                    <PhoneCall size={10} className={hasSip ? 'text-brand-500 flex-shrink-0' : 'text-gray-400 flex-shrink-0'}/>
+                    <span className={clsx('text-xs font-mono font-bold', hasSip ? 'text-brand-600' : 'text-gray-400')}>
+                      {m.ramal || '—'}
+                    </span>
                   </button>
 
                   {/* Status */}
                   <div className="flex items-center gap-1">
-                    <span className={clsx('w-1.5 h-1.5 rounded-full', isOnline ? 'bg-emerald-500' : 'bg-gray-300')}/>
-                    <span className="text-2xs text-gray-400">{isOnline ? 'Disponível' : 'Offline'}</span>
+                    <span className={clsx('w-1.5 h-1.5 rounded-full',
+                      isChamando ? 'bg-emerald-500 animate-pulse' : isOnline ? 'bg-emerald-500' : 'bg-gray-300'
+                    )}/>
+                    <span className="text-2xs text-gray-400">
+                      {isChamando ? 'Em chamada' : isOnline ? 'Disponível' : 'Offline'}
+                    </span>
                   </div>
                 </div>
               )
