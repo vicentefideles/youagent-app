@@ -78,7 +78,7 @@ export const contatosApi = {
   bulkInsert:   (data: unknown) => api.post('/contatos/bulk', data),
   patch:        (id: string, data: unknown) => api.patch(`/contatos/${id}`, data),
   reativacao:   (tipo: string, dias: number) => api.get(`/contatos/reativacao?tipo=${tipo}&dias=${dias}`),
-  reativarLote: (data: { ids: string[]; canal: string; mensagem: string }) => api.post('/contatos/reativar-lote', data),
+  reativarLote: (data: { ids: string[]; canal: string; mensagem: string; vendedor_id?: string }) => api.post('/contatos/reativar-lote', data),
 }
 
 /** @deprecated Use campanhasApi */

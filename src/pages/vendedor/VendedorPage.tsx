@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ExternalLink, Calendar, CheckCircle, ChevronDown } from 'lucide-react'
-import { reunioesApi } from '@/services/api'
+import { ExternalLink, Calendar, CheckCircle, ChevronDown, Users } from 'lucide-react'
+import { reunioesApi, equipeApi } from '@/services/api'
 import { PainelReativacao } from '@/pages/discadora/DiscadoraPage'
 
 type TabId = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens' | 'reativacao'
@@ -761,6 +761,74 @@ function TabMensagens() {
   )
 }
 
+// ─── TabReativacaoVendedor — painel reativação com filtro por vendedor ────────
+
+function TabReativacaoVendedor() {
+  const [vendedorSel, setVendedorSel] = useState<string>('')
+
+  const { data: equipeRaw = [] } = useQuery({
+    queryKey: ['equipe-reativ'],
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
+  })
+
+  const vendedores = (equipeRaw as any[]).filter((m: any) =>
+    m.funcao === 'vendedor' || m.cargo?.toLowerCase().includes('vend') || m.ativo !== false
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Filtro por vendedor */}
+      {vendedores.length > 1 && (
+        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+          <Users size={14} className="text-gray-400 flex-shrink-0"/>
+          <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Enviar como:</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setVendedorSel('')}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                vendedorSel === ''
+                  ? 'bg-brand-600 text-white border-brand-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Minha conta
+            </button>
+            {vendedores.map((v: any) => (
+              <button
+                key={v.id}
+                onClick={() => setVendedorSel(v.id)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+                  vendedorSel === v.id
+                    ? 'bg-brand-600 text-white border-brand-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full text-white text-2xs font-bold flex items-center justify-center flex-shrink-0 ${
+                  vendedorSel === v.id ? 'bg-white/20' : 'bg-brand-400'
+                }`}>
+                  {(v.nome || 'V').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
+                {v.nome?.split(' ')[0]}
+                {!v.whatsapp_status || v.whatsapp_status !== 'conectado'
+                  ? <span className="text-2xs opacity-60">(sem WA)</span>
+                  : <span className="text-2xs opacity-80">✓ WA</span>
+                }
+              </button>
+            ))}
+          </div>
+          {vendedorSel && (
+            <p className="text-2xs text-gray-400 ml-auto whitespace-nowrap">
+              WA enviado pelo WhatsApp de <strong>{vendedores.find((v: any) => v.id === vendedorSel)?.nome?.split(' ')[0]}</strong>
+            </p>
+          )}
+        </div>
+      )}
+
+      <PainelReativacao vendedorIdExterno={vendedorSel || undefined} />
+    </div>
+  )
+}
+
 // ─── Tabs config ──────────────────────────────────────────────────────────────
 
 const tabs: { id: TabId; label: string; badge?: string; badgeColor?: string }[] = [
@@ -889,7 +957,7 @@ export default function VendedorPage() {
         {activeTab === 'email' && <TabEmail />}
         {activeTab === 'gcal' && <TabGcal />}
         {activeTab === 'mensagens'   && <TabMensagens />}
-        {activeTab === 'reativacao'  && <PainelReativacao />}
+        {activeTab === 'reativacao'  && <TabReativacaoVendedor />}
       </div>
     </div>
   )

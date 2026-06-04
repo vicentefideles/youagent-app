@@ -220,7 +220,7 @@ function CallCardModal({ callCard: h, onClose, onSave }: CallCardModalProps) {
 
 // ─── TIPOS ──────────────────────────────────────────────────────────────────
 
-type Tab = 'fila' | 'agendados' | 'gravacoes' | 'manual' | 'agenda' | 'aovivo' | 'historico' | 'ramal' | 'reativacao'
+type Tab = 'fila' | 'agendados' | 'gravacoes' | 'manual' | 'agenda' | 'aovivo' | 'historico' | 'ramal'
 
 type StatusLigacao = 'em_ligacao' | 'na_fila' | 'retornar' | 'agendado'
 
@@ -4070,7 +4070,7 @@ const TIPO_LABEL: Record<string, string> = {
   todos:     'Todos os inativos',
 }
 
-export function PainelReativacao() {
+export function PainelReativacao({ vendedorIdExterno }: { vendedorIdExterno?: string } = {}) {
   // ── Config ─────────────────────────────────────────────────────────────────
   const [tipo, setTipo]         = useState('pipeline')
   const [dias, setDias]         = useState(30)
@@ -4122,7 +4122,7 @@ export function PainelReativacao() {
     setEnviando(true)
     setResultado(null)
     try {
-      const r = await contatosApi.reativarLote({ ids, canal, mensagem })
+      const r = await contatosApi.reativarLote({ ids, canal, mensagem, vendedor_id: vendedorIdExterno })
       setResultado(r.data)
       // Remove enviados da lista
       setLeads(prev => prev.filter(l => !ids.includes(String(l.id))))
@@ -4376,9 +4376,7 @@ export function PainelReativacao() {
   )
 }
 
-function TabReativacao() {
-  return <PainelReativacao />
-}
+// TabReativacao removida da Discadora — use PainelReativacao no módulo Vendedor
 
 // ─── TABS CONFIG ──────────────────────────────────────────────────────────────
 
@@ -4390,8 +4388,7 @@ const TABS_BASE: { id: Tab; label: string; icon: React.ReactNode; badge?: number
   { id:'agenda',    label:'Minha Agenda',      icon:<Calendar size={13}/> },
   { id:'aovivo',    label:'Ao Vivo',           icon:<Radio size={13}/> },
   { id:'historico', label:'Histórico',         icon:<History size={13}/> },
-  { id:'ramal',      label:'Ramal',      icon:<Antenna size={13}/> },
-  { id:'reativacao', label:'Reativação', icon:<RefreshCw size={13}/> },
+  { id:'ramal', label:'Ramal', icon:<Antenna size={13}/> },
 ]
 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
@@ -4481,7 +4478,6 @@ export default function DiscadoraPage() {
       )}
       {activeTab === 'historico' && <TabHistorico />}
       {activeTab === 'ramal'      && <TabRamal />}
-      {activeTab === 'reativacao' && <TabReativacao />}
     </div>
   )
 }
