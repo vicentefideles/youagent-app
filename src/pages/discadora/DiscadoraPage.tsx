@@ -3785,22 +3785,17 @@ function TabHistorico() {
 
 function TabRamal() {
   const [toast, setToast] = useState<string | null>(null)
-  const [busca, setBusca] = useState('')
 
   const { data: equipeRaw = [], isLoading } = useQuery({
     queryKey: ['equipe-ramal'],
-    queryFn: () => fetch('/api/v1/equipe', { headers: { Authorization: `Bearer ${localStorage.getItem('etz_token')}` } }).then(r => r.json()),
+    queryFn: () => equipeApi.list().then(r => r.data as any[]),
     refetchInterval: 30000,
   })
 
   const membros = (equipeRaw as any[]).filter(m => m.ativo !== false)
-  const filtrados = busca.trim()
-    ? membros.filter(m => m.nome?.toLowerCase().includes(busca.toLowerCase()) || m.cargo?.toLowerCase().includes(busca.toLowerCase()))
-    : membros
-
-  const total      = membros.length
-  const comRamal   = membros.filter(m => m.ramal).length
-  const semRamal   = total - comRamal
+  const total    = membros.length
+  const comRamal = membros.filter(m => m.ramal).length
+  const semRamal = total - comRamal
 
   function ligarParaMembro(nome: string, ramal: string) {
     setToast(`Iniciando chamada interna para ${nome} — ramal ${ramal}`)
@@ -3838,7 +3833,7 @@ function TabRamal() {
         </div>
       </div>
 
-      {/* Info box — SIP movido para Config */}
+      {/* Info SIP */}
       <div className="flex items-start gap-3 bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
         <Radio size={15} className="text-brand-500 mt-0.5 flex-shrink-0"/>
         <div>
@@ -3849,95 +3844,71 @@ function TabRamal() {
         </div>
       </div>
 
-      {/* Diretório da equipe */}
+      {/* Diretório em cards */}
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-gray-100">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Diretório da equipe</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Ramais são atribuídos automaticamente ao criar um perfil</p>
-          </div>
-          <div className="relative w-52">
-            <input
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar membro..."
-              className="input text-xs py-1.5 pl-3 pr-3 w-full"
-            />
-          </div>
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-900">Diretório da equipe</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Clique em um card para iniciar uma chamada interna via ramal</p>
         </div>
 
         {isLoading && (
           <div className="px-4 py-10 text-center text-xs text-gray-400">Carregando equipe...</div>
         )}
-        {!isLoading && filtrados.length === 0 && (
+
+        {!isLoading && membros.length === 0 && (
           <div className="px-4 py-10 text-center">
-            <div className="text-sm text-gray-500 font-medium">
-              {busca ? 'Nenhum membro encontrado para esta busca' : 'Nenhum membro na equipe'}
-            </div>
-            {!busca && (
-              <p className="text-xs text-gray-400 mt-1">Adicione membros em <strong>Configurações → Equipe</strong></p>
-            )}
+            <p className="text-sm text-gray-500 font-medium">Nenhum membro na equipe</p>
+            <p className="text-xs text-gray-400 mt-1">Adicione membros em <strong>Configurações → Equipe</strong></p>
           </div>
         )}
-        {filtrados.length > 0 && (
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                {['Nome', 'Cargo', 'Ramal SIP', 'Status', ''].map(h => (
-                  <th key={h} className="text-left text-2xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtrados.map((m: any, idx: number) => {
-                const cor = COR_AVATAR[idx % COR_AVATAR.length]
-                const temRamal = !!m.ramal
-                return (
-                  <tr key={m.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={clsx('w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0', cor)}>
-                          {iniciais(m.nome)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{m.nome}</div>
-                          {m.email && <div className="text-2xs text-gray-400">{m.email}</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{m.cargo || m.funcao || '—'}</td>
-                    <td className="px-4 py-3">
-                      {temRamal ? (
-                        <span className="text-sm font-mono font-semibold text-brand-600">{m.ramal}</span>
-                      ) : (
-                        <span className="text-2xs text-amber-600 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">sem ramal</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={clsx('w-2 h-2 rounded-full flex-shrink-0',
-                          m.ativo !== false ? 'bg-emerald-500' : 'bg-gray-300'
-                        )}/>
-                        <span className="text-2xs text-gray-600">
-                          {m.ativo !== false ? 'Disponível' : 'Inativo'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {temRamal && m.ativo !== false && (
-                        <button
-                          onClick={() => ligarParaMembro(m.nome, m.ramal)}
-                          className="flex items-center gap-1.5 text-2xs font-semibold px-2.5 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-600 hover:bg-brand-100 transition-colors"
-                        >
-                          <PhoneCall size={11}/> Ligar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+
+        {membros.length > 0 && (
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {membros.map((m: any, idx: number) => {
+              const cor = COR_AVATAR[idx % COR_AVATAR.length]
+              const temRamal = !!m.ramal
+              return (
+                <button
+                  key={m.id}
+                  disabled={!temRamal}
+                  onClick={() => temRamal && ligarParaMembro(m.nome, m.ramal)}
+                  className={clsx(
+                    'flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all',
+                    temRamal
+                      ? 'bg-white border-gray-200 hover:border-brand-300 hover:shadow-sm hover:bg-brand-50/30 cursor-pointer'
+                      : 'bg-gray-50 border-gray-100 cursor-default opacity-60'
+                  )}
+                >
+                  {/* Avatar */}
+                  <div className={clsx('w-12 h-12 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0', cor)}>
+                    {iniciais(m.nome)}
+                  </div>
+
+                  {/* Nome */}
+                  <div className="w-full">
+                    <p className="text-xs font-semibold text-gray-900 truncate leading-tight">{m.nome}</p>
+                    <p className="text-2xs text-gray-400 truncate mt-0.5">{m.cargo || m.funcao || '—'}</p>
+                  </div>
+
+                  {/* Ramal */}
+                  {temRamal ? (
+                    <div className="flex items-center gap-1 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 w-full justify-center">
+                      <PhoneCall size={10} className="text-brand-500 flex-shrink-0"/>
+                      <span className="text-xs font-mono font-bold text-brand-600">{m.ramal}</span>
+                    </div>
+                  ) : (
+                    <span className="text-2xs text-amber-500 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">sem ramal</span>
+                  )}
+
+                  {/* Status dot */}
+                  <div className="flex items-center gap-1">
+                    <span className={clsx('w-1.5 h-1.5 rounded-full', m.ativo !== false ? 'bg-emerald-500' : 'bg-gray-300')}/>
+                    <span className="text-2xs text-gray-400">{m.ativo !== false ? 'Disponível' : 'Inativo'}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>

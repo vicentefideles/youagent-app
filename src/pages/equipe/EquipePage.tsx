@@ -18,6 +18,7 @@ interface ApiVendedor {
   ativo: boolean
   criado_em: string
   whatsapp_status?: string
+  ramal?: string
 }
 
 interface Vendedor {
@@ -36,6 +37,7 @@ interface Vendedor {
   realizado: number
   avatar: string
   whatsappStatus: string
+  ramal?: string
 }
 
 interface NovoVendedor {
@@ -510,6 +512,7 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
                 <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 whitespace-nowrap">Vendedor</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Cargo</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Ramal</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Agentes</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Ligações</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Reuniões</th>
@@ -520,7 +523,7 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
             <tbody className="divide-y divide-gray-50">
               {vendedores.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-400">
                     Nenhum vendedor cadastrado ainda.
                   </td>
                 </tr>
@@ -541,6 +544,17 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
                   </td>
                   <td className="px-4 py-3.5">
                     <StatusDot status={v.status} />
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {v.ramal ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-100 text-xs font-mono font-semibold text-blue-700">
+                        📞 {v.ramal}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-500 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">
+                        sem ramal
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5 text-right text-gray-700 tabular-nums">{v.agentesAtivos}</td>
                   <td className="px-4 py-3.5 text-right text-gray-700 tabular-nums">{v.ligacoes.toLocaleString('pt-BR')}</td>
@@ -896,6 +910,7 @@ export default function EquipePage() {
           realizado: 0,
           avatar: getInitials(v.nome),
           whatsappStatus: v.whatsapp_status || 'desconectado',
+          ramal: v.ramal,
         }
       })
 
