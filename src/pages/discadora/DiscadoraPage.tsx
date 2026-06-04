@@ -10,7 +10,7 @@ import {
   User, Building2, MapPin, MessageSquare, X,
   Play, Pause, PauseCircle, CheckCircle2, XCircle, RotateCcw,
   Volume2, Video, Hash, Sparkles, Send, Save,
-  RefreshCw, Archive, ArrowUpDown,
+  RefreshCw, Archive,
   Copy, PhoneForwarded, FileText, Zap, Star
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -3783,204 +3783,162 @@ function TabHistorico() {
 
 // ─── ABA RAMAL ───────────────────────────────────────────────────────────────
 
-interface MembroEquipe {
-  nome: string
-  cargo: string
-  ramal: string
-  status: 'disponivel' | 'em_chamada' | 'offline'
-}
-
-interface ChamadaRecente {
-  direcao: 'entrada' | 'saida'
-  nomeOuNumero: string
-  duracao: string
-  dataHora: string
-}
-
-const EQUIPE_RAMAL: MembroEquipe[] = [
-  { nome: 'João Silva',      cargo: 'Closer SP',    ramal: '2202', status: 'disponivel' },
-  { nome: 'Carlos Ferreira', cargo: 'Closer MG',    ramal: '2203', status: 'em_chamada' },
-  { nome: 'Ana Rodrigues',   cargo: 'Gerente',      ramal: '2204', status: 'disponivel' },
-  { nome: 'Fernanda Rocha',  cargo: 'Colaboradora', ramal: '2205', status: 'offline'    },
-  { nome: 'Marcos Lima',     cargo: 'Closer GO',    ramal: '2206', status: 'disponivel' },
-]
-
-const CHAMADAS_RAMAL: ChamadaRecente[] = [
-  { direcao: 'saida',   nomeOuNumero: 'João Silva',      duracao: '4m32s', dataHora: 'Hoje · 10h14' },
-  { direcao: 'entrada', nomeOuNumero: '(11) 98765-4321', duracao: '1m18s', dataHora: 'Hoje · 09h52' },
-  { direcao: 'saida',   nomeOuNumero: 'Ana Rodrigues',   duracao: '2m05s', dataHora: 'Hoje · 09h30' },
-  { direcao: 'entrada', nomeOuNumero: 'Carlos Ferreira', duracao: '0m47s', dataHora: 'Ontem · 17h40' },
-  { direcao: 'saida',   nomeOuNumero: '(31) 97654-3210', duracao: '3m22s', dataHora: 'Ontem · 16h15' },
-]
-
 function TabRamal() {
-  const [copiado, setCopiado] = useState(false)
-  const [atenderRamal, setAtenderRamal] = useState(true)
-  const [gravarRamal, setGravarRamal] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
-  const sipAddress = 'sip:2201@youagent.telnyx.com'
+  const [busca, setBusca] = useState('')
 
-  function copiarSip() {
-    navigator.clipboard.writeText(sipAddress).catch(() => undefined)
-    setCopiado(true)
-    setTimeout(() => setCopiado(false), 2000)
-  }
+  const { data: equipeRaw = [], isLoading } = useQuery({
+    queryKey: ['equipe-ramal'],
+    queryFn: () => fetch('/api/v1/equipe', { headers: { Authorization: `Bearer ${localStorage.getItem('etz_token')}` } }).then(r => r.json()),
+    refetchInterval: 30000,
+  })
 
-  function ligarParaMembro(nome: string) {
-    setToast(`Iniciando chamada para ${nome}...`)
+  const membros = (equipeRaw as any[]).filter(m => m.ativo !== false)
+  const filtrados = busca.trim()
+    ? membros.filter(m => m.nome?.toLowerCase().includes(busca.toLowerCase()) || m.cargo?.toLowerCase().includes(busca.toLowerCase()))
+    : membros
+
+  const total      = membros.length
+  const comRamal   = membros.filter(m => m.ramal).length
+  const semRamal   = total - comRamal
+
+  function ligarParaMembro(nome: string, ramal: string) {
+    setToast(`Iniciando chamada interna para ${nome} — ramal ${ramal}`)
     setTimeout(() => setToast(null), 3000)
   }
 
+  function iniciais(nome: string) {
+    return (nome || '').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+  }
+
+  const COR_AVATAR = ['bg-brand-500','bg-emerald-500','bg-amber-500','bg-purple-500','bg-rose-500','bg-cyan-500']
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 right-6 z-50 bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg animate-fade-in">
+        <div className="fixed top-6 right-6 z-50 bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg">
           📡 {toast}
         </div>
       )}
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Ramal ativo', value: 'SIP/2201',  color: 'text-brand-600',   bg: 'bg-brand-50',   border: 'border-brand-200' },
-          { label: 'Status',      value: '🟢 Online',  color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-          { label: 'Latência',    value: '42ms',        color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-        ].map(k => (
-          <div key={k.label} className={clsx('rounded-xl border p-4 flex items-center gap-4', k.bg, k.border)}>
-            <div>
-              <div className={clsx('text-xl font-bold font-mono', k.color)}>{k.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
-            </div>
-          </div>
-        ))}
+      {/* KPIs */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="kpi-card">
+          <span className="text-2xl font-bold font-mono text-gray-900">{total}</span>
+          <span className="text-xs text-gray-500">Membros ativos</span>
+        </div>
+        <div className="kpi-card">
+          <span className="text-2xl font-bold font-mono text-emerald-600">{comRamal}</span>
+          <span className="text-xs text-gray-500">Com ramal atribuído</span>
+        </div>
+        <div className="kpi-card">
+          <span className={clsx('text-2xl font-bold font-mono', semRamal > 0 ? 'text-amber-500' : 'text-gray-400')}>{semRamal}</span>
+          <span className="text-xs text-gray-500">Aguardando ramal</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-[380px_1fr] gap-6">
-        {/* Card principal SIP */}
-        <div className="flex flex-col gap-4">
-          <div className="card p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Meu ramal SIP</h3>
-            <div className="flex flex-col gap-4">
-              {/* SIP address */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 block mb-1.5">Número SIP</label>
-                <div className="flex gap-2">
-                  <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                    <Radio size={13} className="text-gray-400 flex-shrink-0"/>
-                    <span className="text-xs font-mono text-gray-700 flex-1">{sipAddress}</span>
-                  </div>
-                  <button
-                    onClick={copiarSip}
-                    className={clsx('text-xs font-semibold px-3 py-2 rounded-lg border transition-colors', copiado ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50')}
-                  >
-                    {copiado ? 'Copiado!' : 'Copiar'}
-                  </button>
-                </div>
-              </div>
+      {/* Info box — SIP movido para Config */}
+      <div className="flex items-start gap-3 bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
+        <Radio size={15} className="text-brand-500 mt-0.5 flex-shrink-0"/>
+        <div>
+          <p className="text-xs font-semibold text-brand-700">Configuração SIP pessoal</p>
+          <p className="text-xs text-brand-600 mt-0.5">
+            Para configurar seu ramal SIP pessoal (endereço, softphone e gravação), acesse <strong>Configurações → Meu Ramal</strong>.
+          </p>
+        </div>
+      </div>
 
-              {/* Status */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>
-                <span className="text-emerald-700 font-semibold">Registrado — Telnyx</span>
-              </div>
-
-              {/* Toggles */}
-              <div className="flex flex-col gap-3 pt-2 border-t border-gray-100">
-                {[
-                  { label: 'Atender chamadas via ramal', value: atenderRamal, set: setAtenderRamal },
-                  { label: 'Gravar chamadas do ramal',   value: gravarRamal,  set: setGravarRamal  },
-                ].map(t => (
-                  <div key={t.label} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">{t.label}</span>
-                    <button
-                      onClick={() => t.set(!t.value)}
-                      className={clsx('w-10 h-5 rounded-full transition-colors relative flex-shrink-0', t.value ? 'bg-brand-600' : 'bg-gray-300')}
-                    >
-                      <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', t.value ? 'translate-x-5' : 'translate-x-0.5')}/>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* Diretório da equipe */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-gray-100">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Diretório da equipe</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Ramais são atribuídos automaticamente ao criar um perfil</p>
           </div>
-
-          {/* Chamadas recentes */}
-          <div className="card overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-900">Chamadas recentes via ramal</h3>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {CHAMADAS_RAMAL.map((c, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <div className={clsx('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0', c.direcao === 'entrada' ? 'bg-emerald-50' : 'bg-brand-50')}>
-                    <ArrowUpDown size={12} className={c.direcao === 'entrada' ? 'text-emerald-600' : 'text-brand-600'}/>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-gray-900 truncate">{c.nomeOuNumero}</div>
-                    <div className="text-2xs text-gray-400">{c.dataHora}</div>
-                  </div>
-                  <div className="text-xs font-mono text-gray-500 flex-shrink-0">{c.duracao}</div>
-                </div>
-              ))}
-            </div>
+          <div className="relative w-52">
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar membro..."
+              className="input text-xs py-1.5 pl-3 pr-3 w-full"
+            />
           </div>
         </div>
 
-        {/* Diretório da equipe */}
-        <div className="card overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-900">Diretório da equipe</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Clique em "Ligar" para iniciar uma chamada interna</p>
+        {isLoading && (
+          <div className="px-4 py-10 text-center text-xs text-gray-400">Carregando equipe...</div>
+        )}
+        {!isLoading && filtrados.length === 0 && (
+          <div className="px-4 py-10 text-center">
+            <div className="text-sm text-gray-500 font-medium">
+              {busca ? 'Nenhum membro encontrado para esta busca' : 'Nenhum membro na equipe'}
+            </div>
+            {!busca && (
+              <p className="text-xs text-gray-400 mt-1">Adicione membros em <strong>Configurações → Equipe</strong></p>
+            )}
           </div>
+        )}
+        {filtrados.length > 0 && (
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Nome', 'Cargo', 'Ramal', 'Status', ''].map(h => (
+                {['Nome', 'Cargo', 'Ramal SIP', 'Status', ''].map(h => (
                   <th key={h} className="text-left text-2xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {EQUIPE_RAMAL.map(m => (
-                <tr key={m.ramal} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                        {m.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {filtrados.map((m: any, idx: number) => {
+                const cor = COR_AVATAR[idx % COR_AVATAR.length]
+                const temRamal = !!m.ramal
+                return (
+                  <tr key={m.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={clsx('w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0', cor)}>
+                          {iniciais(m.nome)}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{m.nome}</div>
+                          {m.email && <div className="text-2xs text-gray-400">{m.email}</div>}
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">{m.nome}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{m.cargo}</td>
-                  <td className="px-4 py-3 text-xs font-mono text-gray-600">{m.ramal}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className={clsx('w-2 h-2 rounded-full flex-shrink-0',
-                        m.status === 'disponivel' ? 'bg-emerald-500' :
-                        m.status === 'em_chamada' ? 'bg-amber-500 animate-pulse' :
-                        'bg-gray-400'
-                      )}/>
-                      <span className="text-2xs text-gray-600">
-                        {m.status === 'disponivel' ? '🟢 Disponível' : m.status === 'em_chamada' ? '🟡 Em chamada' : '⚫ Offline'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {m.status !== 'offline' && (
-                      <button
-                        onClick={() => ligarParaMembro(m.nome)}
-                        className="flex items-center gap-1.5 text-2xs font-semibold px-2.5 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-600 hover:bg-brand-100 transition-colors"
-                      >
-                        <PhoneCall size={11}/> Ligar
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600">{m.cargo || m.funcao || '—'}</td>
+                    <td className="px-4 py-3">
+                      {temRamal ? (
+                        <span className="text-sm font-mono font-semibold text-brand-600">{m.ramal}</span>
+                      ) : (
+                        <span className="text-2xs text-amber-600 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">sem ramal</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className={clsx('w-2 h-2 rounded-full flex-shrink-0',
+                          m.ativo !== false ? 'bg-emerald-500' : 'bg-gray-300'
+                        )}/>
+                        <span className="text-2xs text-gray-600">
+                          {m.ativo !== false ? 'Disponível' : 'Inativo'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {temRamal && m.ativo !== false && (
+                        <button
+                          onClick={() => ligarParaMembro(m.nome, m.ramal)}
+                          className="flex items-center gap-1.5 text-2xs font-semibold px-2.5 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-600 hover:bg-brand-100 transition-colors"
+                        >
+                          <PhoneCall size={11}/> Ligar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
     </div>
   )
