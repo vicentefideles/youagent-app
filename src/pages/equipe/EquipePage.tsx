@@ -571,7 +571,7 @@ function TabVendedores({ vendedores, onToggleStatus, onAddVendedor, onEditVended
     setSipProvisionando(true)
     setSipResultado(null)
     try {
-      const token = localStorage.getItem('etz_token') || localStorage.getItem('youagent_jwt') || ''
+      const token = localStorage.getItem('youagent_jwt') || ''
       const r = await fetch('https://app.etztech.com/api/v1/equipe/provisionar-sip', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },

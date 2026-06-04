@@ -3807,7 +3807,7 @@ function TabRamal() {
     setSipConfig(null)
     setSipLoading(true)
     try {
-      const token = localStorage.getItem('etz_token') || localStorage.getItem('youagent_jwt') || ''
+      const token = localStorage.getItem('youagent_jwt') || ''
       const r = await fetch(`/api/v1/equipe/${membro.id}/sip-config`, {
         headers: { Authorization: `Bearer ${token}` }
       })
