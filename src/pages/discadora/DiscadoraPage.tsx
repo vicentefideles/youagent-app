@@ -3792,10 +3792,11 @@ function TabRamal() {
     refetchInterval: 30000,
   })
 
-  const membros = (equipeRaw as any[]).filter(m => m.ativo !== false)
-  const total    = membros.length
-  const comRamal = membros.filter(m => m.ramal).length
-  const semRamal = total - comRamal
+  const todos    = (equipeRaw as any[])
+  const membros  = todos.filter(m => m.ativo !== false)
+  const total    = todos.length
+  const online   = membros.length
+  const offline  = total - online
 
   function ligarParaMembro(nome: string, ramal: string) {
     setToast(`Iniciando chamada interna para ${nome} — ramal ${ramal}`)
@@ -3821,15 +3822,15 @@ function TabRamal() {
       <div className="grid grid-cols-3 gap-3">
         <div className="kpi-card">
           <span className="text-2xl font-bold font-mono text-gray-900">{total}</span>
-          <span className="text-xs text-gray-500">Membros ativos</span>
+          <span className="text-xs text-gray-500">Total de membros</span>
         </div>
         <div className="kpi-card">
-          <span className="text-2xl font-bold font-mono text-emerald-600">{comRamal}</span>
-          <span className="text-xs text-gray-500">Com ramal atribuído</span>
+          <span className="text-2xl font-bold font-mono text-emerald-600">{online}</span>
+          <span className="text-xs text-gray-500">Disponíveis agora</span>
         </div>
         <div className="kpi-card">
-          <span className={clsx('text-2xl font-bold font-mono', semRamal > 0 ? 'text-amber-500' : 'text-gray-400')}>{semRamal}</span>
-          <span className="text-xs text-gray-500">Aguardando ramal</span>
+          <span className={clsx('text-2xl font-bold font-mono', offline > 0 ? 'text-gray-400' : 'text-gray-300')}>{offline}</span>
+          <span className="text-xs text-gray-500">Offline</span>
         </div>
       </div>
 
@@ -3864,17 +3865,17 @@ function TabRamal() {
 
         {membros.length > 0 && (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {membros.map((m: any, idx: number) => {
+            {(equipeRaw as any[]).map((m: any, idx: number) => {
               const cor = COR_AVATAR[idx % COR_AVATAR.length]
-              const temRamal = !!m.ramal
+              const online = m.ativo !== false
               return (
                 <button
                   key={m.id}
-                  disabled={!temRamal}
-                  onClick={() => temRamal && ligarParaMembro(m.nome, m.ramal)}
+                  disabled={!online}
+                  onClick={() => online && m.ramal && ligarParaMembro(m.nome, m.ramal)}
                   className={clsx(
                     'flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all',
-                    temRamal
+                    online
                       ? 'bg-white border-gray-200 hover:border-brand-300 hover:shadow-sm hover:bg-brand-50/30 cursor-pointer'
                       : 'bg-gray-50 border-gray-100 cursor-default opacity-60'
                   )}
@@ -3891,19 +3892,15 @@ function TabRamal() {
                   </div>
 
                   {/* Ramal */}
-                  {temRamal ? (
-                    <div className="flex items-center gap-1 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 w-full justify-center">
-                      <PhoneCall size={10} className="text-brand-500 flex-shrink-0"/>
-                      <span className="text-xs font-mono font-bold text-brand-600">{m.ramal}</span>
-                    </div>
-                  ) : (
-                    <span className="text-2xs text-amber-500 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">sem ramal</span>
-                  )}
+                  <div className="flex items-center gap-1 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 w-full justify-center">
+                    <PhoneCall size={10} className="text-brand-500 flex-shrink-0"/>
+                    <span className="text-xs font-mono font-bold text-brand-600">{m.ramal || '—'}</span>
+                  </div>
 
-                  {/* Status dot */}
+                  {/* Status */}
                   <div className="flex items-center gap-1">
-                    <span className={clsx('w-1.5 h-1.5 rounded-full', m.ativo !== false ? 'bg-emerald-500' : 'bg-gray-300')}/>
-                    <span className="text-2xs text-gray-400">{m.ativo !== false ? 'Disponível' : 'Inativo'}</span>
+                    <span className={clsx('w-1.5 h-1.5 rounded-full', online ? 'bg-emerald-500' : 'bg-gray-300')}/>
+                    <span className="text-2xs text-gray-400">{online ? 'Disponível' : 'Offline'}</span>
                   </div>
                 </button>
               )
