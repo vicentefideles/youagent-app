@@ -2577,19 +2577,19 @@ export default function InteligenciaPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="bg-white border border-gray-200 rounded-xl p-1.5">
-          <div className="flex gap-0 items-start">
+        <div className="bg-white border border-gray-200 rounded-xl px-3 py-2 overflow-x-auto">
+          <div className="flex gap-4 items-start min-w-max">
             {TAB_GROUPS.map((group, gi) => (
-              <div key={gi} className="flex-1">
-                <p className="text-xs text-gray-400 font-semibold px-2 mb-1 uppercase tracking-wide">{group.label}</p>
+              <div key={gi} className="flex flex-col gap-1 flex-shrink-0">
+                <p className="text-2xs text-gray-400 font-semibold px-1 uppercase tracking-widest leading-none">{group.label}</p>
                 <div className="flex gap-0.5">
                   {group.tabs.map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex-1 flex items-center justify-center gap-1 text-xs px-2 py-2 rounded-lg transition-colors whitespace-nowrap font-medium ${
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${
                         activeTab === tab.id
-                          ? 'bg-white border border-gray-200 border-b-2 border-b-blue-600 text-blue-600 font-semibold shadow-sm'
+                          ? 'bg-brand-50 border border-brand-200 text-brand-700 font-semibold shadow-sm'
                           : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                       }`}
                     >
