@@ -6,7 +6,7 @@ import {
   BarChart2, Sliders, TrendingUp, Share2, GitBranch, Play,
   Target, TestTube2, Globe, Cpu, CheckCircle,
   ChevronRight, Upload, Trash2, RotateCcw, Zap,
-  AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star,
+  AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star, X,
 } from 'lucide-react'
 import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi } from '@/services/api'
 
@@ -640,81 +640,369 @@ function TabQualidade() {
   )
 }
 
+interface CrossArgumento {
+  id: string
+  gatilho: string
+  frase: string
+  eficacia?: number
+  aprovado: boolean
+  criado_em?: string
+}
+
+const GATILHO_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  urgencia:    { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200' },
+  preco:       { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
+  proposta:    { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200' },
+  decisor:     { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  concorrente: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  demo:        { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200' },
+  humano:      { bg: 'bg-pink-50',   text: 'text-pink-700',   border: 'border-pink-200' },
+}
+
+function gatilhoBadge(gatilho: string) {
+  const c = GATILHO_COLORS[gatilho] ?? { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' }
+  return <span className={`text-2xs font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} ${c.border}`}>{gatilho}</span>
+}
+
 function TabColetiva() {
-  const steps = ['Ligações', 'Análise', 'Padrões', 'Aprovação', 'Produção', 'Impacto']
-  const segments = [
-    { name: 'Indústria', pct: 42 },
-    { name: 'Varejo', pct: 38 },
-    { name: 'Tecnologia', pct: 61 },
-    { name: 'Serviços', pct: 29 },
-    { name: 'Saúde', pct: 34 },
-    { name: 'Construção', pct: 22 },
+  const [detectando, setDetectando]       = useState(false)
+  const [detectMsg, setDetectMsg]         = useState('')
+  const [acaoId, setAcaoId]               = useState<string | null>(null)
+  const [filtro, setFiltro]               = useState<'pendentes' | 'aprovados'>('pendentes')
+
+  const { data: crossRaw = [], isLoading, refetch } = useQuery<CrossArgumento[]>({
+    queryKey: ['inteligencia-cross'],
+    queryFn: () => inteligenciaApi.getCross().then(r => (r.data as CrossArgumento[]) || []),
+    refetchInterval: 30000,
+  })
+
+  const pendentes = crossRaw.filter(a => !a.aprovado)
+  const aprovados = crossRaw.filter(a =>  a.aprovado)
+  const lista     = filtro === 'pendentes' ? pendentes : aprovados
+
+  // Mapa de gatilhos dos aprovados (para o painel de padrões)
+  const gatilhoCount: Record<string, number> = {}
+  aprovados.forEach(a => {
+    gatilhoCount[a.gatilho] = (gatilhoCount[a.gatilho] || 0) + 1
+  })
+  const gatilhoRanking = Object.entries(gatilhoCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+
+  async function aprovar(id: string) {
+    setAcaoId(id)
+    try {
+      await inteligenciaApi.aprovarCross(id)
+      await refetch()
+    } catch { /* silencioso */ }
+    finally { setAcaoId(null) }
+  }
+
+  async function rejeitar(id: string) {
+    setAcaoId(id)
+    try {
+      await inteligenciaApi.rejeitarCross(id)
+      await refetch()
+    } catch { /* silencioso */ }
+    finally { setAcaoId(null) }
+  }
+
+  async function detectarPadroes() {
+    setDetectando(true)
+    setDetectMsg('Analisando ligações com IA...')
+    try {
+      const res = await inteligenciaApi.detectarPadroes()
+      const d = res.data as { padroes?: any[] }
+      await refetch()
+      const qtd = d?.padroes?.length ?? 0
+      setDetectMsg(qtd > 0 ? `✓ ${qtd} novo${qtd !== 1 ? 's' : ''} padrão${qtd !== 1 ? 'ões' : ''} detectado${qtd !== 1 ? 's' : ''}` : '✓ Análise concluída — sem novos padrões')
+    } catch {
+      setDetectMsg('Erro na análise — tente novamente')
+    } finally {
+      setDetectando(false)
+      setTimeout(() => setDetectMsg(''), 5000)
+    }
+  }
+
+  const STEPS = [
+    { label: 'Ligações', desc: 'Agentes ligam para leads' },
+    { label: 'Análise', desc: 'IA detecta o que converte' },
+    { label: 'Padrões', desc: 'Argumentos gerados' },
+    { label: 'Aprovação', desc: 'Gerente aprova aqui' },
+    { label: 'Produção', desc: 'Injetado nos agentes' },
+    { label: 'Impacto', desc: 'Conversão aumenta' },
   ]
+
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#2d1b69,#4a1d96)' }}
-      >
-        <h2 className="text-lg font-semibold mb-3">Inteligência Coletiva</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'Total insights', value: '847' },
-            { label: 'Segmentos ativos', value: '6' },
-            { label: 'Impacto acumulado', value: '+14.2%' },
-          ].map((k, i) => (
-            <div key={i} className="bg-white/10 rounded-lg p-3">
-              <p className="text-xs text-white/60 mb-0.5">{k.label}</p>
-              <p className="text-xl font-mono font-bold">{k.value}</p>
+
+      {/* ── Explicação ───────────────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Share2 size={18} className="text-purple-600" />
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { icon: '🌐', label: 'Banco Universal', desc: 'Insights compartilhados entre todos os clientes anonimamente' },
-          { icon: '🏢', label: 'Por Segmento', desc: 'Padrões específicos por setor de atuação do lead' },
-          { icon: '📊', label: 'Pesquisa Mercado', desc: 'Dados externos de benchmarking e tendências' },
-        ].map((c, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl mb-2">{c.icon}</div>
-            <p className="text-sm font-semibold text-gray-900 mb-1">{c.label}</p>
-            <p className="text-xs text-gray-500">{c.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Ciclo cascade</h3>
-        <div className="flex items-center gap-1 flex-wrap">
-          {steps.map((s, i) => (
-            <div key={i} className="flex items-center gap-1">
-              <div className="bg-purple-50 border border-purple-200 text-purple-700 text-xs px-3 py-1.5 rounded-lg font-medium">{s}</div>
-              {i < steps.length - 1 && <ArrowRight size={12} className="text-gray-400" />}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Mapa de segmentos</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {segments.map((s, i) => (
-            <div key={i}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600">{s.name}</span>
-                <span className="font-mono text-gray-900 font-semibold">{s.pct}%</span>
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Inteligência Coletiva — Ciclo de Aprendizado</h2>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
+                A cada ligação, a IA identifica frases e argumentos que geraram conversão.
+                Esses padrões chegam aqui como <strong className="text-gray-700">pendentes de aprovação</strong> — você revisa, aprova ou rejeita.
+                Os aprovados são <strong className="text-gray-700">injetados automaticamente em todos os agentes</strong>, que passam a usá-los nas próximas chamadas.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-3">
+                {[
+                  'Padrões extraídos de ligações reais',
+                  'Aprovação obrigatória pelo gerente',
+                  'Aplicado em todos os agentes automaticamente',
+                ].map(t => (
+                  <span key={t} className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1">
+                    <CheckCircle size={11} className="text-emerald-500" /> {t}
+                  </span>
+                ))}
               </div>
-              <Bar pct={s.pct} color="bg-purple-500" />
             </div>
-          ))}
+          </div>
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            <button
+              onClick={detectarPadroes}
+              disabled={detectando}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60"
+            >
+              <Sparkles size={14} className={detectando ? 'animate-pulse' : ''} />
+              {detectando ? 'Analisando...' : 'Detectar padrões agora'}
+            </button>
+            {detectMsg && (
+              <p className={`text-xs font-medium ${detectMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>
+                {detectMsg}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      <button className="w-full bg-purple-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-purple-700 transition-colors">
-        Diagnóstico do ciclo
-      </button>
+      {/* ── KPI strip ────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle size={18} className="text-amber-500" />
+          </div>
+          <div>
+            <p className="text-2xs text-gray-400 font-medium mb-0.5">Pendentes de aprovação</p>
+            <p className="text-2xl font-mono font-bold text-amber-600">{pendentes.length}</p>
+            <p className="text-2xs text-gray-400">aguardando sua revisão</p>
+          </div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <CheckCircle size={18} className="text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-2xs text-gray-400 font-medium mb-0.5">Aprovados e ativos</p>
+            <p className="text-2xl font-mono font-bold text-emerald-600">{aprovados.length}</p>
+            <p className="text-2xs text-gray-400">injetados nos agentes</p>
+          </div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <GitBranch size={18} className="text-brand-600" />
+          </div>
+          <div>
+            <p className="text-2xs text-gray-400 font-medium mb-0.5">Tipos de gatilho</p>
+            <p className="text-2xl font-mono font-bold text-gray-900">{Object.keys(gatilhoCount).length}</p>
+            <p className="text-2xs text-gray-400">categorias distintas</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Ciclo cascade visual ─────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Como funciona o ciclo</h3>
+        <div className="flex items-start gap-1 flex-wrap">
+          {STEPS.map((s, i) => {
+            const isActive = s.label === 'Aprovação' && pendentes.length > 0
+            const isDone   = s.label === 'Produção' && aprovados.length > 0
+            return (
+              <div key={i} className="flex items-center gap-1">
+                <div className={`flex flex-col items-center px-3 py-2 rounded-xl border text-center min-w-[80px] ${
+                  isActive ? 'bg-amber-50 border-amber-300' :
+                  isDone   ? 'bg-emerald-50 border-emerald-200' :
+                  'bg-gray-50 border-gray-100'
+                }`}>
+                  <span className={`text-xs font-semibold ${isActive ? 'text-amber-700' : isDone ? 'text-emerald-700' : 'text-gray-700'}`}>
+                    {s.label}
+                    {isActive && <span className="ml-1 text-2xs">⚡</span>}
+                    {isDone   && <span className="ml-1 text-2xs">✓</span>}
+                  </span>
+                  <span className="text-2xs text-gray-400 mt-0.5 leading-tight">{s.desc}</span>
+                </div>
+                {i < STEPS.length - 1 && <ArrowRight size={13} className="text-gray-300 flex-shrink-0" />}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Lista de argumentos ──────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        {/* Tabs pendentes / aprovados */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
+            <button
+              onClick={() => setFiltro('pendentes')}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                filtro === 'pendentes'
+                  ? 'bg-white border border-gray-200 text-gray-900 shadow-sm font-semibold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              Pendentes
+              {pendentes.length > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-2xs font-bold px-1.5 py-0.5 rounded-full">
+                  {pendentes.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setFiltro('aprovados')}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                filtro === 'aprovados'
+                  ? 'bg-white border border-gray-200 text-gray-900 shadow-sm font-semibold'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              Aprovados e ativos
+              {aprovados.length > 0 && (
+                <span className="bg-emerald-100 text-emerald-700 text-2xs font-bold px-1.5 py-0.5 rounded-full">
+                  {aprovados.length}
+                </span>
+              )}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            {filtro === 'pendentes'
+              ? 'Revise cada argumento e aprove os que devem ser usados pelos agentes'
+              : 'Argumentos já ativos — são usados pelos agentes em todas as chamadas'}
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-50 rounded-xl animate-pulse" />)}
+          </div>
+        ) : lista.length === 0 ? (
+          <div className="py-14 text-center">
+            <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-3">
+              <Share2 size={22} className="text-gray-300" />
+            </div>
+            {filtro === 'pendentes' ? (
+              <>
+                <p className="text-sm font-medium text-gray-500 mb-1">Nenhum argumento pendente</p>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed mb-4">
+                  Clique em "Detectar padrões agora" para a IA analisar as últimas ligações e identificar frases que converteram.
+                </p>
+                <button
+                  onClick={detectarPadroes}
+                  disabled={detectando}
+                  className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60"
+                >
+                  <Sparkles size={14} className={detectando ? 'animate-pulse' : ''} />
+                  {detectando ? 'Analisando...' : 'Detectar padrões agora'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-500 mb-1">Nenhum argumento aprovado ainda</p>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                  Aprove argumentos da aba "Pendentes" para que os agentes comecem a usá-los.
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {lista.map(arg => (
+              <div key={arg.id} className="px-5 py-4 flex items-start gap-4 hover:bg-gray-50/50 transition-colors">
+                {/* Gatilho badge */}
+                <div className="flex-shrink-0 pt-0.5">{gatilhoBadge(arg.gatilho)}</div>
+
+                {/* Frase */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 leading-relaxed">"{arg.frase}"</p>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    {arg.eficacia && arg.eficacia > 0 && (
+                      <span className="text-2xs text-emerald-600 font-semibold">▲ {arg.eficacia}% conversão</span>
+                    )}
+                    {arg.criado_em && (
+                      <span className="text-2xs text-gray-400 font-mono">
+                        {new Date(arg.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
+                    {arg.aprovado && (
+                      <span className="flex items-center gap-1 text-2xs text-emerald-600 font-medium">
+                        <CheckCircle size={10} /> Ativo nos agentes
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ações */}
+                {!arg.aprovado && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => aprovar(arg.id)}
+                      disabled={acaoId === arg.id}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                    >
+                      <CheckCircle size={12} />
+                      {acaoId === arg.id ? '...' : 'Aprovar'}
+                    </button>
+                    <button
+                      onClick={() => rejeitar(arg.id)}
+                      disabled={acaoId === arg.id}
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-60"
+                    >
+                      <X size={12} />
+                      Rejeitar
+                    </button>
+                  </div>
+                )}
+                {arg.aprovado && (
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                    <CheckCircle size={14} className="text-emerald-600" />
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Mapa de gatilhos ativos ──────────────────────────────────────────── */}
+      {gatilhoRanking.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Padrões aprovados por tipo de gatilho</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {gatilhoRanking.map(([gatilho, count]) => {
+              const max = gatilhoRanking[0][1]
+              const pct = Math.round((count / max) * 100)
+              const c = GATILHO_COLORS[gatilho] ?? { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' }
+              return (
+                <div key={gatilho}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className={`font-medium ${c.text}`}>{gatilho}</span>
+                    <span className="font-mono font-bold text-gray-900">{count} argumento{count !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${c.bg.replace('50', '400')}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
