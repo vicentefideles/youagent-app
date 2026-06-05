@@ -1249,7 +1249,8 @@ function TabConhecimento() {
   const [salvando, setSalvando] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
-  const [pdfStatus, setPdfStatus] = useState<string | null>(null) // nome do arquivo selecionado
+  const [pdfStatus, setPdfStatus] = useState<string | null>(null)
+  const [audioFile, setAudioFile] = useState<File | null>(null)
 
   const cats = ['livro', 'artigo', 'video', 'audio', 'texto']
   const catLabel: Record<string, string> = { livro: 'Livro', artigo: 'Artigo', video: 'Vídeo', audio: 'Áudio', texto: 'Texto livre' }
@@ -1295,28 +1296,44 @@ function TabConhecimento() {
     if (format === 'video' && !urlVideo && !textoLivre) { setFeedback('❌ Informe a URL do YouTube ou cole um resumo'); return }
     setSalvando(true); setFeedback(null)
     try {
+      const token = localStorage.getItem('youagent_jwt')
+
       // PDF: envia como multipart/form-data
       if (format === 'livro' && pdfFile) {
         const formData = new FormData()
         formData.append('arquivo', pdfFile)
         formData.append('titulo', titulo)
         formData.append('categoria', categoria)
-        const token = localStorage.getItem('youagent_jwt')
         const resp = await fetch('https://app.etztech.com/api/v1/inteligencia/conhecimento/upload-pdf', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
         })
-        if (!resp.ok) {
-          const err = await resp.json()
-          throw new Error(err.error || 'Erro no upload')
-        }
+        if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || 'Erro no upload') }
         const saved = await resp.json()
         queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
         setTitulo(''); setCategoria(''); setPdfFile(null); setPdfStatus(null); setTextoLivre('')
         setFeedback(`✅ PDF processado! ${saved.paginas_lidas} página(s) lidas, ${(saved.argumentos?.length ?? 0) + (saved.tecnicas?.length ?? 0)} insights extraídos.`)
+
+      // Áudio: envia como multipart/form-data para transcrição com Groq Whisper
+      } else if (format === 'audio' && audioFile) {
+        const formData = new FormData()
+        formData.append('arquivo', audioFile)
+        formData.append('titulo', titulo)
+        formData.append('categoria', categoria)
+        const resp = await fetch('https://app.etztech.com/api/v1/inteligencia/conhecimento/upload-audio', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        })
+        if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || 'Erro no upload') }
+        const saved = await resp.json()
+        queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
+        setTitulo(''); setCategoria(''); setAudioFile(null); setTextoLivre('')
+        setFeedback(`✅ Áudio transcrito e processado! ${saved.chars_transcritos?.toLocaleString() ?? 0} caracteres transcritos, ${(saved.argumentos?.length ?? 0) + (saved.tecnicas?.length ?? 0)} insights extraídos.`)
+
       } else {
-        // Texto / URL / outros
+        // Texto / URL / outros (inclui áudio com texto colado)
         const conteudo = textoLivre || urlArtigo || urlVideo || `Material do tipo ${format}: ${titulo}`
         await api.post('/inteligencia/conhecimento', {
           titulo, tipo: format, categoria,
@@ -1459,10 +1476,35 @@ function TabConhecimento() {
               </div>
             )}
             {format === 'audio' && (
-              <div className="border-2 border-dashed border-purple-200 rounded-xl p-4 text-center bg-purple-50">
-                <Upload size={18} className="mx-auto text-purple-400 mb-1" />
-                <p className="text-xs text-purple-600 font-semibold">Cole a transcrição do áudio abaixo</p>
-                <p className="text-[10px] text-purple-400 mt-0.5">Upload direto em breve</p>
+              <div className="space-y-2">
+                <label className={`cursor-pointer block border-2 border-dashed rounded-xl p-4 text-center transition-colors
+                  ${audioFile ? 'border-purple-300 bg-purple-50' : 'border-purple-200 bg-purple-50 hover:border-purple-400'}`}>
+                  <input type="file" accept=".mp3,.mp4,.wav,.m4a,.ogg,.webm" className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0] ?? null
+                      setAudioFile(f)
+                      if (f) setTextoLivre('')
+                    }} />
+                  {audioFile ? (
+                    <>
+                      <div className="text-2xl mb-1">🎙️</div>
+                      <p className="text-xs text-purple-700 font-semibold truncate">{audioFile.name}</p>
+                      <p className="text-[10px] text-purple-500 mt-0.5">{(audioFile.size / (1024 * 1024)).toFixed(1)} MB · clique para trocar</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={18} className="mx-auto text-purple-400 mb-1" />
+                      <p className="text-xs text-purple-600 font-semibold">Clique para selecionar áudio</p>
+                      <p className="text-[10px] text-purple-400 mt-0.5">MP3, MP4, WAV, M4A · até 25 MB</p>
+                    </>
+                  )}
+                </label>
+                <div className="flex items-start gap-1.5 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                  <span className="text-purple-500 text-sm mt-0.5">🤖</span>
+                  <p className="text-[11px] text-purple-700 leading-relaxed">
+                    <span className="font-semibold">Transcrição automática com Whisper:</span> o sistema converte o áudio em texto e extrai argumentos, técnicas e objeções automaticamente. Ou cole a transcrição no campo abaixo.
+                  </p>
+                </div>
               </div>
             )}
 
