@@ -2875,7 +2875,6 @@ interface CampanhaRow {
   ligacoes: number
   taxaAgend: number
   taxaConv: number
-  icpMedio: number
   status: 'ativa' | 'pausada'
 }
 
@@ -2888,15 +2887,22 @@ function TabCampanhas() {
     queryFn: () => campanhasApi.list().then(r => r.data as any[]),
   })
 
-  const CAMPANHAS_INT: CampanhaRow[] = (campanhasInt as any[]).map((c: any) => ({
-    nome: c.nome ?? c.name ?? '—',
-    tipo: (['outbound', 'inbound', 'nurturing'].includes(c.tipo ?? c.type ?? '') ? (c.tipo ?? c.type) : 'outbound') as CampanhaRow['tipo'],
-    ligacoes: c.ligacoes ?? c.total_ligacoes ?? 0,
-    taxaAgend: c.taxaAgend ?? c.taxa_agend ?? c.taxa_agendamento ?? 0,
-    taxaConv: c.taxaConv ?? c.taxa_conv ?? c.taxa_conversao ?? 0,
-    icpMedio: c.icpMedio ?? c.icp_medio ?? 0,
-    status: (['ativa', 'pausada'].includes(c.status ?? '') ? c.status : 'ativa') as CampanhaRow['status'],
-  }))
+  const CAMPANHAS_INT: CampanhaRow[] = (campanhasInt as any[]).map((c: any) => {
+    const dash = c.dashboard ?? {}
+    const ligacoes_feitas = dash.ligacoes_feitas ?? 0
+    const agendadas = dash.agendadas ?? 0
+    const taxaAgendCalc = ligacoes_feitas > 0
+      ? parseFloat(((agendadas / ligacoes_feitas) * 100).toFixed(1))
+      : 0
+    return {
+      nome: c.nome ?? c.name ?? '—',
+      tipo: (['outbound', 'inbound', 'nurturing'].includes(c.tipo ?? c.type ?? '') ? (c.tipo ?? c.type) : 'outbound') as CampanhaRow['tipo'],
+      ligacoes: ligacoes_feitas,
+      taxaAgend: taxaAgendCalc,
+      taxaConv: dash.taxa_conversao ?? 0,
+      status: (['ativa', 'pausada'].includes(c.status ?? '') ? c.status : 'ativa') as CampanhaRow['status'],
+    }
+  })
 
   const filtrado = CAMPANHAS_INT.filter(c => {
     const tipoOk = filtroTipo === 'todos' || c.tipo === filtroTipo
@@ -2982,7 +2988,7 @@ function TabCampanhas() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
-                {['Campanha','Tipo','Ligações','Tx. Agend.','Tx. Conversão','ICP Médio','Status'].map(h => (
+                {['Campanha','Tipo','Ligações','Tx. Agend.','Tx. Conversão','Status'].map(h => (
                   <th key={h} className="text-left px-4 py-2 font-semibold uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -2999,9 +3005,6 @@ function TabCampanhas() {
                   <td className="px-4 py-2.5 text-xs font-mono text-gray-700">{c.ligacoes}</td>
                   <td className={`px-4 py-2.5 text-xs font-mono font-bold ${c.taxaAgend >= 10 ? 'text-emerald-600' : c.taxaAgend >= 7 ? 'text-blue-600' : 'text-amber-600'}`}>{c.taxaAgend}%</td>
                   <td className={`px-4 py-2.5 text-xs font-mono font-bold ${c.taxaConv >= 6 ? 'text-emerald-600' : c.taxaConv >= 4 ? 'text-blue-600' : 'text-amber-600'}`}>{c.taxaConv}%</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`text-xs font-bold font-mono ${c.icpMedio >= 80 ? 'text-emerald-600' : c.icpMedio >= 65 ? 'text-amber-600' : 'text-red-500'}`}>{c.icpMedio}</span>
-                  </td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${c.status === 'ativa' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                       {c.status}
