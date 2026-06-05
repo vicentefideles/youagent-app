@@ -1248,6 +1248,8 @@ function TabConhecimento() {
   const [textoLivre, setTextoLivre] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [pdfStatus, setPdfStatus] = useState<string | null>(null) // nome do arquivo selecionado
 
   const cats = ['livro', 'artigo', 'video', 'audio', 'texto']
   const catLabel: Record<string, string> = { livro: 'Livro', artigo: 'Artigo', video: 'Vídeo', audio: 'Áudio', texto: 'Texto livre' }
@@ -1289,20 +1291,41 @@ function TabConhecimento() {
 
   async function adicionar() {
     if (!titulo || !categoria) { setFeedback('❌ Preencha título e categoria'); return }
-    const conteudo = textoLivre || urlArtigo || urlVideo || `Material do tipo ${format}: ${titulo}`
     setSalvando(true); setFeedback(null)
     try {
-      await api.post('/inteligencia/conhecimento', {
-        titulo,
-        tipo: format,
-        categoria,
-        conteudo_texto: conteudo,
-        url: urlArtigo || urlVideo || undefined,
-      })
-      queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
-      setTitulo(''); setCategoria(''); setUrlArtigo(''); setUrlVideo(''); setTextoLivre('')
-      setFeedback('✅ Material processado pela IA e adicionado à base!')
-      setTimeout(() => setFeedback(null), 5000)
+      // PDF: envia como multipart/form-data
+      if (format === 'livro' && pdfFile) {
+        const formData = new FormData()
+        formData.append('arquivo', pdfFile)
+        formData.append('titulo', titulo)
+        formData.append('categoria', categoria)
+        const token = localStorage.getItem('youagent_jwt')
+        const resp = await fetch('https://app.etztech.com/api/v1/inteligencia/conhecimento/upload-pdf', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        })
+        if (!resp.ok) {
+          const err = await resp.json()
+          throw new Error(err.error || 'Erro no upload')
+        }
+        const saved = await resp.json()
+        queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
+        setTitulo(''); setCategoria(''); setPdfFile(null); setPdfStatus(null); setTextoLivre('')
+        setFeedback(`✅ PDF processado! ${saved.paginas_lidas} página(s) lidas, ${(saved.argumentos?.length ?? 0) + (saved.tecnicas?.length ?? 0)} insights extraídos.`)
+      } else {
+        // Texto / URL / outros
+        const conteudo = textoLivre || urlArtigo || urlVideo || `Material do tipo ${format}: ${titulo}`
+        await api.post('/inteligencia/conhecimento', {
+          titulo, tipo: format, categoria,
+          conteudo_texto: conteudo,
+          url: urlArtigo || urlVideo || undefined,
+        })
+        queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
+        setTitulo(''); setCategoria(''); setUrlArtigo(''); setUrlVideo(''); setTextoLivre('')
+        setFeedback('✅ Material processado pela IA e adicionado à base!')
+      }
+      setTimeout(() => setFeedback(null), 6000)
     } catch (e: unknown) {
       setFeedback('❌ Erro: ' + (e as Error).message)
     } finally {
@@ -1374,11 +1397,36 @@ function TabConhecimento() {
             </select>
 
             {format === 'livro' && (
-              <div className="border-2 border-dashed border-brand-200 rounded-xl p-4 text-center bg-brand-50">
-                <Upload size={18} className="mx-auto text-brand-400 mb-1" />
-                <p className="text-xs text-brand-600 font-semibold">Cole trechos relevantes do livro abaixo</p>
-                <p className="text-[10px] text-brand-400 mt-0.5">Upload de PDF em breve</p>
-              </div>
+              <label className={`cursor-pointer block border-2 border-dashed rounded-xl p-4 text-center transition-colors
+                ${pdfFile ? 'border-emerald-300 bg-emerald-50' : 'border-brand-200 bg-brand-50 hover:border-brand-400 hover:bg-brand-100/60'}`}>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null
+                    setPdfFile(f)
+                    setPdfStatus(f ? f.name : null)
+                    // limpa textarea se escolheu PDF
+                    if (f) setTextoLivre('')
+                  }}
+                />
+                {pdfFile ? (
+                  <>
+                    <div className="text-2xl mb-1">📄</div>
+                    <p className="text-xs text-emerald-700 font-semibold truncate max-w-full">{pdfStatus}</p>
+                    <p className="text-[10px] text-emerald-500 mt-0.5">
+                      {(pdfFile.size / 1024).toFixed(0)} KB · clique para trocar
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={18} className="mx-auto text-brand-400 mb-1" />
+                    <p className="text-xs text-brand-600 font-semibold">Clique para selecionar um PDF</p>
+                    <p className="text-[10px] text-brand-400 mt-0.5">ou cole trechos no campo abaixo</p>
+                  </>
+                )}
+              </label>
             )}
             {format === 'artigo' && (
               <div className="space-y-2">
