@@ -47,6 +47,8 @@ export interface Campanha {
   dashboard?: CampanhaDashboard
   // Total de contatos
   total_contatos?: number
+  // Argumentos CI aprovados injetados nesta campanha
+  argumentos?: { id: string; texto: string; gatilho: string; adicionado_em: string }[]
 }
 
 export interface NovaCampanhaForm {

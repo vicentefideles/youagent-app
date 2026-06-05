@@ -282,6 +282,17 @@ export default function CampanhaCard({
           >
             <Zap size={10} /> {agress.label}
           </button>
+
+          {/* Chip CI — argumentos aprovados injetados nesta campanha */}
+          {Array.isArray(campanha.argumentos) && campanha.argumentos.length > 0 && (
+            <button
+              onClick={() => navigate('/inteligencia?tab=coletiva')}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+              title={`${campanha.argumentos.length} argumento${campanha.argumentos.length !== 1 ? 's' : ''} CI ativo${campanha.argumentos.length !== 1 ? 's' : ''} nesta campanha`}
+            >
+              <Brain size={10} /> CI · {campanha.argumentos.length} arg.
+            </button>
+          )}
         </div>
 
         {/* Barra de consumo da lista */}
