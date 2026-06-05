@@ -589,13 +589,13 @@ export default function DashboardPage() {
     { label: 'Score CI',        value: dash?.kpis?.score_ci ?? 0,                            icon: <Brain size={18} className="text-purple-600" />,    bg: 'bg-purple-50',  text: 'text-purple-600',  delta: '—', deltaPositive: true },
   ]
 
-  const reunioesFila: ReuniaoFila[] = dash?.proximas_reunioes?.map((r: { id: number; vendedor: string; inicio: string }) => ({
+  const reunioesFila: ReuniaoFila[] = dash?.proximas_reunioes?.map((r: any) => ({
     id: r.id,
-    empresa: '—',
-    avatarEmpresa: r.vendedor.slice(0, 2).toUpperCase(),
-    contato: '—',
+    empresa: r.empresa || '—',
+    avatarEmpresa: (r.empresa || r.vendedor || 'XX').slice(0, 2).toUpperCase(),
+    contato: r.contato ? `${r.contato}${r.cargo ? ` · ${r.cargo}` : ''}` : '—',
     icpScore: 0,
-    agente: '—',
+    agente: r.agente || '—',
     vendedor: r.vendedor,
     horario: new Date(r.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   })) ?? []
@@ -677,9 +677,11 @@ export default function DashboardPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
                 Reuniões
               </div>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                2 em andamento
-              </span>
+              {(dash?.kpis?.ligacoes_em_andamento ?? 0) > 0 && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                  {dash!.kpis.ligacoes_em_andamento} em andamento
+                </span>
+              )}
             </div>
           </div>
 
@@ -833,15 +835,41 @@ export default function DashboardPage() {
               <Zap size={16} className="text-amber-500" />
               <h2 className="text-sm font-semibold text-gray-900">Padrões Detectados</h2>
             </div>
-            <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">3 novos</span>
+            {(() => {
+              const padroes = dash?.padroes ?? []
+              const count = padroes.length || PATTERNS.length
+              return (
+                <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                  {count} padrão{count !== 1 ? 'ões' : ''}
+                </span>
+              )
+            })()}
           </div>
           <div className="space-y-3">
-            {PATTERNS.map((p, i) => (
-              <div key={i} className={`border-l-4 ${p.border} pl-3 py-1 flex items-start justify-between gap-2`}>
-                <p className="text-xs text-gray-700 font-medium leading-relaxed">{p.text}</p>
-                <span className={`text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${p.badge}`}>{p.delta}</span>
-              </div>
-            ))}
+            {(() => {
+              const padroes: { texto: string; gatilho: string; eficacia: number }[] = dash?.padroes ?? []
+              const BORDER_COLORS = ['border-l-emerald-500', 'border-l-blue-500', 'border-l-amber-500', 'border-l-purple-500']
+              const BADGE_COLORS = ['bg-emerald-50 text-emerald-700', 'bg-blue-50 text-blue-700', 'bg-amber-50 text-amber-700', 'bg-purple-50 text-purple-700']
+
+              if (padroes.length > 0) {
+                return padroes.map((p, i) => (
+                  <div key={i} className={`border-l-4 ${BORDER_COLORS[i % BORDER_COLORS.length]} pl-3 py-1 flex items-start justify-between gap-2`}>
+                    <p className="text-xs text-gray-700 font-medium leading-relaxed">{p.texto}</p>
+                    {p.eficacia > 0 && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${BADGE_COLORS[i % BADGE_COLORS.length]}`}>
+                        ▲ {p.eficacia}%
+                      </span>
+                    )}
+                  </div>
+                ))
+              }
+              return PATTERNS.map((p, i) => (
+                <div key={i} className={`border-l-4 ${p.border} pl-3 py-1 flex items-start justify-between gap-2`}>
+                  <p className="text-xs text-gray-700 font-medium leading-relaxed">{p.text}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${p.badge}`}>{p.delta}</span>
+                </div>
+              ))
+            })()}
           </div>
           <div className="mt-4 pt-3 border-t border-gray-100">
             <a href="/inteligencia" className="text-xs text-blue-600 hover:underline">
@@ -857,27 +885,70 @@ export default function DashboardPage() {
               <BookOpen size={16} className="text-purple-500" />
               <h2 className="text-sm font-semibold text-gray-900">Memória Ativa</h2>
             </div>
-            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-medium">127 contatos</span>
+            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+              {dash?.contatos_count != null ? `${dash.contatos_count} contatos` : '— contatos'}
+            </span>
           </div>
           <div className="space-y-3">
-            {CONTACTS.map((c, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                  {c.initials}
+            {(() => {
+              const recentesReal: { id: string; nome: string; empresa: string; cargo: string; tentativas: number; status: string }[] =
+                dash?.contatos_recentes ?? []
+
+              if (recentesReal.length > 0) {
+                return recentesReal.slice(0, 3).map((c) => {
+                  const initials = c.nome.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                  const statusLabel: Record<string, string> = {
+                    esgotado: 'Tentativas esgotadas',
+                    nao_atendeu: 'Não atendeu',
+                    retornar: 'Aguardando retorno',
+                    convertido: 'Convertido',
+                    em_andamento: 'Em andamento',
+                  }
+                  return (
+                    <div key={c.id} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-900">
+                          {c.nome}
+                          {c.empresa && <span className="text-gray-400 font-normal"> · {c.empresa}</span>}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {c.cargo || statusLabel[c.status] || c.status}
+                        </p>
+                        <p className="text-xs text-blue-600 mt-0.5">→ {c.tentativas} tentativa{c.tentativas !== 1 ? 's' : ''}</p>
+                      </div>
+                      <button
+                        onClick={() => navigate('/discadora')}
+                        className="text-xs text-gray-400 hover:text-gray-700 flex-shrink-0 font-medium"
+                      >
+                        Ver →
+                      </button>
+                    </div>
+                  )
+                })
+              }
+
+              return CONTACTS.map((c, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                  <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                    {c.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-900">{c.nome} <span className="text-gray-400 font-normal">· {c.empresa}</span></p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{c.last}</p>
+                    <p className="text-xs text-blue-600 mt-0.5 truncate">→ {c.next}</p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/inteligencia')}
+                    className="text-xs text-gray-400 hover:text-gray-700 flex-shrink-0 font-medium"
+                  >
+                    Ver →
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-900">{c.nome} <span className="text-gray-400 font-normal">· {c.empresa}</span></p>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">{c.last}</p>
-                  <p className="text-xs text-blue-600 mt-0.5 truncate">→ {c.next}</p>
-                </div>
-                <button
-                  onClick={() => navigate('/inteligencia')}
-                  className="text-xs text-gray-400 hover:text-gray-700 flex-shrink-0 font-medium"
-                >
-                  Ver →
-                </button>
-              </div>
-            ))}
+              ))
+            })()}
           </div>
         </div>
       </div>
@@ -889,37 +960,64 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">KPIs de Inteligência</h2>
           <div className="grid grid-cols-2 gap-3">
-            {/* Score médio propensão */}
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500 mb-1">Score Médio Propensão</p>
-              <p className="text-xl font-bold text-gray-900 font-mono">78,4</p>
-              <div className="h-1 bg-gray-200 rounded-full mt-2 overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: '78%' }} />
-              </div>
-              <p className="text-xs text-emerald-600 mt-1 font-medium">▲ 4 pts esta semana</p>
-            </div>
-            {/* Taxa acerto timing */}
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500 mb-1">Acerto de Timing</p>
-              <p className="text-xl font-bold text-gray-900 font-mono">64%</p>
-              <div className="h-1 bg-gray-200 rounded-full mt-2 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: '64%' }} />
-              </div>
-              <p className="text-xs text-red-500 mt-1 font-medium">▼ 3% vs ontem</p>
-            </div>
-            {/* Insights Cross-Cliente */}
+            {/* Score médio ICP — derivado das 5 dimensões */}
+            {(() => {
+              const icp = dash?.icp_dimensoes
+              const scoreIcp = icp
+                ? Object.values(icp).reduce((sum: number, d: any) => sum + (d.valor || 0), 0)
+                : null
+              const maxIcp = 95
+              const pct = scoreIcp != null ? Math.round((scoreIcp / maxIcp) * 100) : 78
+              const label = scoreIcp != null ? scoreIcp.toString() : '—'
+              const barColor = pct >= 70 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-500'
+              return (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Score ICP Médio</p>
+                  <p className="text-xl font-bold text-gray-900 font-mono">{label}<span className="text-xs text-gray-400 font-normal">/95</span></p>
+                  <div className="h-1 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className={`text-xs mt-1 font-medium ${scoreIcp != null ? 'text-emerald-600' : 'text-gray-400'}`}>
+                    {scoreIcp != null ? 'dados reais' : 'sem dados ainda'}
+                  </p>
+                </div>
+              )
+            })()}
+            {/* Taxa de acerto — real do KPI */}
+            {(() => {
+              const taxa = dash?.kpis?.taxa_acerto ?? null
+              const pct = taxa ?? 0
+              const barColor = pct >= 20 ? 'bg-emerald-500' : pct >= 10 ? 'bg-amber-500' : 'bg-red-400'
+              return (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Taxa de Conversão</p>
+                  <p className="text-xl font-bold text-gray-900 font-mono">{taxa != null ? `${taxa}%` : '—'}</p>
+                  <div className="h-1 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                  </div>
+                  <p className={`text-xs mt-1 font-medium ${taxa != null ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {taxa != null ? 'ligações → transferidas' : 'sem dados ainda'}
+                  </p>
+                </div>
+              )
+            })()}
+            {/* Insights Cross-Cliente — real */}
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-xs text-gray-500 mb-1">Insights Cross-Cliente</p>
-              <p className="text-xl font-bold text-gray-900 font-mono">12</p>
+              <p className="text-xl font-bold text-gray-900 font-mono">{dash?.ic?.argumentos_aprovados ?? '—'}</p>
               <span className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-medium">aprovados</span>
-              <p className="text-xs text-emerald-600 mt-1 font-medium">▲ 3 esta semana</p>
+              {(dash?.ic?.argumentos_pendentes ?? 0) > 0 && (
+                <p className="text-xs text-amber-600 mt-1 font-medium">⏳ {dash!.ic.argumentos_pendentes} pendente{dash!.ic.argumentos_pendentes !== 1 ? 's' : ''}</p>
+              )}
             </div>
-            {/* Versões simulador */}
+            {/* Reuniões agendadas futuras — real */}
             <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500 mb-1">Versões Simulador</p>
-              <p className="text-xl font-bold text-gray-900 font-mono">8</p>
-              <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded font-medium">versões</span>
-              <p className="text-xs text-blue-600 mt-1 font-medium">▲ 2 novas</p>
+              <p className="text-xs text-gray-500 mb-1">Próximas Reuniões</p>
+              <p className="text-xl font-bold text-gray-900 font-mono">{dash?.kpis?.reunioes_agendadas ?? '—'}</p>
+              <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">agendadas</span>
+              <p className="text-xs text-blue-600 mt-1 font-medium">
+                {dash?.totais?.contatos != null ? `${dash.totais.contatos} contatos na base` : '—'}
+              </p>
             </div>
           </div>
         </div>
