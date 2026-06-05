@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { claudeApi, agentesApi } from '@/services/api'
@@ -20,6 +20,9 @@ import {
   Loader2,
   Copy,
   Pencil,
+  RefreshCw,
+  Brain,
+  AlertTriangle,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -922,6 +925,9 @@ function AgenteCard({
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
+// Chave localStorage para última sincronização CI
+const CI_SYNC_KEY = 'etz_ultima_sync_ci'
+
 export default function OnboardingPage() {
   const [tela, setTela] = useState<'grid' | 'wiz0' | 'wizard'>('grid')
   const [propositoSelecionado, setPropositoSelecionado] = useState<string | null>(null)
@@ -933,6 +939,44 @@ export default function OnboardingPage() {
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState('')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [sincronizando, setSincronizando] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  // Última sincronização CI (localStorage)
+  const [ultimaSync, setUltimaSync] = useState<string>(() =>
+    localStorage.getItem(CI_SYNC_KEY) || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  )
+
+  // Verifica pendências CI — polling a cada 5 min
+  const { data: ciStatus } = useQuery({
+    queryKey: ['ci-pendencias', ultimaSync],
+    queryFn: () => agentesApi.ciPendencias(ultimaSync).then(r => r.data as {
+      pendente: boolean; motivos: string[]; total: number
+    }),
+    refetchInterval: 5 * 60 * 1000, // 5 min
+    staleTime: 60 * 1000,
+  })
+
+  async function sincronizarComCI() {
+    setSincronizando(true)
+    setSyncFeedback(null)
+    try {
+      const res = await agentesApi.sincronizarTodos()
+      const data = res.data as { sincronizados: number; mensagem: string }
+      const agora = new Date().toISOString()
+      localStorage.setItem(CI_SYNC_KEY, agora)
+      setUltimaSync(agora)
+      setSyncFeedback({ ok: true, msg: data.mensagem || `✅ ${data.sincronizados} agente(s) sincronizado(s)` })
+      setTimeout(() => setSyncFeedback(null), 6000)
+    } catch {
+      setSyncFeedback({ ok: false, msg: '❌ Erro ao sincronizar. Tente novamente.' })
+    } finally {
+      setSincronizando(false)
+    }
+  }
+
+  // Limpa feedback ao trocar de tela
+  useEffect(() => { setSyncFeedback(null) }, [tela])
 
   const { data: agentesRaw = [], refetch: refetchAgentes } = useQuery({
     queryKey: ['agentes'],
@@ -1045,7 +1089,9 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="w-full max-w-3xl mx-auto">
-          <div className="mb-8 flex items-center justify-between">
+
+          {/* Header */}
+          <div className="mb-6 flex items-center justify-between gap-3">
             <div>
               <div className="inline-flex items-center gap-2 mb-1">
                 <Bot size={22} className="text-blue-600" />
@@ -1053,14 +1099,75 @@ export default function OnboardingPage() {
               </div>
               <p className="text-sm text-gray-500">Gerencie seus agentes de IA</p>
             </div>
-            <button
-              onClick={() => setTela('wiz0')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
-            >
-              <Bot size={16} />
-              Criar novo agente
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Botão Sincronizar CI */}
+              <button
+                onClick={sincronizarComCI}
+                disabled={sincronizando}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors border disabled:opacity-60
+                  ${ciStatus?.pendente
+                    ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                  }`}
+              >
+                {sincronizando
+                  ? <Loader2 size={15} className="animate-spin" />
+                  : <Brain size={15} />
+                }
+                {sincronizando ? 'Sincronizando...' : 'Sincronizar com CI'}
+                {ciStatus?.pendente && !sincronizando && (
+                  <span className="bg-white text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    {ciStatus.total}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setTela('wiz0')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                <Bot size={16} />
+                Criar novo agente
+              </button>
+            </div>
           </div>
+
+          {/* Alerta CI pendente */}
+          {ciStatus?.pendente && !syncFeedback && (
+            <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+              <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">Centro de Inteligência tem novos aprendizados</p>
+                <ul className="mt-1 space-y-0.5">
+                  {ciStatus.motivos.map((m, i) => (
+                    <li key={i} className="text-xs text-amber-700 flex items-center gap-1.5">
+                      <span className="w-1 h-1 bg-amber-400 rounded-full shrink-0" />
+                      {m}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={sincronizarComCI}
+                disabled={sincronizando}
+                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors shrink-0 disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={sincronizando ? 'animate-spin' : ''} />
+                Sincronizar agora
+              </button>
+            </div>
+          )}
+
+          {/* Feedback de sincronização */}
+          {syncFeedback && (
+            <div className={`mb-5 px-4 py-3 rounded-xl border flex items-center gap-2 text-sm font-medium
+              ${syncFeedback.ok
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+              {syncFeedback.ok ? <Brain size={15} className="text-emerald-600 shrink-0" /> : <AlertTriangle size={15} className="text-red-500 shrink-0" />}
+              {syncFeedback.msg}
+            </div>
+          )}
 
           {agentes.length > 0 && (
             <div className="grid grid-cols-2 gap-4 mb-6">
