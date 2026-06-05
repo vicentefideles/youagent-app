@@ -1291,6 +1291,8 @@ function TabConhecimento() {
 
   async function adicionar() {
     if (!titulo || !categoria) { setFeedback('❌ Preencha título e categoria'); return }
+    // Para vídeo: URL ou texto são suficientes (sistema transcreve automaticamente)
+    if (format === 'video' && !urlVideo && !textoLivre) { setFeedback('❌ Informe a URL do YouTube ou cole um resumo'); return }
     setSalvando(true); setFeedback(null)
     try {
       // PDF: envia como multipart/form-data
@@ -1438,10 +1440,22 @@ function TabConhecimento() {
             )}
             {format === 'video' && (
               <div className="space-y-2">
-                <input value={urlVideo} onChange={e => setUrlVideo(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200"
-                  placeholder="URL YouTube ou Vimeo" />
-                <p className="text-[10px] text-gray-400">Cole os pontos principais do vídeo como texto:</p>
+                <div className="relative">
+                  <input value={urlVideo} onChange={e => setUrlVideo(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200 pr-28"
+                    placeholder="URL do YouTube (ex: youtube.com/watch?v=...)" />
+                  {urlVideo && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
+                      ✓ Auto-transcrição
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-start gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                  <span className="text-emerald-500 text-sm mt-0.5">🤖</span>
+                  <p className="text-[11px] text-emerald-700 leading-relaxed">
+                    <span className="font-semibold">Transcrição automática:</span> cole a URL e o sistema extrai e processa o conteúdo do vídeo automaticamente. O campo abaixo é opcional — use para adicionar contexto extra.
+                  </p>
+                </div>
               </div>
             )}
             {format === 'audio' && (
@@ -1452,14 +1466,14 @@ function TabConhecimento() {
               </div>
             )}
 
-            {/* Textarea sempre visível (conteúdo principal) */}
+            {/* Textarea — obrigatório para todos exceto vídeo (que tem auto-transcrição) */}
             <textarea rows={format === 'texto' ? 5 : 3}
               value={textoLivre} onChange={e => setTextoLivre(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200 resize-none"
               placeholder={
                 format === 'livro' ? 'Cole trechos do livro aqui — capítulos, frases-chave, argumentos...'
                 : format === 'artigo' ? 'Cole o texto do artigo aqui...'
-                : format === 'video' ? 'Resumo ou pontos principais do vídeo...'
+                : format === 'video' ? 'Contexto extra (opcional) — pontos principais, resumo...'
                 : format === 'audio' ? 'Transcrição ou pontos principais do áudio...'
                 : 'Cole ou digite o conteúdo aqui...'
               }
