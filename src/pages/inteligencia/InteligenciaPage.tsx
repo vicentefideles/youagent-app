@@ -1522,16 +1522,6 @@ function TabConhecimento() {
             />
           </div>
 
-          <div className="mb-3">
-            <p className="text-xs font-medium text-gray-700 mb-1.5">O agente deve usar este material para:</p>
-            <div className="space-y-1">
-              {['Aprender argumentos de persuasão', 'Melhorar qualificação', 'Aprender a contornar objeções', 'Adaptar tom por segmento', 'Incorporar vocabulário setorial'].map(c => (
-                <label key={c} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="rounded" /> {c}
-                </label>
-              ))}
-            </div>
-          </div>
 
           {feedback && (
             <div className={`text-xs px-3 py-2 rounded-lg mb-2 ${feedback.startsWith('✅') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
