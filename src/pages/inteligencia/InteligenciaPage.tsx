@@ -1562,29 +1562,75 @@ function TabConhecimento() {
             {library.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-4">Nenhum material cadastrado ainda.<br /><span className="text-gray-300">Adicione o primeiro à esquerda.</span></p>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {library.map((b: any) => (
-                  <div key={b.id} className="flex items-center gap-3 border border-gray-100 rounded-lg p-2 hover:bg-gray-50 transition-colors">
-                    <div className="w-8 h-10 rounded flex items-center justify-center text-lg shrink-0 bg-brand-50">
-                      {tipoIcon[b.tipo] ?? '📄'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-gray-800 truncate">{b.titulo}</p>
-                      <p className="text-xs text-gray-400">
-                        {b.tipo} · {(b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0)} insights · {new Date(b.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {b.aprovado
-                        ? <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-medium">ativo</span>
-                        : <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-medium">revisão</span>
-                      }
-                      <button onClick={() => remover(b.id)} className="text-gray-300 hover:text-red-400 transition-colors ml-1">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-2 max-h-[480px] overflow-y-auto">
+                {library.map((b: any) => {
+                  const totalInsightsMat = (b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0) + (b.objecoes?.length ?? 0)
+                  const dataFormatada = b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
+                  return (
+                    <details key={b.id} className="border border-gray-100 rounded-lg group">
+                      <summary className="flex items-center gap-3 p-2 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors list-none">
+                        <div className="w-8 h-8 rounded flex items-center justify-center text-lg shrink-0 bg-brand-50">
+                          {tipoIcon[b.tipo] ?? '📄'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{b.titulo}</p>
+                          <p className="text-xs text-gray-400">{b.tipo} · <span className="text-brand-600 font-medium">{totalInsightsMat} insights</span> · {dataFormatada}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {b.aprovado
+                            ? <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-medium">ativo</span>
+                            : <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-medium">revisão</span>
+                          }
+                          <button onClick={e => { e.preventDefault(); remover(b.id) }} className="text-gray-300 hover:text-red-400 transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </summary>
+                      {/* Expansão: insights extraídos */}
+                      <div className="px-3 pb-3 pt-1 border-t border-gray-50 space-y-2">
+                        {b.conteudo_resumo && (
+                          <div className="bg-brand-50 rounded-lg p-2">
+                            <p className="text-[10px] font-semibold text-brand-600 mb-0.5">📋 Resumo do aprendizado</p>
+                            <p className="text-xs text-gray-700">{b.conteudo_resumo}</p>
+                          </div>
+                        )}
+                        {b.argumentos?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-emerald-600 mb-1">💬 Argumentos de venda ({b.argumentos.length})</p>
+                            <ul className="space-y-0.5">
+                              {b.argumentos.map((a: string, i: number) => (
+                                <li key={i} className="text-xs text-gray-600 flex gap-1.5"><span className="text-emerald-400 shrink-0">•</span>{a}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {b.tecnicas?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-blue-600 mb-1">⚡ Técnicas ({b.tecnicas.length})</p>
+                            <ul className="space-y-0.5">
+                              {b.tecnicas.map((t: string, i: number) => (
+                                <li key={i} className="text-xs text-gray-600 flex gap-1.5"><span className="text-blue-400 shrink-0">•</span>{t}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {b.objecoes?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold text-amber-600 mb-1">🛡️ Objeções ({b.objecoes.length})</p>
+                            <ul className="space-y-1">
+                              {b.objecoes.map((o: any, i: number) => (
+                                <li key={i} className="text-xs bg-amber-50 rounded p-1.5">
+                                  <span className="font-medium text-amber-700">"{o.objecao}"</span>
+                                  {o.resposta && <span className="text-gray-600"> → {o.resposta}</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )
+                })}
               </div>
             )}
           </div>
