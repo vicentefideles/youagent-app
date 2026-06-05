@@ -878,40 +878,43 @@ function TabFila() {
 
             {/* PAINEL MONITOR */}
             {expandido === item.id && (
-              <div className="border-b border-brand-200 bg-gradient-to-b from-brand-950 to-gray-950" style={{ background: 'linear-gradient(180deg, #1e1b4b 0%, #0f0f1f 100%)' }}>
+              <div className="border-t border-gray-100 bg-gray-50">
                 {/* Header do monitor */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-wrap gap-2">
-                  <div className="flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-sm font-bold text-white">{item.empresa}</span>
-                    <span className="text-2xs text-indigo-300 font-medium">{item.agente}</span>
-                    {/* Campanha destacada */}
+                <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-100 flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                    <span className="text-sm font-semibold text-gray-900">{item.empresa}</span>
+                    <span className="text-xs text-gray-400">{item.agente}</span>
                     {item.campanha && (
-                      <span className="text-2xs font-semibold bg-indigo-900/60 border border-indigo-500/40 text-indigo-300 rounded-full px-2 py-0.5">
-                        📋 {item.campanha}
+                      <span className="text-2xs font-medium bg-brand-50 border border-brand-200 text-brand-700 rounded-full px-2 py-0.5">
+                        {item.campanha}
                       </span>
                     )}
                     <IcpBadge value={item.icp} />
                   </div>
                   <div className="flex items-center gap-2">
-                    {item.transferindo && <span className="text-2xs bg-purple-900/50 text-purple-300 border border-purple-700 rounded-full px-2 py-0.5 font-semibold animate-pulse">🟣 IA: Sinal — transferindo</span>}
-                    <span className="text-2xs text-gray-400 font-mono">{item.duracao}</span>
+                    {item.transferindo && (
+                      <span className="text-2xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2 py-0.5 font-semibold animate-pulse">
+                        Transferindo...
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400 font-mono tabular-nums">{item.duracao}</span>
                   </div>
                 </div>
 
-                {/* Briefing handoff no monitor (quando transferindo) */}
+                {/* Briefing handoff (quando transferindo) */}
                 {item.transferindo && (
-                  <div className="mx-4 mt-4 rounded-xl border border-brand-500/50 bg-brand-900/20 p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText size={13} className="text-brand-400" />
-                      <span className="text-xs font-bold text-brand-300">Briefing para o Vendedor</span>
+                  <div className="mx-5 mt-4 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText size={14} className="text-brand-600" />
+                      <span className="text-xs font-semibold text-brand-700">Briefing para o Vendedor</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-2xs mb-3">
-                      <div><span className="text-gray-500">Empresa:</span> <span className="font-semibold text-white">{item.empresa}</span></div>
-                      <div><span className="text-gray-500">Contato:</span> <span className="font-semibold text-white">{item.contato}</span></div>
-                      <div><span className="text-gray-500">ICP:</span> <span className="font-bold text-emerald-400">{item.icp}/100</span></div>
-                      <div className="col-span-2"><span className="text-gray-500">Sinais:</span> <span className="font-semibold text-purple-300">{item.gatilhoDetectado}</span></div>
-                      <div><span className="text-gray-500">Slot:</span> <span className="font-semibold text-brand-300">15h00 hoje</span></div>
+                    <div className="grid grid-cols-3 gap-x-6 gap-y-1.5 text-xs mb-3">
+                      <div className="flex gap-1.5"><span className="text-gray-500">Empresa</span><span className="font-semibold text-gray-900">{item.empresa}</span></div>
+                      <div className="flex gap-1.5"><span className="text-gray-500">Contato</span><span className="font-semibold text-gray-900">{item.contato}</span></div>
+                      <div className="flex gap-1.5"><span className="text-gray-500">ICP</span><span className="font-bold text-emerald-600">{item.icp}/100</span></div>
+                      <div className="col-span-2 flex gap-1.5"><span className="text-gray-500">Sinais</span><span className="font-semibold text-brand-700">{item.gatilhoDetectado ?? '—'}</span></div>
+                      <div className="flex gap-1.5"><span className="text-gray-500">Slot</span><span className="font-semibold text-gray-900">15h00 hoje</span></div>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -919,159 +922,166 @@ function TabFila() {
                           const texto = `Briefing — ${item.empresa}\nContato: ${item.contato}${item.cargo ? ` (${item.cargo})` : ''}\nICP: ${item.icp}/100\nSinais: ${item.gatilhoDetectado ?? '—'}\nDuração: ${item.duracao ?? '—'}`
                           navigator.clipboard.writeText(texto)
                         }}
-                        className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors"
+                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                       >
-                        <Copy size={10}/> Copiar Briefing
+                        <Copy size={12}/> Copiar Briefing
                       </button>
-                      <button onClick={() => iniciarTransferencia(item.id, 'Ana Rodrigues')} className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors">
-                        <PhoneForwarded size={10}/> Iniciar Transferência
+                      <button onClick={() => iniciarTransferencia(item.id, 'Ana Rodrigues')} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                        <PhoneForwarded size={12}/> Iniciar Transferência
                       </button>
                     </div>
                   </div>
                 )}
 
-                <div className="p-4 grid grid-cols-3 gap-4">
-                  {/* Col 1: Transcrição */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-2xs font-semibold text-emerald-400 uppercase tracking-wide">🎤 Transcrição ao vivo</span>
+                <div className="p-5 grid grid-cols-3 gap-4">
+                  {/* Col 1: Transcrição ao vivo */}
+                  <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-3">
+                    {/* Título + ações */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Mic size={13} className="text-emerald-600" />
+                        <span className="text-xs font-semibold text-gray-700">Transcrição ao vivo</span>
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => toggleTranscricao(item.id)}
-                          className="text-2xs bg-gray-800 border border-gray-700 text-gray-400 rounded-full px-2 py-0.5 font-semibold hover:bg-gray-700 transition-colors"
+                          className="text-2xs font-medium px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                         >
-                          {transcricaoAberta[item.id] ? '▲ Ocultar' : '▼ Ver Transcrição'}
+                          {transcricaoAberta[item.id] ? 'Ocultar' : 'Ver transcrição'}
                         </button>
                         <button
                           onClick={() => ouvirLigacao(item as EntradaFila & { _callControlId?: string })}
-                          title="Escuta silenciosa em tempo real via ramal SIP. Você ouvirá a ligação sem interferir."
-                          className="text-2xs bg-emerald-900/30 border border-emerald-700 text-emerald-400 rounded-full px-2 py-0.5 font-semibold hover:bg-emerald-800/30 transition-colors"
-                        >🎧 Ouvir ao vivo</button>
+                          title="Escuta silenciosa em tempo real via ramal SIP."
+                          className="text-2xs font-medium px-2 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        >Ouvir ao vivo</button>
                       </div>
                     </div>
-                    {/* Monitor IA */}
-                    {monitorIA[item.id] && (
-                      <div className="mb-3 space-y-2">
-                        {/* Potencial de fechamento */}
+
+                    {/* Monitor IA — potencial + gatilhos */}
+                    {(monitorIA[item.id] || item.potencial > 0) && (
+                      <div className="space-y-2.5">
                         <div>
                           <div className="flex justify-between mb-1">
-                            <span className="text-2xs text-gray-400 uppercase tracking-wide">Potencial de fechamento</span>
-                            <span className="text-xs text-purple-400 font-bold font-mono">{monitorIA[item.id].potencial}%</span>
+                            <span className="text-2xs text-gray-500 font-medium">Potencial de fechamento</span>
+                            <span className="text-xs font-bold font-mono text-brand-600">
+                              {monitorIA[item.id]?.potencial ?? item.potencial}%
+                            </span>
                           </div>
-                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div
-                              className="h-full rounded-full"
+                              className="h-full rounded-full transition-all"
                               style={{
-                                width: `${monitorIA[item.id].potencial}%`,
-                                background: `linear-gradient(90deg, #6d28d9, #10b981)`,
+                                width: `${monitorIA[item.id]?.potencial ?? item.potencial}%`,
+                                background: 'linear-gradient(90deg, #6366f1, #10b981)',
                               }}
                             />
                           </div>
                         </div>
-                        {/* ICP Badge */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-2xs bg-purple-900/40 border border-purple-700 text-purple-300 rounded-full px-2 py-0.5 font-bold">
-                            🎯 ICP: {monitorIA[item.id].icp_score}
-                          </span>
-                          {/* Gatilhos */}
-                          {monitorIA[item.id].gatilhos.map((g, gi) => {
-                            const isUrgencia = /urgên|urgenc/i.test(g)
-                            const isPreco = /preço|preco|valor|cust/i.test(g)
-                            const isDecisor = /decisor|sócio|diretori/i.test(g)
-                            const cls = isUrgencia ? 'bg-red-900/40 border-red-700 text-red-300' :
-                              isPreco ? 'bg-amber-900/40 border-amber-700 text-amber-300' :
-                              isDecisor ? 'bg-blue-900/40 border-blue-700 text-blue-300' :
-                              'bg-gray-800 border-gray-600 text-gray-300'
-                            return (
-                              <span key={gi} className={`text-2xs border rounded-full px-2 py-0.5 font-semibold ${cls}`}>
-                                {isUrgencia ? '🚨' : isPreco ? '💰' : isDecisor ? '👔' : '💡'} {g}
-                              </span>
-                            )
-                          })}
-                        </div>
-                        {/* Sugestão */}
-                        {monitorIA[item.id].sugestao === 'transferir' && (
+
+                        {monitorIA[item.id] && (
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="text-2xs bg-brand-50 border border-brand-200 text-brand-700 rounded-full px-2 py-0.5 font-semibold">
+                              ICP {monitorIA[item.id].icp_score}
+                            </span>
+                            {monitorIA[item.id].gatilhos.map((g, gi) => {
+                              const isUrgencia = /urgên|urgenc/i.test(g)
+                              const isPreco = /preço|preco|valor|cust/i.test(g)
+                              const isDecisor = /decisor|sócio|diretor/i.test(g)
+                              const cls = isUrgencia ? 'bg-red-50 border-red-200 text-red-700' :
+                                isPreco ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                isDecisor ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                'bg-gray-50 border-gray-200 text-gray-600'
+                              return (
+                                <span key={gi} className={`text-2xs border rounded-full px-2 py-0.5 font-medium ${cls}`}>
+                                  {g}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {monitorIA[item.id]?.sugestao === 'transferir' && (
                           <button
                             onClick={() => {
-                              const disponiveis = getTransferCandidates(item).filter(v => v.status === 'disponivel')
-                              const primeiro = disponiveis[0]
+                              const primeiro = getTransferCandidates(item).find(v => v.status === 'disponivel')
                               if (primeiro) iniciarTransferencia(item.id, primeiro.nome, primeiro.telefone)
                             }}
-                            className="flex items-center gap-1.5 text-2xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors w-full justify-center"
                           >
-                            <Zap size={10} /> ⚡ Transferir Agora
+                            <Zap size={12} /> Transferir agora
                           </button>
                         )}
                       </div>
                     )}
-                    {item.potencial > 0 && !monitorIA[item.id] && (
-                      <div className="mb-3">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-2xs text-gray-400 uppercase tracking-wide">Potencial de fechamento</span>
-                          <span className="text-xs text-purple-400 font-bold font-mono">{item.potencial}%</span>
-                        </div>
-                        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-700 to-purple-400 rounded-full" style={{ width:`${item.potencial}%` }} />
-                        </div>
-                      </div>
-                    )}
-                    {/* Botão Gerar Briefing com Claude */}
-                    <div className="mb-2">
+
+                    {/* Briefing IA */}
+                    <div>
                       <button
                         onClick={() => gerarBriefingIA(item)}
                         disabled={gerandoBriefing[item.id]}
-                        className="flex items-center gap-1.5 text-2xs font-semibold px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 w-full"
                       >
-                        <FileText size={10} />
-                        {gerandoBriefing[item.id] ? 'Gerando...' : '📋 Gerar Briefing IA'}
+                        <FileText size={12} />
+                        {gerandoBriefing[item.id] ? 'Gerando briefing...' : 'Gerar Briefing IA'}
                       </button>
                       {briefingIA[item.id] && (
-                        <div className="mt-2 bg-brand-900/20 border border-brand-700/50 rounded-lg p-2">
-                          <p className="text-2xs text-brand-300 font-semibold mb-1">Briefing gerado por IA:</p>
-                          <p className="text-2xs text-gray-300 leading-relaxed">{briefingIA[item.id]}</p>
+                        <div className="mt-2 bg-brand-50 border border-brand-100 rounded-lg p-2.5">
+                          <p className="text-2xs text-brand-700 font-semibold mb-1">Briefing gerado:</p>
+                          <p className="text-2xs text-gray-600 leading-relaxed">{briefingIA[item.id]}</p>
                         </div>
                       )}
                     </div>
-                    {transcricaoAberta[item.id] && (
-                      <div className="max-h-36 overflow-y-auto">
+
+                    {/* Transcrição expandida */}
+                    {transcricaoAberta[item.id] ? (
+                      <div className="max-h-36 overflow-y-auto rounded-lg bg-gray-50 border border-gray-100 p-2">
                         <TranscriptAoVivo callControlId={(item as any)._callControlId ?? item.id} enabled={transcricaoAberta[item.id]} />
                       </div>
-                    )}
-                    {!transcricaoAberta[item.id] && (
-                      <div className="text-2xs text-gray-500 italic">Clique em "Ver Transcrição" para expandir...</div>
+                    ) : (
+                      <p className="text-2xs text-gray-400 italic">Clique em "Ver transcrição" para expandir...</p>
                     )}
                   </div>
 
-                  {/* Col 2: Script + Slots */}
-                  <div className="flex flex-col gap-3">
+                  {/* Col 2: Injetar frase + Anotação */}
+                  <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-4">
                     {/* Injetar frase */}
                     <div>
-                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💬 Injetar frase no agente</div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <MessageSquare size={13} className="text-brand-600" />
+                        <span className="text-xs font-semibold text-gray-700">Injetar frase no agente</span>
+                      </div>
                       <div className="flex gap-1.5">
                         <input
-                          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-2xs text-white placeholder-gray-500 outline-none focus:border-brand-500"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100 transition-colors"
                           placeholder="Digite a frase para o agente falar..."
                           value={scriptInput[item.id] ?? ''}
                           onChange={e => setScriptInput(prev => ({ ...prev, [item.id]: e.target.value }))}
                           onKeyDown={e => e.key === 'Enter' && injetarScript(item.id)}
                         />
-                        <button onClick={() => injetarScript(item.id)} className="text-2xs bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-2 py-1.5 font-semibold transition-colors">Enviar</button>
+                        <button onClick={() => injetarScript(item.id)} className="text-xs bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-3 py-2 font-semibold transition-colors">
+                          <Send size={12} />
+                        </button>
                       </div>
                       {scriptFeedback[item.id] && (
-                        <div className={clsx('text-2xs mt-1', scriptFeedback[item.id].startsWith('✓') ? 'text-emerald-400' : 'text-red-400')}>
+                        <p className={clsx('text-2xs mt-1.5', scriptFeedback[item.id].startsWith('✓') ? 'text-emerald-600' : 'text-red-500')}>
                           {scriptFeedback[item.id]}
-                        </div>
+                        </p>
                       )}
                     </div>
 
                     {/* Anotação do supervisor */}
-                    <div>
-                      <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">📝 Anotação do supervisor</div>
-                      <div className="text-2xs text-gray-500 mb-2 leading-relaxed">Anote insights enquanto acompanha — o agente de IA agenda automaticamente durante a ligação.</div>
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Save size={13} className="text-gray-500" />
+                        <span className="text-xs font-semibold text-gray-700">Anotação do supervisor</span>
+                      </div>
+                      <p className="text-2xs text-gray-400 mb-2 leading-relaxed">
+                        Anote insights enquanto acompanha — o agente agenda automaticamente durante a ligação.
+                      </p>
                       <textarea
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-2xs text-white placeholder-gray-500 outline-none focus:border-brand-500 resize-none"
+                        className="flex-1 w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-900 placeholder-gray-400 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100 transition-colors resize-none"
                         rows={4}
-                        placeholder="Ex: Cliente citou o concorrente X... mencionou budget para Q3... pedir follow-up sobre decisão..."
+                        placeholder="Ex: Cliente citou concorrente X... mencionou budget para Q3..."
                         value={scriptInput[`nota_${item.id}`] ?? ''}
                         onChange={e => setScriptInput(prev => ({ ...prev, [`nota_${item.id}`]: e.target.value }))}
                       />
@@ -1092,40 +1102,48 @@ function TabFila() {
                           setScriptFeedback(prev => ({ ...prev, [`nota_${item.id}`]: '✓ Anotação salva' }))
                           setTimeout(() => setScriptFeedback(prev => ({ ...prev, [`nota_${item.id}`]: '' })), 2500)
                         }}
-                        className="mt-1.5 text-2xs font-semibold px-3 py-1 rounded-lg bg-gray-700 border border-gray-600 text-gray-300 hover:bg-gray-600 transition-colors"
+                        className="mt-2 text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
                       >
                         Salvar anotação
                       </button>
                       {scriptFeedback[`nota_${item.id}`] && (
-                        <div className="text-2xs text-emerald-400 mt-1">{scriptFeedback[`nota_${item.id}`]}</div>
+                        <p className="text-2xs text-emerald-600 mt-1">{scriptFeedback[`nota_${item.id}`]}</p>
                       )}
                     </div>
                   </div>
 
-                  {/* Col 3: Transferência — candidatos */}
-                  <div>
-                    <div className="text-2xs font-semibold text-gray-400 uppercase tracking-wide mb-1">⚡ Transferência a quente</div>
-                  <div className="text-2xs text-gray-500 mb-2 leading-relaxed">
-                    Transfere a ligação para o vendedor agora — ele entra na chamada com o lead direto, sem perder o contato.
-                    {item.modalidade_campanha && item.modalidade_campanha !== 'online' && (
-                      <span className="ml-1 text-purple-400">· Modalidade: {item.modalidade_campanha}</span>
-                    )}
-                  </div>
-                    <div className="flex flex-col gap-2">
+                  {/* Col 3: Transferência a quente */}
+                  <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <PhoneForwarded size={13} className="text-purple-600" />
+                      <span className="text-xs font-semibold text-gray-700">Transferência a quente</span>
+                    </div>
+                    <p className="text-2xs text-gray-400 leading-relaxed -mt-1">
+                      O vendedor entra na chamada com o lead direto, sem perder o contato.
+                      {item.modalidade_campanha && item.modalidade_campanha !== 'online' && (
+                        <span className="ml-1 text-brand-600">· {item.modalidade_campanha}</span>
+                      )}
+                    </p>
+
+                    <div className="flex flex-col gap-2 flex-1">
                       {getTransferCandidates(item).map(v => (
                         <div
                           key={v.nome}
                           className={clsx(
-                            'flex items-center justify-between p-2 rounded-lg border',
-                            v.status === 'disponivel' ? 'bg-gray-800 border-gray-700' :
-                            v.status === 'em_chamada' ? 'bg-gray-900/50 border-gray-800 opacity-60' :
-                            'bg-gray-900/50 border-gray-800 opacity-40'
+                            'flex items-center justify-between p-3 rounded-xl border transition-colors',
+                            v.status === 'disponivel'
+                              ? 'bg-gray-50 border-gray-200 hover:border-brand-200 hover:bg-brand-50/30'
+                              : 'bg-gray-50 border-gray-100 opacity-50'
                           )}
                         >
                           <div>
-                            <div className="text-2xs font-semibold text-white">{v.nome}</div>
+                            <p className="text-xs font-semibold text-gray-900">{v.nome}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className={clsx('w-1.5 h-1.5 rounded-full', v.status === 'disponivel' ? 'bg-emerald-500' : v.status === 'em_chamada' ? 'bg-amber-400 animate-pulse' : 'bg-gray-500')} />
+                              <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0',
+                                v.status === 'disponivel' ? 'bg-emerald-500' :
+                                v.status === 'em_chamada' ? 'bg-amber-400 animate-pulse' :
+                                'bg-gray-300'
+                              )} />
                               <span className="text-2xs text-gray-400">
                                 {v.status === 'disponivel' ? 'Disponível' : v.status === 'em_chamada' ? 'Em chamada' : 'Ausente'}
                                 {' · '}{v.reunioes_hoje} reunião(ões) hoje
@@ -1135,33 +1153,37 @@ function TabFila() {
                           {v.status === 'disponivel' ? (
                             <button
                               onClick={() => iniciarTransferencia(item.id, v.nome, v.telefone)}
-                              className="text-2xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-2 py-1 transition-colors"
+                              className="text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-3 py-1.5 transition-colors"
                             >
                               Transferir
                             </button>
                           ) : (
-                            <span className="text-2xs text-gray-500">{v.status === 'em_chamada' ? 'Em chamada' : 'Ausente'}</span>
+                            <span className="text-2xs text-gray-400">{v.status === 'em_chamada' ? 'Em chamada' : 'Ausente'}</span>
                           )}
                         </div>
                       ))}
+
                       {transferidoPara[item.id] && (
-                        <div className="bg-emerald-900/20 border border-emerald-700 rounded-lg p-2 text-2xs text-emerald-400 font-semibold">
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-xs text-emerald-700 font-semibold">
                           ✓ Transferindo para {transferidoPara[item.id]}...
                         </div>
                       )}
-                      <button
-                        onClick={async () => {
-                          const ccid = (item as any)._callControlId
-                          if (!ccid) { alert('Ligação demo — indisponível.'); return }
-                          if (!confirm(`Encerrar ligação com ${item.empresa}?`)) return
-                          try {
-                            await ligacoesApi.encerrar(ccid)
-                            setFila(prev => prev.filter(f => f.id !== item.id))
-                          } catch { alert('Erro ao encerrar a ligação.') }
-                        }}
-                        className="w-full text-xs font-semibold py-2 rounded-lg bg-amber-900/30 border border-amber-700 text-amber-300 hover:bg-amber-800/30 transition-colors"
-                      >⏸ Pausar agente</button>
                     </div>
+
+                    <button
+                      onClick={async () => {
+                        const ccid = (item as any)._callControlId
+                        if (!ccid) { alert('Ligação demo — indisponível.'); return }
+                        if (!confirm(`Encerrar ligação com ${item.empresa}?`)) return
+                        try {
+                          await ligacoesApi.encerrar(ccid)
+                          setFila(prev => prev.filter(f => f.id !== item.id))
+                        } catch { alert('Erro ao encerrar a ligação.') }
+                      }}
+                      className="w-full text-xs font-semibold py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <PauseCircle size={13} /> Pausar agente
+                    </button>
                   </div>
                 </div>
               </div>
