@@ -2545,53 +2545,83 @@ export default function InteligenciaPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-4">
-        {/* Page header */}
-        <div
-          className="rounded-xl px-6 py-4 text-white flex items-center justify-between"
-          style={{ background: 'linear-gradient(135deg, #1a1f35, #2d1b69)' }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="bg-white/10 border border-white/20 text-white text-xs px-2 py-0.5 rounded-full font-mono font-semibold">v2.4</span>
-            <div>
-              <h1 className="text-lg font-semibold">Centro de Inteligência</h1>
-              <p className="text-sm text-white/60">Motor de IA autônomo — aprende a cada ligação</p>
-            </div>
-          </div>
-          <div className="flex gap-6 text-right items-center">
-            <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-3 py-2">
-              <Brain size={14} className="text-purple-300" />
+
+        {/* ── Page header ─────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Accent bar */}
+          <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)' }} />
+
+          <div className="px-6 py-5 flex items-center justify-between gap-6">
+            {/* Título + badge */}
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
+                <Brain size={22} className="text-brand-600" />
+              </div>
               <div>
-                <p className="text-xs text-white/50">Score de Inteligência</p>
-                <p className="text-lg font-mono font-bold text-purple-300">{scoreIA != null ? `${scoreIA}/100` : '--'}</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Centro de Inteligência</h1>
+                  <span className="text-2xs font-mono font-bold bg-brand-50 border border-brand-200 text-brand-600 px-2 py-0.5 rounded-full">v2.4</span>
+                </div>
+                <p className="text-sm text-gray-400 mt-0.5">Motor de IA autônomo — aprende e evolui a cada ligação</p>
               </div>
             </div>
-            <div>
-              <p className="text-xs text-white/50">Conversão</p>
-              <p className="text-xl font-mono font-bold text-emerald-400">+3.7%</p>
-            </div>
-            <div>
-              <p className="text-xs text-white/50">Ligações</p>
-              <p className="text-xl font-mono font-bold">1.284</p>
+
+            {/* KPIs */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {/* Score de Inteligência */}
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <Sparkles size={15} className="text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xs text-gray-400 leading-none mb-0.5">Score CI</p>
+                  <p className="text-lg font-mono font-bold text-purple-600 leading-none">
+                    {scoreIA != null ? `${scoreIA}` : '—'}<span className="text-xs text-gray-400 font-normal">/100</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Conversão */}
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <TrendingUp size={15} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-2xs text-gray-400 leading-none mb-0.5">Conversão</p>
+                  <p className="text-lg font-mono font-bold text-emerald-600 leading-none">+3.7%</p>
+                </div>
+              </div>
+
+              {/* Ligações processadas */}
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Zap size={15} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xs text-gray-400 leading-none mb-0.5">Ligações</p>
+                  <p className="text-lg font-mono font-bold text-gray-900 leading-none">1.284</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tab bar — linha 1: ANÁLISE + CONHECIMENTO · linha 2: INTELIGÊNCIA */}
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 flex flex-col gap-2">
-          {/* Linha 1 */}
-          <div className="flex items-center gap-1 flex-wrap">
+        {/* ── Tab bar ──────────────────────────────────────────────────────────── */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm px-5 py-3 flex flex-col gap-2.5">
+          {/* Linha 1: ANÁLISE + CONHECIMENTO */}
+          <div className="flex items-center gap-1">
             {TAB_GROUPS.slice(0, 2).map((group, gi) => (
               <div key={gi} className="flex items-center gap-1">
-                {gi > 0 && <span className="w-px h-5 bg-gray-200 mx-1.5 flex-shrink-0" />}
-                <span className="text-2xs text-gray-400 font-semibold uppercase tracking-widest mr-1 flex-shrink-0">{group.label}</span>
+                {gi > 0 && <span className="w-px h-4 bg-gray-200 mx-2 flex-shrink-0" />}
+                <span className="text-2xs text-gray-300 font-semibold uppercase tracking-widest mr-2 select-none">{group.label}</span>
                 {group.tabs.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all whitespace-nowrap font-medium ${
                       activeTab === tab.id
-                        ? 'bg-brand-50 border border-brand-200 text-brand-700 font-semibold'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                        : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
                     }`}
                   >
                     {tab.icon}
@@ -2607,15 +2637,15 @@ export default function InteligenciaPage() {
 
           {/* Linha 2: INTELIGÊNCIA */}
           <div className="flex items-center gap-1">
-            <span className="text-2xs text-gray-400 font-semibold uppercase tracking-widest mr-1 flex-shrink-0">{TAB_GROUPS[2].label}</span>
+            <span className="text-2xs text-gray-300 font-semibold uppercase tracking-widest mr-2 select-none">{TAB_GROUPS[2].label}</span>
             {TAB_GROUPS[2].tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all whitespace-nowrap font-medium ${
                   activeTab === tab.id
-                    ? 'bg-brand-50 border border-brand-200 text-brand-700 font-semibold'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-brand-600 text-white font-semibold shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
                 }`}
               >
                 {tab.icon}
