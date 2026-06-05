@@ -87,137 +87,225 @@ function KpiCard({
 // ─── TAB PANELS ──────────────────────────────────────────────────────────────
 
 function TabTestes() {
-  const [abVote, setAbVote] = useState<Record<string, string>>({})
   const [cicloRodou, setCicloRodou] = useState(false)
+  const [cicloMsg, setCicloMsg]     = useState('')
 
-  const { data: testesData } = useQuery({
+  const { data: testesData, isLoading, refetch } = useQuery({
     queryKey: ['inteligencia-testes'],
     queryFn: () => api.get('/inteligencia/testes').then(r => r.data as any),
   })
-  const testRows: any[] = testesData?.rows ?? []
-  const testStats = testesData?.stats ?? { taxaSucesso: 0 }
+  const rows: any[]  = testesData?.rows  ?? []
+  const stats: any   = testesData?.stats ?? {}
 
-  const rows = testRows
+  const total   = stats.total   ?? rows.length
+  const sucesso = stats.sucesso ?? 0
+  const taxa    = stats.taxaSucesso ?? (total > 0 ? Math.round(sucesso / total * 100) : 0)
+
+  // Resultado → label + cor
+  function resultadoBadge(resultado: string) {
+    const map: Record<string, { label: string; cls: string }> = {
+      agendou:     { label: 'Agendou',     cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      transferida: { label: 'Transferida', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+      nao_atendeu: { label: 'Não atendeu', cls: 'bg-gray-50 text-gray-500 border-gray-200' },
+      sem_interesse:{ label: 'Sem interesse',cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+      esgotado:    { label: 'Esgotado',    cls: 'bg-red-50 text-red-600 border-red-200' },
+    }
+    const r = map[resultado] ?? { label: resultado ?? '—', cls: 'bg-gray-50 text-gray-500 border-gray-200' }
+    return <span className={`text-2xs px-2 py-0.5 rounded-full font-semibold border ${r.cls}`}>{r.label}</span>
+  }
+
+  async function rodarCiclo() {
+    setCicloRodou(true)
+    setCicloMsg('Processando ligações recentes...')
+    await new Promise(r => setTimeout(r, 1500))
+    await refetch()
+    setCicloMsg('✓ Dados atualizados')
+    setTimeout(() => { setCicloRodou(false); setCicloMsg('') }, 3000)
+  }
+
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white flex items-center justify-between"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#2d1b69)' }}
-      >
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">🧪</span>
-            <h2 className="text-lg font-semibold">Centro de Testes — QA Automático</h2>
-          </div>
-          <p className="text-sm text-white/60">Validação contínua de scripts e qualidade dos agentes</p>
-        </div>
-        <button
-          onClick={() => setCicloRodou(true)}
-          className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 border border-white/30"
-        >
-          <RefreshCw size={14} className={cicloRodou ? 'animate-spin' : ''} />
-          {cicloRodou ? 'Rodando ciclo...' : 'Rodar novo ciclo'}
-        </button>
-      </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 border-t-4 border-t-emerald-500">
-          <p className="text-xs text-gray-500 mb-1">Taxa de sucesso</p>
-          <p className="text-2xl font-mono font-bold text-emerald-600">{testStats.taxaSucesso ?? testStats.precisao ?? '—'}%</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 border-t-4 border-t-blue-500">
-          <p className="text-xs text-gray-500 mb-1">Score de qualidade</p>
-          <p className="text-2xl font-mono font-bold text-blue-600">{testStats.scoreQualidade ?? '—'}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 border-t-4 border-t-purple-500">
-          <p className="text-xs text-gray-500 mb-1">Conformidade LGPD</p>
-          <p className="text-2xl font-mono font-bold text-purple-600">{testStats.conformidadeLgpd ?? '—'}%</p>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Ligações simuladas esta semana</h3>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-400 border-b border-gray-100">
-              <th className="text-left pb-2">Cenário</th>
-              <th className="text-left pb-2">Agente</th>
-              <th className="text-left pb-2">Precisão</th>
-              <th className="text-left pb-2">Qualidade</th>
-              <th className="text-left pb-2">Status</th>
-              <th className="text-left pb-2">KPI</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={6} className="py-6 text-center text-xs text-gray-400">Nenhum teste disponível.</td></tr>
-            )}
-            {rows.map((r: any, i: number) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0">
-                <td className="py-2 text-gray-700">{r.cenario ?? r.scenario ?? '—'}</td>
-                <td className="py-2 text-gray-500">{r.agente ?? r.agent ?? '—'}</td>
-                <td className="py-2 font-mono text-gray-900">{r.precisao ?? r.accuracy ?? 0}%</td>
-                <td className="py-2 text-amber-400 tracking-tighter">{'★'.repeat(Math.min(r.estrelas ?? r.stars ?? 0, 5))}{'☆'.repeat(Math.max(5 - (r.estrelas ?? r.stars ?? 0), 0))}</td>
-                <td className="py-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${(r.status ?? '') === 'Aprovado' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{r.status ?? '—'}</span>
-                </td>
-                <td className={`py-2 font-mono text-xs font-semibold ${String(r.kpi ?? '').startsWith('+') ? 'text-emerald-600' : 'text-red-500'}`}>{r.kpi ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Próximo ciclo de testes</h3>
-          <p className="text-3xl font-mono font-bold text-amber-600 mb-1">14:32:07</p>
-          <p className="text-xs text-gray-500">A cada 6h o sistema testa 24 cenários automaticamente</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Aprendizado cross-setor</h3>
-          <p className="text-xs text-gray-400 italic">
-            Padrões cross-setor aparecerão aqui após ligações suficientes serem processadas.
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Testes A/B ativos</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { name: 'Abertura com pergunta vs afirmação', a: 67, b: 73 },
-            { name: 'Follow-up 2h vs 24h', a: 54, b: 61 },
-          ].map((ab, i) => {
-            const key = `ab${i}`
-            return (
-              <div key={i} className="border border-gray-100 rounded-lg p-3">
-                <p className="text-xs font-medium text-gray-700 mb-2">{ab.name}</p>
-                <div className="space-y-1.5 mb-3">
-                  <div>
-                    <div className="flex justify-between text-xs mb-0.5">
-                      <span className="text-gray-500">Versão A</span>
-                      <span className="font-mono text-gray-700">{ab.a}%</span>
-                    </div>
-                    <Bar pct={ab.a} color="bg-blue-400" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-0.5">
-                      <span className="text-gray-500">Versão B</span>
-                      <span className="font-mono text-emerald-600 font-semibold">{ab.b}%</span>
-                    </div>
-                    <Bar pct={ab.b} color="bg-emerald-500" />
-                  </div>
-                </div>
-                <button
-                  onClick={() => setAbVote(p => ({ ...p, [key]: 'B' }))}
-                  className="w-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg py-1.5 hover:bg-emerald-100 transition-colors font-medium"
-                >
-                  {abVote[key] ? '✓ Vencedor aplicado' : 'Aplicar vencedor (B)'}
-                </button>
+      {/* ── Explicação para o cliente ─────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <FlaskConical size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">QA Automático — Análise de Ligações</h2>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
+                Esta aba mostra o resultado de todas as ligações realizadas pelos seus agentes — quais converteram, quais não atenderam e qual a taxa de sucesso geral.
+                Com esses dados, você identifica padrões, mede o desempenho real e ajusta campanhas antes de escalar.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-3">
+                <span className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1">
+                  <CheckCircle size={11} className="text-emerald-500" /> Taxa de conversão em tempo real
+                </span>
+                <span className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1">
+                  <CheckCircle size={11} className="text-emerald-500" /> Histórico completo por agente
+                </span>
+                <span className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1">
+                  <CheckCircle size={11} className="text-emerald-500" /> Score ICP de cada contato
+                </span>
               </div>
-            )
-          })}
+            </div>
+          </div>
+          <button
+            onClick={rodarCiclo}
+            disabled={cicloRodou}
+            className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-60 flex-shrink-0"
+          >
+            <RefreshCw size={14} className={cicloRodou ? 'animate-spin' : ''} />
+            {cicloMsg || 'Atualizar dados'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── KPI strip ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <TrendingUp size={18} className="text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-2xs text-gray-400 font-medium mb-0.5">Taxa de conversão</p>
+            <p className="text-2xl font-mono font-bold text-emerald-600">{taxa}<span className="text-sm text-gray-400 font-normal">%</span></p>
+            <p className="text-2xs text-gray-400">{sucesso} de {total} ligações</p>
+          </div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <BarChart2 size={18} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xs text-gray-400 font-medium mb-0.5">Ligações analisadas</p>
+            <p className="text-2xl font-mono font-bold text-gray-900">{total}</p>
+            <p className="text-2xs text-gray-400">últimas 50 com resultado</p>
+          </div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <Target size={18} className="text-brand-600" />
+          </div>
+          <div>
+            <p className="text-2xs text-gray-400 font-medium mb-0.5">Sem resultado</p>
+            <p className="text-2xl font-mono font-bold text-gray-900">{total - sucesso}</p>
+            <p className="text-2xs text-gray-400">não atenderam ou sem interesse</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Tabela de ligações reais ──────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Histórico de ligações processadas</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Últimas {rows.length} ligações com resultado registrado pelos seus agentes</p>
+          </div>
+          {rows.length > 0 && (
+            <span className="text-2xs bg-brand-50 border border-brand-200 text-brand-700 rounded-full px-2.5 py-1 font-semibold">
+              {rows.length} registros
+            </span>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="h-8 bg-gray-50 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="py-14 text-center">
+            <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-3">
+              <FlaskConical size={22} className="text-gray-300" />
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Nenhuma ligação com resultado ainda</p>
+            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+              Assim que seus agentes realizarem ligações e registrarem resultados, o histórico aparecerá aqui automaticamente.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-2xs text-gray-400 font-semibold uppercase tracking-wide bg-gray-50">
+                  <th className="text-left px-5 py-3">Contato</th>
+                  <th className="text-left px-5 py-3">Empresa</th>
+                  <th className="text-left px-5 py-3">Agente</th>
+                  <th className="text-left px-5 py-3">Resultado</th>
+                  <th className="text-left px-5 py-3">ICP</th>
+                  <th className="text-left px-5 py-3">Data</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {rows.map((r: any, i: number) => (
+                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-5 py-3 text-sm font-medium text-gray-900">{r.contato ?? '—'}</td>
+                    <td className="px-5 py-3 text-xs text-gray-500">{r.empresa ?? '—'}</td>
+                    <td className="px-5 py-3 text-xs text-gray-600">{r.agente ?? '—'}</td>
+                    <td className="px-5 py-3">{resultadoBadge(r.resultado)}</td>
+                    <td className="px-5 py-3">
+                      {r.icp > 0 ? (
+                        <span className={`text-2xs font-bold font-mono px-2 py-0.5 rounded-full border ${r.icp >= 70 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : r.icp >= 50 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                          {r.icp}
+                        </span>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                    <td className="px-5 py-3 text-2xs text-gray-400 font-mono">
+                      {r.data ? new Date(r.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Próximos passos / orientação ─────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-brand-50 border border-brand-100 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles size={15} className="text-brand-600" />
+            <h3 className="text-sm font-semibold text-brand-800">Como aumentar a taxa de conversão</h3>
+          </div>
+          <ul className="space-y-2 mt-3">
+            {[
+              'Analise os horários com maior taxa de atendimento na aba Horários',
+              'Revise os argumentos de alta performance na aba Cross',
+              'Ajuste o script do agente com base nos padrões detectados',
+              'Use a aba Simulador para testar novas abordagens antes de publicar',
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-brand-700">
+                <span className="w-4 h-4 rounded-full bg-brand-200 text-brand-700 text-2xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle size={15} className="text-amber-500" />
+            <h3 className="text-sm font-semibold text-gray-900">O que cada resultado significa</h3>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: 'Agendou',      desc: 'Reunião marcada — conversão completa',       cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+              { label: 'Transferida',  desc: 'Passou para vendedor humano na chamada',     cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+              { label: 'Não atendeu',  desc: 'Ninguém atendeu — entra em recontato',       cls: 'bg-gray-50 text-gray-500 border-gray-200' },
+              { label: 'Sem interesse',desc: 'Lead rejeitou — alimenta o aprendizado CI',  cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+              { label: 'Esgotado',     desc: 'Tentativas máximas atingidas',               cls: 'bg-red-50 text-red-600 border-red-200' },
+            ].map((r, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <span className={`text-2xs px-2 py-0.5 rounded-full font-semibold border flex-shrink-0 ${r.cls}`}>{r.label}</span>
+                <span className="text-xs text-gray-500">{r.desc}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
