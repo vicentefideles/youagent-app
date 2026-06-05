@@ -2920,6 +2920,26 @@ function TabCampanhas() {
   return (
     <div className="space-y-4">
 
+      {/* Header explicativo */}
+      <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center">
+            <Megaphone size={18} className="text-brand-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Desempenho por Campanha</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Acompanhe <span className="font-medium text-gray-700">ligações, taxa de agendamento e conversão</span> de cada campanha em tempo real. Use os filtros para comparar tipos e identificar o que está performando melhor.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-full font-semibold">
+            {CAMPANHAS_INT.length} campanha{CAMPANHAS_INT.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard label="Campanhas ativas" value={String(ativas.length)} sub={`de ${CAMPANHAS_INT.length} total`} accent="blue" />
