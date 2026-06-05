@@ -6,9 +6,9 @@ import {
   BarChart2, Sliders, TrendingUp, Share2, GitBranch, Play,
   Target, TestTube2, Globe, Cpu, CheckCircle,
   ChevronRight, Upload, Trash2, RotateCcw, Zap,
-  AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2,
+  AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star,
 } from 'lucide-react'
-import { inteligenciaQualidadeApi, inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi } from '@/services/api'
+import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi } from '@/services/api'
 
 type TabId =
   | 'testes' | 'qualidade' | 'coletiva' | 'horarios' | 'campanhas'
@@ -314,143 +314,278 @@ function TabTestes() {
 
 interface QualidadeItem {
   agente_id: string
-  clareza: number
-  empatia: number
-  objecoes: number
-  fechamento: number
-  observacoes?: string
+  nome_agente?: string
+  score_total: number
+  taxa_sucesso: number
+  total_ligacoes: number
+  atualizado_em?: string
+  agentes?: { nome: string }
 }
 
-function TabQualidade({ agentesQualidade }: { agentesQualidade?: { name: string; score: number; nota: string; ligacoes: number; ultima: string }[] }) {
-  const [qualidade, setQualidade] = useState<QualidadeItem[]>([])
-  const [loadingQ, setLoadingQ] = useState(true)
+function notaFromScore(score: number): { nota: string; cls: string } {
+  if (score >= 90) return { nota: 'A+', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+  if (score >= 80) return { nota: 'A',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+  if (score >= 70) return { nota: 'B',  cls: 'bg-blue-50 text-blue-700 border-blue-200' }
+  if (score >= 60) return { nota: 'C',  cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+  return { nota: 'D', cls: 'bg-red-50 text-red-600 border-red-200' }
+}
 
-  useEffect(() => {
-    inteligenciaApi.getQualidade()
-      .then(res => setQualidade((res.data as QualidadeItem[]) || []))
-      .catch(() => {})
-      .finally(() => setLoadingQ(false))
-  }, [])
+function TabQualidade() {
+  const [calculando, setCalculando] = useState(false)
+  const [calcMsg, setCalcMsg]       = useState('')
 
-  const agentsMock = [
-    { name: 'Ana', score: 94, nota: 'A+', ligacoes: 312, ultima: 'Hoje 09:14' },
-    { name: 'Julia', score: 88, nota: 'A', ligacoes: 287, ultima: 'Hoje 09:14' },
-    { name: 'Carlos', score: 78, nota: 'B', ligacoes: 198, ultima: 'Hoje 08:47' },
-  ]
-  const agents = (agentesQualidade && agentesQualidade.length > 0) ? agentesQualidade : agentsMock
-  const dims = [
-    { label: 'Precisão do script', pct: 94 },
-    { label: 'Aderência ao script', pct: 88 },
-    { label: 'Qualidade de voz', pct: 92 },
-    { label: 'Conformidade legal', pct: 100 },
-  ]
-  const sotaques = [
-    { region: 'SP Interior', pct: 11.2, bar: 78 },
-    { region: 'MG', pct: 8.4, bar: 60 },
-    { region: 'Grande SP', pct: 5.9, bar: 42 },
-  ]
+  const { data: qualidade = [], isLoading, refetch } = useQuery<QualidadeItem[]>({
+    queryKey: ['inteligencia-qualidade'],
+    queryFn: () => inteligenciaApi.getQualidade().then(r => (r.data as QualidadeItem[]) || []),
+  })
+
+  async function calcularScores() {
+    setCalculando(true)
+    setCalcMsg('Calculando scores das ligações...')
+    try {
+      const res = await qualidadeCalcularApi.calcular()
+      const d = res.data as { calculados: number; total_agentes: number }
+      await refetch()
+      setCalcMsg(`✓ ${d.calculados} agente${d.calculados !== 1 ? 's' : ''} atualizado${d.calculados !== 1 ? 's' : ''}`)
+    } catch {
+      setCalcMsg('Erro ao calcular — tente novamente')
+    } finally {
+      setCalculando(false)
+      setTimeout(() => setCalcMsg(''), 4000)
+    }
+  }
+
+  // Métricas agregadas
+  const totalAgentes  = qualidade.length
+  const mediaScore    = totalAgentes > 0
+    ? Math.round(qualidade.reduce((s, q) => s + (q.score_total ?? 0), 0) / totalAgentes)
+    : 0
+  const totalLigacoes = qualidade.reduce((s, q) => s + (q.total_ligacoes ?? 0), 0)
+  const melhor        = totalAgentes > 0
+    ? qualidade.reduce((a, b) => (a.score_total ?? 0) >= (b.score_total ?? 0) ? a : b)
+    : null
+
   return (
     <div className="space-y-4">
-      {/* Análise por agente via API real */}
-      {loadingQ ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-          <div className="h-4 bg-gray-100 rounded animate-pulse w-1/3" />
-          {[1,2,3].map(i => (
-            <div key={i} className="space-y-2">
-              <div className="h-3 bg-gray-100 rounded animate-pulse" />
-              <div className="h-2 bg-gray-100 rounded animate-pulse w-4/5" />
+
+      {/* ── Explicação ───────────────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Shield size={18} className="text-blue-600" />
             </div>
-          ))}
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">QA de Agentes — Score de Desempenho</h2>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
+                Mostra o desempenho real de cada agente de IA com base nas ligações dos últimos 30 dias.
+                O score é calculado automaticamente: agentes que geram mais agendamentos e transferências recebem nota maior.
+                Use para identificar qual agente está performando melhor e em quais campanhas colocá-lo.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-3">
+                {[
+                  'Score calculado das ligações reais',
+                  'Nota A+ a D por agente',
+                  'Ranking automático por conversão',
+                ].map(t => (
+                  <span key={t} className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-3 py-1">
+                    <CheckCircle size={11} className="text-emerald-500" /> {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            <button
+              onClick={calcularScores}
+              disabled={calculando}
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={calculando ? 'animate-spin' : ''} />
+              {calculando ? 'Calculando...' : 'Calcular scores agora'}
+            </button>
+            {calcMsg && (
+              <p className={`text-xs font-medium ${calcMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>
+                {calcMsg}
+              </p>
+            )}
+          </div>
         </div>
-      ) : qualidade.length > 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Qualidade por agente — dados reais</h3>
-          <div className="space-y-4">
-            {qualidade.map((q, i) => (
-              <div key={i} className="border border-gray-100 rounded-xl p-3">
-                <p className="text-xs font-bold text-gray-800 mb-2">{q.agente_id}</p>
-                <div className="space-y-2">
-                  {([
-                    { label: 'Clareza', val: q.clareza },
-                    { label: 'Empatia', val: q.empatia },
-                    { label: 'Objeções', val: q.objecoes },
-                    { label: 'Fechamento', val: q.fechamento },
-                  ] as { label: string; val: number }[]).map((m, j) => (
-                    <div key={j}>
-                      <div className="flex justify-between text-xs mb-0.5">
-                        <span className="text-gray-600">{m.label}</span>
-                        <span className="font-mono font-semibold text-gray-900">{m.val}</span>
-                      </div>
-                      <Bar pct={m.val} color={m.val >= 80 ? 'bg-emerald-500' : m.val >= 60 ? 'bg-blue-500' : 'bg-amber-400'} />
-                    </div>
-                  ))}
-                </div>
-                {q.observacoes && <p className="text-xs text-gray-500 mt-2 italic">{q.observacoes}</p>}
+      </div>
+
+      {/* ── KPI strip ────────────────────────────────────────────────────────── */}
+      {totalAgentes > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+              <Users size={18} className="text-brand-600" />
+            </div>
+            <div>
+              <p className="text-2xs text-gray-400 font-medium mb-0.5">Agentes avaliados</p>
+              <p className="text-2xl font-mono font-bold text-gray-900">{totalAgentes}</p>
+              <p className="text-2xs text-gray-400">{totalLigacoes} ligações analisadas</p>
+            </div>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+              <TrendingUp size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-2xs text-gray-400 font-medium mb-0.5">Score médio</p>
+              <p className="text-2xl font-mono font-bold text-emerald-600">{mediaScore}<span className="text-sm text-gray-400 font-normal">%</span></p>
+              <p className="text-2xs text-gray-400">conversão média dos agentes</p>
+            </div>
+          </div>
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <Star size={18} className="text-amber-500" />
+            </div>
+            <div>
+              <p className="text-2xs text-gray-400 font-medium mb-0.5">Melhor agente</p>
+              <p className="text-sm font-bold text-gray-900 truncate">
+                {melhor?.agentes?.nome ?? melhor?.nome_agente ?? melhor?.agente_id ?? '—'}
+              </p>
+              <p className="text-2xs text-gray-400">{melhor?.score_total ?? 0}% de conversão</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabela de agentes ─────────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Ranking de desempenho por agente</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Score = % de ligações que resultaram em agendamento ou transferência nos últimos 30 dias
+            </p>
+          </div>
+          {totalAgentes > 0 && (
+            <span className="text-2xs bg-brand-50 border border-brand-200 text-brand-700 rounded-full px-2.5 py-1 font-semibold">
+              {totalAgentes} agente{totalAgentes !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-10 bg-gray-50 rounded-lg animate-pulse" />)}
+          </div>
+        ) : qualidade.length === 0 ? (
+          <div className="py-14 text-center">
+            <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-3">
+              <Shield size={22} className="text-gray-300" />
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Nenhum score calculado ainda</p>
+            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed mb-4">
+              Clique em "Calcular scores agora" para gerar automaticamente o ranking de desempenho com base nas ligações realizadas.
+            </p>
+            <button
+              onClick={calcularScores}
+              disabled={calculando}
+              className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={calculando ? 'animate-spin' : ''} />
+              {calculando ? 'Calculando...' : 'Calcular agora'}
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-2xs text-gray-400 font-semibold uppercase tracking-wide bg-gray-50">
+                  <th className="text-left px-5 py-3">#</th>
+                  <th className="text-left px-5 py-3">Agente</th>
+                  <th className="text-left px-5 py-3">Score</th>
+                  <th className="text-left px-5 py-3">Nota</th>
+                  <th className="text-left px-5 py-3">Ligações</th>
+                  <th className="text-left px-5 py-3">Atualizado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {[...qualidade]
+                  .sort((a, b) => (b.score_total ?? 0) - (a.score_total ?? 0))
+                  .map((q, i) => {
+                    const nome = q.agentes?.nome ?? q.nome_agente ?? q.agente_id ?? '—'
+                    const score = q.score_total ?? 0
+                    const { nota, cls } = notaFromScore(score)
+                    const barColor = score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-blue-500' : 'bg-amber-400'
+                    return (
+                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold ${i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {i + 1}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{nome}</td>
+                        <td className="px-5 py-3.5 w-48">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${score}%` }} />
+                            </div>
+                            <span className="text-xs font-mono font-bold text-gray-900 w-10 text-right">{score}%</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${cls}`}>{nota}</span>
+                        </td>
+                        <td className="px-5 py-3.5 text-sm text-gray-500">{q.total_ligacoes ?? 0}</td>
+                        <td className="px-5 py-3.5 text-2xs text-gray-400 font-mono">
+                          {q.atualizado_em
+                            ? new Date(q.atualizado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                            : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Guia de notas ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle size={15} className="text-amber-500" />
+            <h3 className="text-sm font-semibold text-gray-900">O que cada nota significa</h3>
+          </div>
+          <div className="space-y-2">
+            {[
+              { nota: 'A+', range: '≥ 90%', desc: 'Excelente — agente no topo da performance',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+              { nota: 'A',  range: '80–89%', desc: 'Muito bom — resultados consistentes',            cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+              { nota: 'B',  range: '70–79%', desc: 'Bom — pode melhorar com ajuste de script',       cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+              { nota: 'C',  range: '60–69%', desc: 'Regular — revisar abordagem e horários',         cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+              { nota: 'D',  range: '< 60%',  desc: 'Crítico — recomendado ajuste fino urgente',      cls: 'bg-red-50 text-red-600 border-red-200' },
+            ].map((r, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border w-9 text-center flex-shrink-0 ${r.cls}`}>{r.nota}</span>
+                <span className="text-2xs text-gray-400 w-14 flex-shrink-0 font-mono">{r.range}</span>
+                <span className="text-xs text-gray-600">{r.desc}</span>
               </div>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-xs text-gray-400">
-          Nenhuma avaliação ainda — as análises aparecem automaticamente após ligações gravadas.
-        </div>
-      )}
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Dimensões de qualidade</h3>
-        <div className="space-y-3">
-          {dims.map((d, i) => (
-            <div key={i}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600">{d.label}</span>
-                <span className="font-mono font-semibold text-gray-900">{d.pct}%</span>
-              </div>
-              <Bar pct={d.pct} color={d.pct === 100 ? 'bg-emerald-500' : 'bg-blue-500'} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Análise por agente</h3>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-400 border-b border-gray-100">
-              <th className="text-left pb-2">Agente</th>
-              <th className="text-left pb-2">Score</th>
-              <th className="text-left pb-2">Nota</th>
-              <th className="text-left pb-2">Ligações analisadas</th>
-              <th className="text-left pb-2">Última análise</th>
-            </tr>
-          </thead>
-          <tbody>
-            {agents.map((a, i) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0">
-                <td className="py-2 font-medium text-gray-900">{a.name}</td>
-                <td className="py-2 font-mono text-gray-900">{a.score}%</td>
-                <td className="py-2">
-                  <span className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-semibold">{a.nota}</span>
-                </td>
-                <td className="py-2 text-gray-600">{a.ligacoes}</td>
-                <td className="py-2 text-gray-400 text-xs">{a.ultima}</td>
-              </tr>
+        <div className="bg-brand-50 border border-brand-100 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={15} className="text-brand-600" />
+            <h3 className="text-sm font-semibold text-brand-800">Como melhorar o score dos agentes</h3>
+          </div>
+          <ul className="space-y-2">
+            {[
+              'Recalcule os scores após cada campanha para acompanhar a evolução',
+              'Agentes com nota C ou D → use a aba Ajuste Fino para refinar o script',
+              'Compare os horários de pico na aba Horários e ajuste os agentes de baixa nota',
+              'Aplique os argumentos aprovados via aba Cross para elevar conversão',
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-brand-700">
+                <span className="w-4 h-4 rounded-full bg-brand-200 text-brand-700 text-2xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                {tip}
+              </li>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Performance por sotaque regional</h3>
-        <div className="space-y-3">
-          {sotaques.map((s, i) => (
-            <div key={i}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600">{s.region}</span>
-                <span className="font-mono font-semibold text-amber-600">+{s.pct}%</span>
-              </div>
-              <Bar pct={s.bar} color="bg-amber-400" />
-            </div>
-          ))}
+          </ul>
         </div>
       </div>
     </div>
@@ -2555,18 +2690,6 @@ export default function InteligenciaPage() {
   const tabFromUrl = (searchParams.get('tab') as TabId) || 'testes'
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl)
   const [scoreIA, setScoreIA] = useState<number | null>(null)
-  const [calculando, setCalculando] = useState(false)
-  const queryClient = useQueryClient()
-
-  const recalcularScores = async () => {
-    setCalculando(true)
-    try {
-      await qualidadeCalcularApi.calcular()
-      queryClient.invalidateQueries({ queryKey: ['inteligencia-qualidade'] })
-    } finally {
-      setCalculando(false)
-    }
-  }
 
   useEffect(() => {
     claudeApi.scoreInteligencia()
@@ -2574,45 +2697,14 @@ export default function InteligenciaPage() {
       .catch(() => {})
   }, [])
 
-  const { data: qualidadeData = [] } = useQuery({
-    queryKey: ['inteligencia-qualidade'],
-    queryFn: () => inteligenciaQualidadeApi.list().then(r => r.data),
-  })
-
   const { data: simuladorData = [] } = useQuery({
     queryKey: ['inteligencia-simulador'],
     queryFn: () => inteligenciaSimuladorApi.list().then(r => r.data),
   })
 
-  const agentesQualidade = (qualidadeData as any[]).length > 0
-    ? (qualidadeData as any[]).map((q: any) => ({
-        name: q.agentes?.nome ?? 'Agente',
-        score: q.score_total ?? 0,
-        nota: q.nota ?? '—',
-        ligacoes: q.ligacoes_analisadas ?? 0,
-        ultima: q.ultima_analise ?? '—',
-      }))
-    : undefined
-
   const tabContent: Record<TabId, React.ReactNode> = {
     testes: <TabTestes />,
-    qualidade: (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-gray-700">Qualidade dos Agentes</span>
-          <button
-            onClick={recalcularScores}
-            disabled={calculando}
-            className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 flex items-center gap-1.5"
-            style={{ background: calculando ? undefined : '#4F46E5' }}
-          >
-            {calculando ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            Recalcular scores
-          </button>
-        </div>
-        <TabQualidade agentesQualidade={agentesQualidade} />
-      </div>
-    ),
+    qualidade: <TabQualidade />,
     coletiva: <TabColetiva />,
     horarios: <TabHorarios />,
     campanhas: <TabCampanhas />,
