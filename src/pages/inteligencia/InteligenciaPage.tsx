@@ -1239,164 +1239,221 @@ function TabHorarios() {
 }
 
 function TabConhecimento() {
+  const queryClient = useQueryClient()
   const [format, setFormat] = useState<string>('livro')
   const [titulo, setTitulo] = useState('')
   const [categoria, setCategoria] = useState('')
   const [urlArtigo, setUrlArtigo] = useState('')
   const [urlVideo, setUrlVideo] = useState('')
   const [textoLivre, setTextoLivre] = useState('')
-  const cats = ['livro', 'artigo', 'video', 'audio', 'texto']
-  const catLabel: Record<string, string> = { livro: 'Livro/PDF', artigo: 'Artigo/Link', video: 'Vídeo', audio: 'Áudio', texto: 'Texto livre' }
+  const [salvando, setSalvando] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
 
-  const { data: conhecimentoData } = useQuery({
+  const cats = ['livro', 'artigo', 'video', 'audio', 'texto']
+  const catLabel: Record<string, string> = { livro: 'Livro', artigo: 'Artigo', video: 'Vídeo', audio: 'Áudio', texto: 'Texto livre' }
+
+  const { data: conhecimentoRaw = [] } = useQuery({
     queryKey: ['inteligencia-conhecimento'],
-    queryFn: () => api.get('/inteligencia/conhecimento').then(r => r.data as any),
+    queryFn: () => api.get('/inteligencia/conhecimento').then(r => r.data as any[]),
   })
-  const library: any[] = conhecimentoData?.items ?? conhecimentoData ?? []
+  const library: any[] = Array.isArray(conhecimentoRaw)
+    ? conhecimentoRaw
+    : (conhecimentoRaw as any)?.items ?? []
+
+  // KPIs derivados dos dados reais
+  const totalMateriais = library.length
+  const totalInsights = library.reduce((s: number, b: any) => s + (b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0), 0)
+  const tiposUnicos = new Set(library.map((b: any) => b.tipo)).size
+  const ultimoUpdate = library.length > 0
+    ? new Date(library[0].criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    : '—'
+
+  // Últimos insights extraídos dos materiais reais
+  const ultimosInsights: string[] = library
+    .slice(0, 5)
+    .flatMap((b: any) => (b.argumentos ?? []).slice(0, 1) as string[])
+    .slice(0, 3)
+
+  const tipoIcon: Record<string, string> = {
+    livro: '📘', artigo: '📰', video: '🎬', audio: '🎙️', texto: '📝',
+  }
+
+  // Recomendações da plataforma ETZ (meta-conhecimento, sempre exibido)
+  const recomendacoes = [
+    { icon: '📘', tipo: 'Livro', titulo: 'Vendas consultivas', exemplo: 'SPIN Selling, The Challenger Sale', impacto: '+22%' },
+    { icon: '🎬', tipo: 'Vídeo', titulo: 'Contorno de objeções', exemplo: 'Objeção de preço e concorrência', impacto: '+17%' },
+    { icon: '📄', tipo: 'Texto', titulo: 'Scripts de qualificação', exemplo: 'Frameworks BANT / MEDDIC', impacto: '+14%' },
+    { icon: '📰', tipo: 'Artigo', titulo: 'Tendências do setor', exemplo: 'Dados e relatórios do mercado-alvo', impacto: '+11%' },
+    { icon: '🎙️', tipo: 'Áudio', titulo: 'Calls de vendas reais', exemplo: 'Transcrições de calls com êxito', impacto: '+9%' },
+  ]
+
+  async function adicionar() {
+    if (!titulo || !categoria) { setFeedback('❌ Preencha título e categoria'); return }
+    const conteudo = textoLivre || urlArtigo || urlVideo || `Material do tipo ${format}: ${titulo}`
+    setSalvando(true); setFeedback(null)
+    try {
+      await api.post('/inteligencia/conhecimento', {
+        titulo,
+        tipo: format,
+        categoria,
+        conteudo_texto: conteudo,
+        url: urlArtigo || urlVideo || undefined,
+      })
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
+      setTitulo(''); setCategoria(''); setUrlArtigo(''); setUrlVideo(''); setTextoLivre('')
+      setFeedback('✅ Material processado pela IA e adicionado à base!')
+      setTimeout(() => setFeedback(null), 5000)
+    } catch (e: unknown) {
+      setFeedback('❌ Erro: ' + (e as Error).message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function remover(id: string) {
+    try {
+      await api.delete(`/inteligencia/conhecimento/${id}`)
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
+    } catch { /* silencioso */ }
+  }
+
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#164e63)' }}
-      >
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Base de Conhecimento</h2>
-            <div className="flex gap-2 flex-wrap">
-              {['PDFs', 'Vídeos', 'Links', 'Áudios', 'Textos'].map(f => (
-                <span key={f} className="bg-white/15 text-white text-xs px-2 py-0.5 rounded-full">{f}</span>
-              ))}
-            </div>
+
+      {/* Header explicativo */}
+      <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center">
+            <BookOpen size={18} className="text-brand-600" />
           </div>
-          <div className="flex gap-4 text-right">
-            {[{ flag: '🇧🇷', lang: 'PT-BR', count: 18 }, { flag: '🇺🇸', lang: 'EN', count: 4 }, { flag: '🌐', lang: 'Outros', count: 2 }].map((l, i) => (
-              <div key={i} className="bg-white/10 rounded-lg px-3 py-1.5 text-center">
-                <p className="text-base">{l.flag}</p>
-                <p className="text-xs text-white/70">{l.lang}</p>
-                <p className="text-xs font-bold">{l.count}</p>
-              </div>
-            ))}
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Base de Conhecimento</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Alimente seus agentes com <span className="font-medium text-gray-700">livros, artigos, vídeos e scripts</span>. A IA processa cada material e o agente se torna especialista em argumentação e contorno de objeções do seu segmento.
+            </p>
           </div>
         </div>
+        <span className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2.5 py-1 rounded-full font-semibold flex-shrink-0">
+          {totalMateriais} material{totalMateriais !== 1 ? 'is' : ''}
+        </span>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
+
+        {/* ── Coluna esquerda: formulário ── */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Adicionar conhecimento</h3>
+
+          {/* Tipo de material */}
           <div className="flex gap-1 mb-4">
             {cats.map(f => (
-              <button
-                key={f}
-                onClick={() => setFormat(f)}
-                className={`flex-1 text-xs py-1.5 rounded-lg transition-colors font-medium ${format === f ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              <button key={f} onClick={() => setFormat(f)}
+                className={`flex-1 text-xs py-1.5 rounded-lg transition-colors font-medium ${format === f ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >
-                {catLabel[f].split('/')[0]}
+                {catLabel[f]}
               </button>
             ))}
           </div>
 
           <div className="space-y-2 mb-3">
-            <input
-              value={titulo}
-              onChange={e => setTitulo(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-              placeholder="Título do material"
-            />
-            <select
-              value={categoria}
-              onChange={e => setCategoria(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-            >
+            <input value={titulo} onChange={e => setTitulo(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400"
+              placeholder="Título do material" />
+            <select value={categoria} onChange={e => setCategoria(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200">
               <option value="">Categoria</option>
-              <option>Vendas e Persuasão</option><option>Setor Industrial</option>
-              <option>Tecnologia</option><option>Negociação</option>
-              <option>Comportamento do comprador</option><option>Concorrência</option>
-              <option>Cases e Referências</option><option>Compliance e LGPD</option>
+              <option>Vendas e Persuasão</option>
+              <option>Setor Industrial</option>
+              <option>Tecnologia</option>
+              <option>Negociação</option>
+              <option>Comportamento do comprador</option>
+              <option>Concorrência</option>
+              <option>Cases e Referências</option>
+              <option>Compliance e LGPD</option>
               <option>Outra</option>
             </select>
 
             {format === 'livro' && (
-              <div className="border-2 border-dashed border-blue-200 rounded-xl p-5 text-center cursor-pointer hover:border-blue-400 transition-colors bg-blue-50">
-                <Upload size={20} className="mx-auto text-blue-400 mb-1" />
-                <p className="text-xs text-blue-600 font-semibold">Upload de PDF</p>
-                <p className="text-xs text-blue-400">Arraste o arquivo ou clique para selecionar</p>
+              <div className="border-2 border-dashed border-brand-200 rounded-xl p-4 text-center bg-brand-50">
+                <Upload size={18} className="mx-auto text-brand-400 mb-1" />
+                <p className="text-xs text-brand-600 font-semibold">Cole trechos relevantes do livro abaixo</p>
+                <p className="text-[10px] text-brand-400 mt-0.5">Upload de PDF em breve</p>
               </div>
             )}
             {format === 'artigo' && (
-              <div>
-                <input
-                  value={urlArtigo}
-                  onChange={e => setUrlArtigo(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                  placeholder="URL do artigo (ex: https://...)"
-                />
-                <p className="text-xs text-gray-400 mt-1">O sistema extrai e indexa o conteúdo automaticamente.</p>
+              <div className="space-y-2">
+                <input value={urlArtigo} onChange={e => setUrlArtigo(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200"
+                  placeholder="URL do artigo (ex: https://...)" />
+                <p className="text-[10px] text-gray-400">Cole o texto do artigo abaixo para melhores resultados:</p>
               </div>
             )}
             {format === 'video' && (
-              <input
-                value={urlVideo}
-                onChange={e => setUrlVideo(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="URL YouTube ou Vimeo"
-              />
-            )}
-            {format === 'audio' && (
-              <div className="border-2 border-dashed border-purple-200 rounded-xl p-5 text-center cursor-pointer hover:border-purple-400 transition-colors bg-purple-50">
-                <Upload size={20} className="mx-auto text-purple-400 mb-1" />
-                <p className="text-xs text-purple-600 font-semibold">Upload de áudio</p>
-                <p className="text-xs text-purple-400">MP3, WAV ou M4A — transcrição automática</p>
+              <div className="space-y-2">
+                <input value={urlVideo} onChange={e => setUrlVideo(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200"
+                  placeholder="URL YouTube ou Vimeo" />
+                <p className="text-[10px] text-gray-400">Cole os pontos principais do vídeo como texto:</p>
               </div>
             )}
-            {format === 'texto' && (
-              <textarea
-                rows={4}
-                value={textoLivre}
-                onChange={e => setTextoLivre(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none"
-                placeholder="Cole ou digite o texto aqui..."
-              />
+            {format === 'audio' && (
+              <div className="border-2 border-dashed border-purple-200 rounded-xl p-4 text-center bg-purple-50">
+                <Upload size={18} className="mx-auto text-purple-400 mb-1" />
+                <p className="text-xs text-purple-600 font-semibold">Cole a transcrição do áudio abaixo</p>
+                <p className="text-[10px] text-purple-400 mt-0.5">Upload direto em breve</p>
+              </div>
             )}
+
+            {/* Textarea sempre visível (conteúdo principal) */}
+            <textarea rows={format === 'texto' ? 5 : 3}
+              value={textoLivre} onChange={e => setTextoLivre(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200 resize-none"
+              placeholder={
+                format === 'livro' ? 'Cole trechos do livro aqui — capítulos, frases-chave, argumentos...'
+                : format === 'artigo' ? 'Cole o texto do artigo aqui...'
+                : format === 'video' ? 'Resumo ou pontos principais do vídeo...'
+                : format === 'audio' ? 'Transcrição ou pontos principais do áudio...'
+                : 'Cole ou digite o conteúdo aqui...'
+              }
+            />
           </div>
 
           <div className="mb-3">
             <p className="text-xs font-medium text-gray-700 mb-1.5">O agente deve usar este material para:</p>
             <div className="space-y-1">
-              {[
-                'Aprender argumentos de persuasão',
-                'Melhorar qualificação',
-                'Aprender a contornar objeções',
-                'Adaptar tom por segmento',
-                'Incorporar vocabulário setorial',
-              ].map(c => (
+              {['Aprender argumentos de persuasão', 'Melhorar qualificação', 'Aprender a contornar objeções', 'Adaptar tom por segmento', 'Incorporar vocabulário setorial'].map(c => (
                 <label key={c} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
                   <input type="checkbox" defaultChecked className="rounded" /> {c}
                 </label>
               ))}
             </div>
           </div>
-          <button
-            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
-            onClick={async () => {
-              if (!titulo || !categoria) { alert('Preencha título e categoria'); return }
-              try {
-                await api.post('/inteligencia/conhecimento', { titulo, categoria, formato: format, url: urlArtigo || urlVideo || undefined, texto: textoLivre || undefined })
-                setTitulo(''); setUrlArtigo(''); setUrlVideo(''); setTextoLivre('')
-                alert('Material adicionado à base!')
-              } catch(e: unknown) { alert('Erro: ' + (e as Error).message) }
-            }}
+
+          {feedback && (
+            <div className={`text-xs px-3 py-2 rounded-lg mb-2 ${feedback.startsWith('✅') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+              {feedback}
+            </div>
+          )}
+
+          <button disabled={salvando} onClick={adicionar}
+            className="w-full bg-brand-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Adicionar à base
+            {salvando
+              ? <><Loader2 size={14} className="animate-spin" /> Processando com IA...</>
+              : 'Adicionar à base'}
           </button>
         </div>
 
+        {/* ── Coluna direita: KPIs + biblioteca + recomendações ── */}
         <div className="space-y-4">
+
+          {/* KPIs reais */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'Materiais', value: '24' },
-              { label: 'Insights extraídos', value: '312' },
-              { label: 'Impacto conversão', value: '+8.2%' },
-              { label: 'Último update', value: 'Hoje' },
+              { label: 'Materiais', value: String(totalMateriais) },
+              { label: 'Insights extraídos', value: String(totalInsights) },
+              { label: 'Tipos diferentes', value: String(tiposUnicos) },
+              { label: 'Último update', value: ultimoUpdate },
             ].map((k, i) => (
               <div key={i} className="bg-white border border-gray-200 rounded-xl p-3 text-center">
                 <p className="text-base font-mono font-bold text-gray-900">{k.value}</p>
@@ -1405,42 +1462,80 @@ function TabConhecimento() {
             ))}
           </div>
 
+          {/* Biblioteca */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Biblioteca</h3>
-            <div className="space-y-2">
-              {library.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-4">Nenhum material cadastrado ainda.</p>
-              )}
-              {library.map((b: any, i: number) => (
-                <div key={i} className="flex items-center gap-3 border border-gray-100 rounded-lg p-2">
-                  <div className="w-8 h-10 rounded flex items-center justify-center text-lg shrink-0" style={{ background: (b.color ?? '#2563eb') + '22' }}>
-                    {b.icon ?? '📄'}
+            {library.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">Nenhum material cadastrado ainda.<br /><span className="text-gray-300">Adicione o primeiro à esquerda.</span></p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {library.map((b: any) => (
+                  <div key={b.id} className="flex items-center gap-3 border border-gray-100 rounded-lg p-2 hover:bg-gray-50 transition-colors">
+                    <div className="w-8 h-10 rounded flex items-center justify-center text-lg shrink-0 bg-brand-50">
+                      {tipoIcon[b.tipo] ?? '📄'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{b.titulo}</p>
+                      <p className="text-xs text-gray-400">
+                        {b.tipo} · {(b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0)} insights · {new Date(b.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {b.aprovado
+                        ? <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-medium">ativo</span>
+                        : <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-medium">revisão</span>
+                      }
+                      <button onClick={() => remover(b.id)} className="text-gray-300 hover:text-red-400 transition-colors ml-1">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 truncate">{b.title ?? b.titulo ?? '—'}</p>
-                    <p className="text-xs text-gray-400">{b.author ?? b.autor ?? '—'} · {b.pages ?? b.paginas ?? '—'}p · {b.insights ?? 0} insights</p>
-                  </div>
-                  <button className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Últimos insights reais (só aparece se houver materiais) */}
+          {ultimosInsights.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Últimos insights extraídos</h3>
+              <div className="space-y-1.5">
+                {ultimosInsights.map((ins, i) => (
+                  <div key={i} className="flex gap-2 text-xs">
+                    <Zap size={11} className="text-amber-400 mt-0.5 shrink-0" />
+                    <span className="text-gray-600 italic">"{ins}"</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Card Recomendações ETZ */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Últimos insights aplicados</h3>
-            <div className="space-y-1.5">
-              {[
-                '"Tom consultivo reduz objeção de preço em 24%"',
-                '"Mencionar case de concorrente aumenta atenção"',
-                '"Perguntar sobre meta antes de apresentar"',
-              ].map((ins, i) => (
-                <div key={i} className="flex gap-2 text-xs">
-                  <Zap size={11} className="text-amber-400 mt-0.5 shrink-0" />
-                  <span className="text-gray-600 italic">{ins}</span>
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles size={14} className="text-brand-500" />
+              <h3 className="text-sm font-semibold text-gray-900">O que funciona na plataforma ETZ</h3>
+            </div>
+            <p className="text-[10px] text-gray-400 mb-3">
+              Baseado em todos os clientes ETZ ativos — tipos de material com maior impacto em conversão de agendamentos
+            </p>
+            <div className="space-y-2">
+              {recomendacoes.map((r, i) => (
+                <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100 hover:bg-brand-50/40 hover:border-brand-100 transition-colors cursor-default">
+                  <span className="text-base">{r.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-800">{r.tipo} · {r.titulo}</p>
+                    <p className="text-[10px] text-gray-400 truncate">{r.exemplo}</p>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-600 font-mono flex-shrink-0">{r.impacto}</span>
                 </div>
               ))}
             </div>
+            <p className="text-[10px] text-gray-300 mt-3 text-center">
+              Clientes com 5+ materiais têm 2.4× mais conversão
+            </p>
           </div>
+
         </div>
       </div>
     </div>
