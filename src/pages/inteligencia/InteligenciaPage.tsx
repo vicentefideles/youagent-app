@@ -1049,18 +1049,20 @@ function TabHorarios() {
 
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white flex items-center justify-between"
-        style={{ background: 'linear-gradient(135deg,#1a56e8,#2563eb)' }}
-      >
-        <div>
-          <h2 className="text-lg font-semibold">⏰ Horários Inteligentes</h2>
-          <p className="text-sm text-white/70">
-            A IA analisa <strong>todas as ligações realizadas</strong> e identifica os horários com maior taxa de conversão.
-          </p>
+      <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center">
+            <Clock size={18} className="text-brand-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Horários Inteligentes</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              A IA analisa <span className="font-medium text-gray-700">todas as ligações realizadas</span> e identifica os horários com maior taxa de conversão.
+            </p>
+          </div>
         </div>
         <button
-          className="bg-white/20 text-white text-xs px-4 py-2 rounded-lg hover:bg-white/30 flex items-center gap-1.5 transition-colors font-semibold border border-white/30"
+          className="text-xs font-semibold px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-1.5 transition-colors"
           onClick={() => refetch()}
         >
           <RefreshCw size={12} /> Reanalisar ligações
@@ -1104,7 +1106,7 @@ function TabHorarios() {
                       />
                     </div>
                     <span className="text-xs text-gray-500 text-center leading-tight">{f.label}</span>
-                    <span className="text-2xs text-gray-400">{f.total} lig.</span>
+                    <span className="text-[10px] text-gray-400">{f.total} lig.</span>
                   </div>
                 )
               })}
