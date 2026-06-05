@@ -335,7 +335,8 @@ export const adminSuporteApi = {
 
 // Qualidade calculada
 export const qualidadeCalcularApi = {
-  calcular: () => api.post('/inteligencia/qualidade/calcular', {}),
+  calcular: (periodo: 'hoje' | 'semana' | 'mes' = 'hoje') =>
+    api.post('/inteligencia/qualidade/calcular', { periodo }),
 }
 
 // Telnyx — provisionamento de números

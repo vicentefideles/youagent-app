@@ -330,9 +330,25 @@ function notaFromScore(score: number): { nota: string; cls: string } {
   return { nota: 'D', cls: 'bg-red-50 text-red-600 border-red-200' }
 }
 
+type Periodo = 'hoje' | 'semana' | 'mes'
+
+const PERIODO_LABELS: Record<Periodo, string> = {
+  hoje:   'Hoje',
+  semana: 'Esta semana',
+  mes:    'Este mês',
+}
+
+const PERIODO_DESC: Record<Periodo, string> = {
+  hoje:   'Ligações realizadas hoje',
+  semana: 'Ligações desde segunda-feira',
+  mes:    'Ligações desde o dia 1º',
+}
+
 function TabQualidade() {
+  const [periodo, setPeriodo]       = useState<Periodo>('hoje')
   const [calculando, setCalculando] = useState(false)
   const [calcMsg, setCalcMsg]       = useState('')
+  const [calcInfo, setCalcInfo]     = useState<{ ligacoes: number; desde: string } | null>(null)
 
   const { data: qualidade = [], isLoading, refetch } = useQuery<QualidadeItem[]>({
     queryKey: ['inteligencia-qualidade'],
@@ -341,17 +357,23 @@ function TabQualidade() {
 
   async function calcularScores() {
     setCalculando(true)
-    setCalcMsg('Calculando scores das ligações...')
+    setCalcMsg('Calculando...')
+    setCalcInfo(null)
     try {
-      const res = await qualidadeCalcularApi.calcular()
-      const d = res.data as { calculados: number; total_agentes: number }
+      const res = await qualidadeCalcularApi.calcular(periodo)
+      const d = res.data as { calculados: number; ligacoes_encontradas: number; desde: string }
       await refetch()
-      setCalcMsg(`✓ ${d.calculados} agente${d.calculados !== 1 ? 's' : ''} atualizado${d.calculados !== 1 ? 's' : ''}`)
+      if (d.calculados === 0) {
+        setCalcMsg(`Nenhuma ligação encontrada ${PERIODO_DESC[periodo].toLowerCase()}`)
+      } else {
+        setCalcMsg(`✓ ${d.calculados} agente${d.calculados !== 1 ? 's' : ''} atualizado${d.calculados !== 1 ? 's' : ''}`)
+        setCalcInfo({ ligacoes: d.ligacoes_encontradas, desde: d.desde })
+      }
     } catch {
       setCalcMsg('Erro ao calcular — tente novamente')
     } finally {
       setCalculando(false)
-      setTimeout(() => setCalcMsg(''), 4000)
+      setTimeout(() => { setCalcMsg(''); setCalcInfo(null) }, 6000)
     }
   }
 
@@ -395,19 +417,45 @@ function TabQualidade() {
               </div>
             </div>
           </div>
+          {/* Seletor de período + botão calcular */}
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            {/* Pills de período */}
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
+              {(Object.keys(PERIODO_LABELS) as Periodo[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPeriodo(p)}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                    periodo === p
+                      ? 'bg-white border border-gray-200 text-gray-900 shadow-sm font-semibold'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {PERIODO_LABELS[p]}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={calcularScores}
               disabled={calculando}
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60 w-full justify-center"
             >
               <RefreshCw size={14} className={calculando ? 'animate-spin' : ''} />
-              {calculando ? 'Calculando...' : 'Calcular scores agora'}
+              {calculando ? 'Calculando...' : `Calcular — ${PERIODO_LABELS[periodo]}`}
             </button>
+
             {calcMsg && (
-              <p className={`text-xs font-medium ${calcMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>
-                {calcMsg}
-              </p>
+              <div className="text-right">
+                <p className={`text-xs font-medium ${calcMsg.startsWith('✓') ? 'text-emerald-600' : calcMsg.startsWith('Nenhuma') ? 'text-amber-600' : 'text-red-500'}`}>
+                  {calcMsg}
+                </p>
+                {calcInfo && (
+                  <p className="text-2xs text-gray-400 mt-0.5">
+                    {calcInfo.ligacoes} lig. · desde {new Date(calcInfo.desde).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -457,7 +505,7 @@ function TabQualidade() {
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Ranking de desempenho por agente</h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              Score = % de ligações que resultaram em agendamento ou transferência nos últimos 30 dias
+              Score = % de conversão · período: <span className="font-medium text-gray-600">{PERIODO_LABELS[periodo]}</span> — {PERIODO_DESC[periodo].toLowerCase()}
             </p>
           </div>
           {totalAgentes > 0 && (
@@ -478,7 +526,7 @@ function TabQualidade() {
             </div>
             <p className="text-sm font-medium text-gray-500 mb-1">Nenhum score calculado ainda</p>
             <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed mb-4">
-              Clique em "Calcular scores agora" para gerar automaticamente o ranking de desempenho com base nas ligações realizadas.
+              Selecione o período e clique em "Calcular" para gerar o ranking de desempenho dos seus agentes.
             </p>
             <button
               onClick={calcularScores}
@@ -486,7 +534,7 @@ function TabQualidade() {
               className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60"
             >
               <RefreshCw size={14} className={calculando ? 'animate-spin' : ''} />
-              {calculando ? 'Calculando...' : 'Calcular agora'}
+              {calculando ? 'Calculando...' : `Calcular — ${PERIODO_LABELS[periodo]}`}
             </button>
           </div>
         ) : (
