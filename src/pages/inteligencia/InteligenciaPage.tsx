@@ -3623,12 +3623,31 @@ function TabCross() {
             <Brain size={20} className="text-emerald-600" />
           </div>
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-0.5">
+            <div className="flex items-center gap-2 mb-1">
               <h2 className="text-base font-semibold text-gray-900">Aprendizado Cross-Cliente</h2>
               <span className="bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">REDE COLABORATIVA</span>
             </div>
-            <p className="text-xs text-gray-500">O que funciona em qualquer segmento vira aprendizado para o seu agente. O sistema detecta automaticamente — você aprova e o agente evolui.</p>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Cada ligação gera dados. O sistema analisa o que converteu — por setor, porte, cargo, objeção — e identifica padrões que funcionam além do seu segmento. Quando um argumento de indústria converte bem com varejo, seu agente aprende isso. Você aprova. O agente aplica na próxima ligação.
+            </p>
           </div>
+        </div>
+
+        {/* Diferenciais em linha */}
+        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-100">
+          {[
+            { icon: '⚡', title: 'Zero cold start', desc: 'Novo agente nasce com o aprendizado acumulado de todas as ligações anteriores da plataforma.' },
+            { icon: '🔒', title: 'Privacidade total', desc: 'Nenhum dado de clientes é compartilhado — apenas padrões estatísticos anônimos de comportamento.' },
+            { icon: '✓', title: 'Controle do gerente', desc: 'Nenhum argumento entra em produção sem sua aprovação. Você decide o que o agente aprende.' },
+          ].map((d, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className="text-base leading-none mt-0.5">{d.icon}</span>
+              <div>
+                <p className="text-xs font-semibold text-gray-800">{d.title}</p>
+                <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">{d.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* KPIs reais */}
