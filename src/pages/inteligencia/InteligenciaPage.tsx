@@ -3534,21 +3534,34 @@ interface CrossArg {
   aprovado_em: string | null
   segmento: string | null
   cliente_id: string
+  origem?: string
+}
+
+interface RedeArg {
+  id: string
+  gatilho: string
+  frase: string
+  aprovado_em: string | null
+  total_ligacoes_impactadas: number
+  ja_importado: boolean
 }
 
 function TabCross() {
   const qc = useQueryClient()
   const [aprovando, setAprovando] = useState<string | null>(null)
   const [rejeitando, setRejeitando] = useState<string | null>(null)
-  const [novoGatilho, setNovoGatilho] = useState('')
-  const [novosExemplos, setNovosExemplos] = useState('')
-  const [gerandoCross, setGerandoCross] = useState(false)
-  const [crossGerado, setCrossGerado] = useState<string | null>(null)
-  const [crossErro, setCrossErro] = useState<string | null>(null)
+  const [importando, setImportando] = useState<string | null>(null)
+  const [detectando, setDetectando] = useState(false)
+  const [detectadoOk, setDetectadoOk] = useState(false)
+  const [bannerSync, setBannerSync] = useState(false)
 
   const { data: crossAll = [], refetch: refetchCross } = useQuery({
     queryKey: ['cross-all'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross').then(r => r.data as CrossArg[]).catch(() => [] as CrossArg[]),
+  })
+  const { data: redeData = [], refetch: refetchRede } = useQuery({
+    queryKey: ['cross-rede'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross/rede').then(r => r.data as RedeArg[]).catch(() => [] as RedeArg[]),
   })
   const { data: ligsRaw = [] } = useQuery({
     queryKey: ['cross-ligacoes'],
@@ -3585,6 +3598,7 @@ function TabCross() {
     try {
       await api.post(`https://app.etztech.com/api/v1/inteligencia/cross/${id}/aprovar`)
       await refetchCross()
+      setBannerSync(true)
       qc.invalidateQueries({ queryKey: ['inteligencia-cross'] })
       qc.invalidateQueries({ queryKey: ['evolucao-cross'] })
     } catch { /* silencioso */ } finally { setAprovando(null) }
@@ -3599,15 +3613,25 @@ function TabCross() {
     } catch { /* silencioso */ } finally { setRejeitando(null) }
   }
 
-  async function handleGerarCross() {
-    if (!novoGatilho.trim()) return
-    setGerandoCross(true); setCrossGerado(null); setCrossErro(null)
+  async function importarDaRede(id: string) {
+    setImportando(id)
     try {
-      const res = await claudeApi.gerarCross({ gatilho: novoGatilho.trim(), exemplos: novosExemplos.split('\n').map(s => s.trim()).filter(Boolean) })
-      const d = res.data as { frase?: string; resultado?: string; content?: string }
-      setCrossGerado(d.frase ?? d.resultado ?? d.content ?? JSON.stringify(d))
-    } catch { setCrossErro('Erro ao gerar com Claude. Tente novamente.') }
-    finally { setGerandoCross(false) }
+      await api.post(`https://app.etztech.com/api/v1/inteligencia/cross/rede/${id}/importar`)
+      await refetchCross()
+      refetchRede()
+      setBannerSync(true)
+      qc.invalidateQueries({ queryKey: ['inteligencia-cross'] })
+    } catch { /* silencioso */ } finally { setImportando(null) }
+  }
+
+  async function detectarPadroes() {
+    setDetectando(true); setDetectadoOk(false)
+    try {
+      await api.post('https://app.etztech.com/api/v1/inteligencia/detectar-padroes')
+      await refetchCross()
+      setDetectadoOk(true)
+      setTimeout(() => setDetectadoOk(false), 4000)
+    } catch { /* silencioso */ } finally { setDetectando(false) }
   }
 
   const fmtDt = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
@@ -3840,49 +3864,103 @@ function TabCross() {
         </div>
       )}
 
-      {/* ── Gerar argumento com Claude ─────────────────────────────────────── */}
+      {/* ── Banner: sincronizar com CI após aprovar ───────────────────────── */}
+      {bannerSync && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <CheckCircle size={15} className="text-emerald-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-emerald-800 font-semibold">Argumento aprovado com sucesso!</p>
+            <p className="text-xs text-emerald-700 mt-0.5">Para aplicar nos seus agentes, vá em <strong>Meus Agentes → Sincronizar com CI</strong>.</p>
+          </div>
+          <button onClick={() => setBannerSync(false)} className="text-emerald-500 hover:text-emerald-700">
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Sugestões da rede ETZ ─────────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={15} className="text-purple-500" />
-          <h3 className="text-sm font-semibold text-gray-900">Gerar argumento com Claude</h3>
-          <span className="text-[10px] text-gray-400 ml-auto">O argumento gerado vai para revisão como pendente</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label className="text-xs text-gray-500 font-medium">Gatilho</label>
-            <input
-              value={novoGatilho}
-              onChange={e => setNovoGatilho(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-purple-200"
-              placeholder="urgência, preço, decisor..."
-            />
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Share2 size={15} className="text-brand-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Sugestões da rede ETZ</h3>
+            {redeData.filter(r => !r.ja_importado).length > 0 && (
+              <span className="bg-brand-50 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                {redeData.filter(r => !r.ja_importado).length} novas
+              </span>
+            )}
           </div>
-          <div>
-            <label className="text-xs text-gray-500 font-medium">Frases que funcionaram (uma por linha)</label>
-            <textarea
-              value={novosExemplos}
-              onChange={e => setNovosExemplos(e.target.value)}
-              rows={2}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-purple-200 resize-none"
-              placeholder={"Temos apenas 3 vagas para junho.\nO investimento se paga em 4 meses."}
-            />
-          </div>
+          <span className="text-[10px] text-gray-400">Argumentos aprovados por outros clientes ETZ — 100% anônimos</span>
         </div>
-        <button
-          onClick={handleGerarCross}
-          disabled={gerandoCross || !novoGatilho.trim()}
-          className="flex items-center gap-1.5 bg-purple-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Sparkles size={12} />
-          {gerandoCross ? <><Loader2 size={11} className="animate-spin" /> Gerando…</> : '✨ Gerar com Claude'}
-        </button>
-        {crossGerado && (
-          <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
-            <p className="text-[10px] font-semibold text-purple-700 mb-1">Argumento gerado — salvo como pendente:</p>
-            <p className="text-xs text-purple-800 italic">"{crossGerado}"</p>
+        <p className="text-xs text-gray-500 mb-4">
+          Estes argumentos foram validados por outros clientes da plataforma e geraram conversões reais. Ao importar, eles entram direto como aprovados no seu CI — prontos para Sincronizar com CI.
+        </p>
+
+        {redeData.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <Share2 size={24} className="mx-auto mb-2 opacity-25" />
+            <p className="text-xs">Ainda não há sugestões disponíveis na rede.</p>
+            <p className="text-[11px] mt-0.5">À medida que outros clientes aprovam argumentos, eles aparecem aqui.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {redeData.map(r => (
+              <div key={r.id} className={`border rounded-xl p-3 transition-colors ${r.ja_importado ? 'border-emerald-100 bg-emerald-50/40 opacity-70' : 'border-gray-200 bg-gray-50/30'}`}>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="bg-brand-50 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">{r.gatilho}</span>
+                    <span className="text-[10px] text-gray-400">
+                      Aprovado em {r.aprovado_em ? new Date(r.aprovado_em).toLocaleDateString('pt-BR') : '—'}
+                    </span>
+                    {r.total_ligacoes_impactadas > 0 && (
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                        +{r.total_ligacoes_impactadas} conv. validadas
+                      </span>
+                    )}
+                  </div>
+                  {r.ja_importado
+                    ? <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold flex-shrink-0"><CheckCircle size={11} /> Importado</span>
+                    : (
+                      <button
+                        onClick={() => importarDaRede(r.id)}
+                        disabled={importando === r.id}
+                        className="flex items-center gap-1 bg-brand-600 text-white text-[10px] px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors font-semibold disabled:opacity-50 flex-shrink-0"
+                      >
+                        {importando === r.id ? <Loader2 size={10} className="animate-spin" /> : <ArrowRight size={10} />}
+                        Importar para meu CI
+                      </button>
+                    )
+                  }
+                </div>
+                <div className="bg-white border border-gray-100 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-700 leading-relaxed">"{r.frase}"</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
-        {crossErro && <p className="mt-2 text-xs text-red-500">{crossErro}</p>}
+      </div>
+
+      {/* ── Detectar novos padrões ────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Detectar novos padrões agora</h3>
+            <p className="text-xs text-gray-500 mt-0.5">O sistema analisa todas as ligações e identifica argumentos que geraram conversão — os melhores viram sugestões pendentes de aprovação.</p>
+          </div>
+          <button
+            onClick={detectarPadroes}
+            disabled={detectando}
+            className="flex items-center gap-2 bg-emerald-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-semibold disabled:opacity-50 flex-shrink-0 ml-4"
+          >
+            {detectando
+              ? <><Loader2 size={12} className="animate-spin" /> Analisando…</>
+              : detectadoOk
+              ? <><CheckCircle size={12} /> Padrões detectados!</>
+              : <><Zap size={12} /> Detectar padrões</>
+            }
+          </button>
+        </div>
       </div>
     </div>
   )
