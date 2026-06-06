@@ -5329,6 +5329,7 @@ function TabAB() {
   const [erro, setErro]       = useState('')
   const [sucesso, setSucesso] = useState('')
   const [expandido, setExpandido] = useState<string | null>(null)
+  const [cicloFechado, setCicloFechado] = useState<{ nome: string; vencedor: string } | null>(null)
 
   // ── Dados do banco
   const { data: testes = [], refetch } = useQuery<AbTeste[]>({
@@ -5365,8 +5366,13 @@ function TabAB() {
     finally { setSalvando(false) }
   }
 
-  async function encerrar(id: string, vencedor: string) {
-    await inteligenciaApi.abPatch(id, { status: 'concluido', vencedor })
+  async function encerrar(id: string, vencedor: string, nomeExperimento: string) {
+    const res = await inteligenciaApi.abPatch(id, { status: 'concluido', vencedor })
+    const d = res.data as { cross_argumento_criado?: boolean }
+    if (d?.cross_argumento_criado) {
+      setCicloFechado({ nome: nomeExperimento, vencedor })
+      queryClient.invalidateQueries({ queryKey: ['cross-argumentos'] })
+    }
     refetch()
   }
 
@@ -5508,6 +5514,33 @@ function TabAB() {
         {sucesso && <p className="mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">✓ {sucesso}</p>}
       </div>
 
+      {/* ── Banner ciclo fechado ── */}
+      {cicloFechado && (
+        <div className="bg-white border-2 border-emerald-200 rounded-2xl p-5 flex items-start justify-between gap-4">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+              <CheckCircle size={20} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900 mb-0.5">Ciclo de inteligência fechado ✓</p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Script vencedor ({cicloFechado.vencedor.toUpperCase()}) do experimento <strong>"{cicloFechado.nome}"</strong> foi enviado para aprovação na aba <strong>Cross</strong>.
+                Após aprovado, será herdado por todos os agentes na próxima atualização.
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-xs text-emerald-600 font-medium">Script em revisão na aba Cross</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-300 ml-1" />
+                <span className="text-xs text-gray-400">Telnyx será atualizado após aprovação</span>
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setCicloFechado(null)} className="text-gray-300 hover:text-gray-500 shrink-0 mt-0.5">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* ── Experimentos ativos ── */}
       {ativos.length > 0 && (
         <div className="space-y-3">
@@ -5538,8 +5571,8 @@ function TabAB() {
                     </button>
                     {totalLig > 0 && (
                       <>
-                        <button onClick={() => encerrar(t.id, 'a')} className="text-xs text-blue-600 border border-blue-200 rounded-xl px-3 py-1.5 hover:bg-blue-50">Declarar A vence</button>
-                        <button onClick={() => encerrar(t.id, 'b')} className="text-xs text-emerald-600 border border-emerald-200 rounded-xl px-3 py-1.5 hover:bg-emerald-50">Declarar B vence</button>
+                        <button onClick={() => encerrar(t.id, 'a', t.nome)} className="text-xs text-blue-600 border border-blue-200 rounded-xl px-3 py-1.5 hover:bg-blue-50">Declarar A vence</button>
+                        <button onClick={() => encerrar(t.id, 'b', t.nome)} className="text-xs text-emerald-600 border border-emerald-200 rounded-xl px-3 py-1.5 hover:bg-emerald-50">Declarar B vence</button>
                       </>
                     )}
                   </div>
