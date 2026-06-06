@@ -5350,8 +5350,12 @@ function TabAB() {
       setVANome(d.versao_a_nome); setVA(d.versao_a_script)
       setVBNome(d.versao_b_nome); setVB(d.versao_b_script)
       setRacional(d.racional)
-    } catch { setErro('Erro ao gerar sugestões. Tente novamente.') }
-    finally { setGerando(false) }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+        || (e as { message?: string })?.message
+        || 'Erro ao gerar sugestões.'
+      setErro(msg)
+    } finally { setGerando(false) }
   }
 
   async function iniciar() {
