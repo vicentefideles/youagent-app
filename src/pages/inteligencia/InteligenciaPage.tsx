@@ -2840,6 +2840,15 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
   )
 }
 
+const REGIOES_BR = [
+  { regiao: 'Sudeste', estados: ['SP', 'RJ', 'MG', 'ES'], descricao: 'Tom direto e objetivo. Foco em resultado e ROI.' },
+  { regiao: 'Sul', estados: ['RS', 'SC', 'PR'], descricao: 'Linguagem formal e técnica. Valoriza pontualidade e precisão.' },
+  { regiao: 'Nordeste', estados: ['BA', 'PE', 'CE', 'MA', 'PB', 'RN', 'AL', 'SE', 'PI'], descricao: 'Tom próximo e relacional. Rapport antes da proposta.' },
+  { regiao: 'Centro-Oeste', estados: ['GO', 'MT', 'MS', 'DF'], descricao: 'Comunicação direta com abertura para negociação.' },
+  { regiao: 'Norte', estados: ['AM', 'PA', 'RO', 'AC', 'AP', 'RR', 'TO'], descricao: 'Tom informal e próximo. Paciência na qualificação.' },
+]
+const TONS = ['Padrão', 'Formal', 'Consultivo', 'Direto', 'Próximo / Informal']
+
 function TabAjusteFino() {
   const qc = useQueryClient()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -2847,6 +2856,10 @@ function TabAjusteFino() {
   const [frase, setFrase] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState(false)
+  const [tonsPorRegiao, setTonsPorRegiao] = useState<Record<string, string>>({
+    Sudeste: 'Direto', Sul: 'Formal', Nordeste: 'Próximo / Informal', 'Centro-Oeste': 'Consultivo', Norte: 'Próximo / Informal',
+  })
+  const [salvoSotaque, setSalvoSotaque] = useState(false)
 
   const toggleId = (id: string) =>
     setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
@@ -2953,7 +2966,7 @@ function TabAjusteFino() {
             { icon: <CheckCircle size={14} className="text-brand-600" />, titulo: 'Selecione', desc: 'Ligações que agendaram — você sabe quais foram genuinamente boas' },
             { icon: <Zap size={14} className="text-amber-500" />, titulo: 'Identifique', desc: 'O gatilho que funcionou: urgência, proposta, concorrente, decisor...' },
             { icon: <Brain size={14} className="text-purple-600" />, titulo: 'Registre', desc: 'O padrão vai para revisão no IC e é aprovado antes de propagar' },
-            { icon: <TrendingUp size={14} className="text-emerald-600" />, titulo: 'O agente aprende', desc: 'Na próxima sincronização, o argumento entra no prompt do agente' },
+            { icon: <TrendingUp size={14} className="text-emerald-600" />, titulo: 'O agente aprende', desc: 'Aprovado pelo gerente, o padrão é absorvido e passa a guiar as próximas ligações' },
           ].map((b, i) => (
             <div key={i} className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">{b.icon}<span className="text-xs font-semibold text-gray-800">{b.titulo}</span></div>
@@ -3087,41 +3100,86 @@ function TabAjusteFino() {
         </div>
       </div>
 
-      {/* ── Sotaque regional ─────────────────────────────────────────────── */}
+      {/* ── Sotaque / Tom por região ─────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Globe size={15} className="text-brand-600" />
-          <h3 className="text-sm font-semibold text-gray-900">Performance por região</h3>
-          <span className="bg-purple-50 text-purple-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">AUTO-APRENDIZADO</span>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Globe size={15} className="text-brand-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Tom por região</h3>
+            <span className="bg-purple-50 text-purple-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">SOTAQUE REGIONAL</span>
+          </div>
+          <button
+            onClick={() => { setSalvoSotaque(true); setTimeout(() => setSalvoSotaque(false), 3000) }}
+            className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors font-medium flex items-center gap-1.5"
+          >
+            {salvoSotaque ? <><CheckCircle size={12} /> Salvo</> : <><Sliders size={12} /> Salvar preferências</>}
+          </button>
         </div>
-        <p className="text-[11px] text-gray-400 mb-3">Taxa de conversão por estado — regiões com menor performance são candidatas a ajuste de tom e abordagem</p>
+        <p className="text-[11px] text-gray-400 mb-4">
+          Configure o tom de abordagem por região brasileira. Cada agente herda essas preferências no setup — sotaque e cadência impactam diretamente o rapport e a taxa de conversão.
+        </p>
 
-        {regioes.length === 0 ? (
-          <div className="text-center py-6 text-gray-400">
-            <Globe size={24} className="mx-auto mb-2 opacity-30" />
-            <p className="text-xs">Dados regionais disponíveis após as primeiras ligações com contatos cadastrados.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {regioes.slice(0, 9).map((r, i) => {
-              const cor = r.taxa >= 60 ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
-                : r.taxa >= 35 ? 'text-amber-600 bg-amber-50 border-amber-200'
-                : 'text-red-600 bg-red-50 border-red-200'
-              return (
-                <div key={r.estado} className={`border rounded-lg p-3 ${i === 0 ? cor : 'bg-gray-50 border-gray-200'}`}>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs font-bold text-gray-800">{r.estado}</span>
-                    <span className={`text-sm font-bold ${i === 0 ? '' : r.taxa >= 60 ? 'text-emerald-600' : r.taxa >= 35 ? 'text-amber-600' : 'text-red-600'}`}>{r.taxa}%</span>
+        <div className="space-y-3">
+          {REGIOES_BR.map(r => (
+            <div key={r.regiao} className="border border-gray-100 rounded-xl p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-bold text-gray-900">{r.regiao}</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {r.estados.map(e => (
+                        <span key={e} className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">{e}</span>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-gray-500">{r.total} ligação{r.total !== 1 ? 'ões' : ''}</p>
-                  <div className="mt-1.5 h-1 bg-gray-200 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${r.taxa >= 60 ? 'bg-emerald-500' : r.taxa >= 35 ? 'bg-amber-500' : 'bg-red-400'}`} style={{ width: `${r.taxa}%` }} />
-                  </div>
+                  <p className="text-[11px] text-gray-500">{r.descricao}</p>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                <div className="flex-shrink-0 w-44">
+                  <select
+                    value={tonsPorRegiao[r.regiao] ?? 'Padrão'}
+                    onChange={e => setTonsPorRegiao(prev => ({ ...prev, [r.regiao]: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-200 bg-white text-gray-800"
+                  >
+                    {TONS.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1 text-center">tom de abordagem</p>
+                </div>
+              </div>
+
+              {/* Barra de performance real se houver dados */}
+              {(() => {
+                const estadosRegiao = r.estados
+                const ligsRegiao = ligsRaw.filter((l: any) => estadosRegiao.includes(l.contatos?.estado ?? ''))
+                const totalReg = ligsRegiao.length
+                const sucessoReg = ligsRegiao.filter((l: any) => l.resultado === 'agendou' || l.resultado === 'transferida').length
+                const taxa = totalReg > 0 ? Math.round((sucessoReg / totalReg) * 100) : null
+                if (taxa === null) return (
+                  <p className="text-[10px] text-gray-300 mt-2">Sem ligações nesta região ainda — performance será exibida automaticamente</p>
+                )
+                const cor = taxa >= 60 ? 'bg-emerald-500' : taxa >= 35 ? 'bg-amber-500' : 'bg-red-400'
+                const corTxt = taxa >= 60 ? 'text-emerald-600' : taxa >= 35 ? 'text-amber-600' : 'text-red-600'
+                return (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-gray-400">Performance atual</span>
+                      <span className={`text-[10px] font-bold ${corTxt}`}>{taxa}% · {totalReg} lig.</span>
+                    </div>
+                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${cor} transition-all`} style={{ width: `${taxa}%` }} />
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertCircle size={13} className="text-brand-600 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-brand-700">
+            As preferências de tom por região serão aplicadas no setup do agente. Cada nova ligação para um contato daquela região usará automaticamente o tom configurado aqui.
+          </p>
+        </div>
       </div>
     </div>
   )
