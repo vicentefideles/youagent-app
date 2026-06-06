@@ -2586,7 +2586,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
                   <p className="text-[10px] text-gray-400">{temDados ? '—' : 'Aguardando'}</p>
                 </div>
                 <p className="text-[11px] text-gray-400">
-                  {temDados ? 'Argumentos de outros agentes ETZ do mesmo segmento incorporados ao banco.' : 'Argumentos validados por outros agentes ETZ do mesmo segmento serão incorporados automaticamente.'}
+                  {temDados ? 'Argumentos validados por outros agentes ETZ de qualquer segmento incorporados ao banco — um argumento que converte em tecnologia pode converter em agronegócio.' : 'Argumentos validados por outros agentes ETZ de qualquer segmento serão incorporados automaticamente. Um bom argumento de agendamento transcende o setor.'}
                 </p>
               </div>
             </div>
