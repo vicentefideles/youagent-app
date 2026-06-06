@@ -1761,34 +1761,37 @@ function TabBanco() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="rounded-xl p-5 text-white" style={{ background: 'linear-gradient(135deg,#1a1f35,#1a3a1f)' }}>
-        <div className="flex items-center gap-2 mb-1">
-          <Database size={18} className="text-white/80" />
-          <h2 className="text-lg font-semibold">Banco de Argumentos</h2>
-        </div>
-        <p className="text-sm text-white/60">
-          Inteligência de mercado injetada automaticamente em cada ligação — sem sincronização manual
-        </p>
-        <div className="flex gap-4 mt-3">
-          <div className="text-center">
-            <p className="text-xl font-bold">{isLoading ? '—' : total}</p>
-            <p className="text-[11px] text-white/50">argumentos ativos</p>
+
+      {/* Header — mesmo padrão das outras abas */}
+      <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+            <Database size={18} className="text-brand-600" />
           </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Banco de Argumentos</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Alimente seus agentes com <span className="font-medium text-gray-700">notícias, dados de mercado e insights</span>. A IA injeta automaticamente em cada ligação — sem sincronização manual.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           {expirando7d > 0 && (
-            <div className="text-center">
-              <p className="text-xl font-bold text-amber-300">{expirando7d}</p>
-              <p className="text-[11px] text-white/50">expirando em 7d</p>
-            </div>
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full font-semibold">
+              {expirando7d} expirando
+            </span>
           )}
+          <span className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2.5 py-1 rounded-full font-semibold">
+            {isLoading ? '…' : total} argumento{total !== 1 ? 's' : ''}
+          </span>
         </div>
       </div>
 
       {/* Card explicativo */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-            <Zap size={12} className="text-emerald-600" />
+          <div className="w-6 h-6 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+            <Zap size={12} className="text-brand-600" />
           </div>
           <p className="text-sm font-semibold text-gray-900">Como o Banco de Argumentos funciona</p>
         </div>
@@ -1797,7 +1800,7 @@ function TabBanco() {
             { icon: '📰', titulo: 'Notícias e tendências', desc: 'Cole a URL de uma notícia relevante — a IA lê, extrai o insight e salva automaticamente' },
             { icon: '⚡', titulo: 'Injeção automática', desc: 'Cada argumento entra na próxima ligação sem clicar em nada — o agente já usa' },
             { icon: '🎯', titulo: 'Contextual e preciso', desc: 'O agente cita o dado somente quando o contexto da conversa for compatível' },
-            { icon: '⏰', titulo: 'Validade inteligente', desc: 'Configure expiração para dados temporários — notícias de 30 dias, sazonalidade, etc.' },
+            { icon: '⏰', titulo: 'Validade inteligente', desc: 'Configure expiração para dados temporários — notícias sazonais, promoções, etc.' },
           ].map((c, i) => (
             <div key={i} className="flex gap-2">
               <span className="text-base mt-0.5">{c.icon}</span>
@@ -1833,21 +1836,24 @@ function TabBanco() {
         {/* Modo URL */}
         {modo === 'url' && (
           <div className="space-y-3">
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <p className="text-xs text-blue-700">Cole a URL de qualquer notícia, artigo ou relatório de mercado. A IA lê o conteúdo e extrai automaticamente o argumento mais relevante para as ligações.</p>
+            <div className="flex items-start gap-1.5 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">
+              <span className="text-brand-500 text-sm mt-0.5">🤖</span>
+              <p className="text-[11px] text-brand-700 leading-relaxed">
+                <span className="font-semibold">Extração automática:</span> cole a URL de qualquer notícia, artigo ou relatório. A IA lê o conteúdo e extrai o argumento mais relevante para as ligações.
+              </p>
             </div>
             <div className="flex gap-2">
               <input
                 value={urlNoticia}
                 onChange={e => setUrlNoticia(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400"
                 placeholder="https://g1.globo.com/economia/noticia/..."
                 type="url"
               />
               <button
                 onClick={handleExtrairUrl}
                 disabled={extraindo}
-                className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0"
+                className="bg-brand-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0"
               >
                 {extraindo ? <><Loader2 size={13} className="animate-spin" />Lendo...</> : <><Brain size={13} />Extrair</>}
               </button>
