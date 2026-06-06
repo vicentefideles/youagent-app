@@ -3704,7 +3704,7 @@ function TabCross() {
       <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-gray-800">Detectar novos padrões</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">Analisa todas as ligações e gera sugestões pendentes de aprovação com os argumentos que mais converteram.</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">O sistema roda automaticamente todo dia às 00:00 e gera sugestões com os argumentos que mais converteram. Use este botão para forçar uma análise agora.</p>
         </div>
         <button
           onClick={detectarPadroes}
