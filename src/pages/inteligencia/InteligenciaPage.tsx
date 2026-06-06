@@ -2127,6 +2127,218 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
 
   const tipoIcon: Record<string, string> = { livro: '📘', artigo: '📰', video: '🎬', audio: '🎙️', texto: '📝' }
 
+  // ── Exportar Relatório de Materiais (PDF via print) ──────────────────────
+  function exportarRelatorioMateriais() {
+    const materiais = Array.isArray(conhecimentoData) ? conhecimentoData : []
+    const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const linhas = materiais.map((m: any) => {
+      const insights = (m.argumentos?.length ?? 0) + (m.tecnicas?.length ?? 0)
+      const data = m.created_at ? new Date(m.created_at).toLocaleDateString('pt-BR') : '—'
+      const icon = tipoIcon[m.tipo] ?? '📄'
+      return `
+        <tr>
+          <td><strong>${m.titulo}</strong><br/><span style="color:#6b7280;font-size:11px">${m.categoria ?? m.tipo}</span></td>
+          <td>${icon} ${m.tipo}</td>
+          <td>${data}</td>
+          <td style="text-align:center">${insights}</td>
+          <td style="text-align:center;color:#6b7280">—</td>
+          <td style="text-align:center;color:#6b7280">—</td>
+        </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>ETZ — Relatório de Impacto por Material</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; color: #111; padding: 40px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; padding-bottom:16px; border-bottom:2px solid #6d28d9; }
+    .header h1 { font-size:20px; font-weight:700; color:#111; }
+    .header p { font-size:12px; color:#6b7280; margin-top:4px; }
+    .meta { text-align:right; font-size:11px; color:#6b7280; }
+    .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
+    .kpi { background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }
+    .kpi-val { font-size:22px; font-weight:700; color:#6d28d9; }
+    .kpi-label { font-size:11px; color:#6b7280; margin-top:2px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    thead tr { background:#f3f4f6; }
+    th { text-align:left; padding:10px 12px; font-size:10px; text-transform:uppercase; color:#6b7280; letter-spacing:.05em; border-bottom:2px solid #e5e7eb; }
+    td { padding:10px 12px; border-bottom:1px solid #f3f4f6; vertical-align:top; }
+    tr:last-child td { border-bottom:none; }
+    .footer { margin-top:32px; padding-top:16px; border-top:1px solid #e5e7eb; font-size:10px; color:#9ca3af; text-align:center; }
+    .nota { background:#fefce8; border:1px solid #fde68a; border-radius:8px; padding:12px 16px; margin-bottom:24px; font-size:11px; color:#92400e; }
+    @media print { body { padding:20px; } .no-print { display:none; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Relatório de Impacto por Material</h1>
+      <p>Centro de Inteligência ETZ — Base de Conhecimento do Agente</p>
+    </div>
+    <div class="meta">
+      <p>Gerado em ${hoje}</p>
+      <p style="color:#6d28d9;font-weight:600">ETZ Intelligence Platform</p>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-val">${materiais.length}</div>
+      <div class="kpi-label">Materiais na base</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val">${materiais.reduce((s: number, m: any) => s + (m.argumentos?.length ?? 0) + (m.tecnicas?.length ?? 0), 0)}</div>
+      <div class="kpi-label">Insights extraídos</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val">${totalBanco}</div>
+      <div class="kpi-label">Argumentos no banco</div>
+    </div>
+  </div>
+
+  ${!temDados ? `<div class="nota">⚠️ Dados de conversão (antes/depois/impacto) serão preenchidos automaticamente após as primeiras ligações realizadas pelo agente.</div>` : ''}
+
+  <table>
+    <thead>
+      <tr>
+        <th>Material</th>
+        <th>Tipo</th>
+        <th>Adicionado em</th>
+        <th style="text-align:center">Insights</th>
+        <th style="text-align:center">Conv. antes → depois</th>
+        <th style="text-align:center">Impacto</th>
+      </tr>
+    </thead>
+    <tbody>${linhas || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:24px">Nenhum material cadastrado ainda.</td></tr>'}</tbody>
+  </table>
+
+  <div class="footer">ETZ Intelligence Platform · Relatório gerado automaticamente · ${hoje}</div>
+
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`
+
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close() }
+  }
+
+  // ── Exportar Linha do Tempo (PDF via print) ──────────────────────────────
+  function exportarLinhaTempo() {
+    const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const marcos = [
+      {
+        cor: '#3b82f6', emoji: '🚀', titulo: 'Setup inicial concluído',
+        data: dataSetup ?? hoje,
+        desc: primeiroAgente
+          ? `Agente "${primeiroAgente.nome}" configurado. ${totalMateriais} materiais na base, ${totalBanco} argumentos no banco.`
+          : 'Agente ainda não configurado.',
+        tags: [
+          totalBanco > 0 ? `${totalBanco} argumentos no banco` : null,
+          totalMateriais > 0 ? `${totalMateriais} materiais na base` : null,
+        ].filter(Boolean),
+        ativo: !!primeiroAgente,
+      },
+      {
+        cor: temDados ? '#10b981' : '#d1d5db', emoji: '🎯', titulo: 'Primeiro agendamento confirmado',
+        data: temDados ? '—' : 'Aguardando',
+        desc: temDados
+          ? 'O agente realizou ligações e confirmou o primeiro agendamento.'
+          : 'Marco registrado automaticamente na primeira reunião agendada.',
+        tags: temDados ? [`${totalLigacoes} ligações realizadas`] : [],
+        ativo: temDados,
+      },
+      {
+        cor: temDados ? '#8b5cf6' : '#d1d5db', emoji: '🔍', titulo: 'Primeiro padrão detectado automaticamente',
+        data: temDados ? '—' : 'Aguardando',
+        desc: temDados
+          ? 'O sistema detectou padrões nas ligações e aplicou no motor automaticamente.'
+          : 'Após ~50 ligações, o sistema detecta melhores horários, tons e argumentos.',
+        tags: [],
+        ativo: temDados,
+      },
+      {
+        cor: temDados ? '#f59e0b' : '#d1d5db', emoji: '🔗', titulo: 'Aprendizado Cross-Cliente ativado',
+        data: temDados ? '—' : 'Aguardando',
+        desc: 'Argumentos validados por outros agentes ETZ de qualquer segmento incorporados ao banco — um bom argumento de agendamento transcende o setor.',
+        tags: [],
+        ativo: temDados,
+      },
+      {
+        cor: '#6d28d9', emoji: '⭐', titulo: 'Estado atual',
+        data: `Hoje — ${hoje}`,
+        desc: temDados
+          ? `${totalLigacoes} ligações realizadas. ${totalMateriais} materiais na base. ${totalBanco} argumentos ativos no banco.`
+          : `${totalMateriais} materiais na base de conhecimento. ${totalBanco} argumentos ativos. Agente pronto para as primeiras ligações.`,
+        tags: [`${totalBanco} argumentos`, `${totalMateriais} materiais`, temDados ? `${totalLigacoes} ligações` : '0 ligações'],
+        ativo: true,
+      },
+    ]
+
+    const marcosHtml = marcos.map(m => `
+      <div class="marco ${m.ativo ? '' : 'inativo'}">
+        <div class="circulo" style="background:${m.cor}">${m.emoji}</div>
+        <div class="conteudo">
+          <div class="mc-header">
+            <span class="mc-titulo">${m.titulo}</span>
+            <span class="mc-data">${m.data}</span>
+          </div>
+          <p class="mc-desc">${m.desc}</p>
+          ${m.tags.length > 0 ? `<div class="tags">${m.tags.map((t: string) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+        </div>
+      </div>`).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>ETZ — Jornada de Evolução do Agente</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; color:#111; padding:40px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; padding-bottom:16px; border-bottom:2px solid #6d28d9; }
+    .header h1 { font-size:20px; font-weight:700; }
+    .header p { font-size:12px; color:#6b7280; margin-top:4px; }
+    .meta { text-align:right; font-size:11px; color:#6b7280; }
+    .timeline { position:relative; padding-left:32px; }
+    .timeline::before { content:''; position:absolute; left:18px; top:0; bottom:0; width:2px; background:#e5e7eb; }
+    .marco { display:flex; gap:16px; margin-bottom:24px; position:relative; }
+    .marco.inativo { opacity:0.45; }
+    .circulo { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; z-index:1; margin-left:-18px; border:3px solid #fff; box-shadow:0 0 0 2px #e5e7eb; }
+    .conteudo { flex:1; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; }
+    .mc-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+    .mc-titulo { font-size:14px; font-weight:600; color:#111; }
+    .mc-data { font-size:10px; color:#9ca3af; }
+    .mc-desc { font-size:11px; color:#4b5563; line-height:1.6; }
+    .tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .tag { font-size:10px; background:#ede9fe; color:#5b21b6; padding:2px 8px; border-radius:99px; font-weight:600; }
+    .footer { margin-top:32px; padding-top:16px; border-top:1px solid #e5e7eb; font-size:10px; color:#9ca3af; text-align:center; }
+    @media print { body { padding:20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>🗓️ Jornada de Evolução do Agente</h1>
+      <p>Linha do tempo completa — cada marco registrado automaticamente desde o primeiro dia.</p>
+    </div>
+    <div class="meta">
+      <p>Gerado em ${hoje}</p>
+      <p style="color:#6d28d9;font-weight:600">ETZ Intelligence Platform</p>
+    </div>
+  </div>
+  <div class="timeline">${marcosHtml}</div>
+  <div class="footer">ETZ Intelligence Platform · Transparência total do aprendizado do agente · ${hoje}</div>
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`
+
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close() }
+  }
+
   // Meses para gráfico de evolução (últimas 10 semanas - estrutura visual)
   const SEMANAS = ['Abr 1', 'Abr 7', 'Abr 14', 'Abr 21', 'Abr 28', 'Mai 5', 'Mai 12', 'Mai 19', 'Mai 26', 'Jun 2']
   const VALS = [6.1, 6.8, 7.2, 7.8, 7.4, 8.1, 8.0, 8.4, 8.6, 8.9]
@@ -2393,7 +2605,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-gray-900">Impacto por material adicionado</h3>
-          {temDados && <button className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">Exportar relatório PDF</button>}
+          {temDados && <button onClick={exportarRelatorioMateriais} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">Exportar relatório PDF</button>}
         </div>
         <p className="text-[11px] text-gray-400 mb-3">Quanto cada livro, argumento ou informação de mercado contribuiu para a evolução da conversão</p>
         {totalMateriais > 0 ? (
@@ -2523,7 +2735,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">Cada marco registrado automaticamente desde o primeiro dia. Transparência total do aprendizado.</p>
           </div>
-          <button className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">Exportar</button>
+          <button onClick={exportarLinhaTempo} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">Exportar</button>
         </div>
 
         <div className="relative">
