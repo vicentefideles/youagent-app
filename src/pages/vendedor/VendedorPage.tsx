@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, Calendar, CheckCircle, ChevronDown, Users } from 'lucide-react'
-import { reunioesApi, equipeApi } from '@/services/api'
+import { reunioesApi, equipeApi, contasApi } from '@/services/api'
 import { PainelReativacao } from '@/pages/discadora/DiscadoraPage'
 
-type TabId = 'agenda' | 'ficha' | 'resultados' | 'email' | 'gcal' | 'mensagens' | 'reativacao'
+type TabId = 'agenda' | 'ficha' | 'conta' | 'resultados' | 'email' | 'gcal' | 'mensagens' | 'reativacao'
 type ResultadoKey = 'fechou' | 'reagendou' | 'perdeu' | 'noshow'
 type MsgSubTab = 'recebidas' | 'enviadas'
 
@@ -24,6 +24,7 @@ interface Reuniao {
   agente: string
   sinais: string[]
   sugestao: string
+  conta_id?: string
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -834,12 +835,198 @@ function TabReativacaoVendedor() {
 const tabs: { id: TabId; label: string; badge?: string; badgeColor?: string }[] = [
   { id: 'agenda', label: '📅 Agenda de Reuniões' },
   { id: 'ficha', label: '📋 Ficha do Contato' },
+  { id: 'conta' as TabId, label: '🏢 Ficha da Conta' },
   { id: 'resultados', label: '✅ Registrar Resultados' },
   { id: 'email', label: '✉️ E-mails', badge: '2', badgeColor: 'bg-amber-500' },
   { id: 'gcal', label: '📆 Meu Google Calendar' },
   { id: 'mensagens',   label: '💬 Mensagens',  badge: '2', badgeColor: 'bg-blue-600' },
   { id: 'reativacao', label: '🔄 Reativação' },
 ]
+
+// ─── TabFichaConta ────────────────────────────────────────────────────────────
+
+function TabFichaConta({ contaId, empresaNome }: { contaId: string | null; empresaNome: string }) {
+  const [subTab, setSubTab] = useState<'stakeholders' | 'timeline' | 'briefing'>('stakeholders')
+  const [gerandoBriefing, setGerandoBriefing] = useState(false)
+  const [briefingGerado, setBriefingGerado] = useState<Record<string, unknown> | null>(null)
+
+  const { data: conta, refetch } = useQuery({
+    queryKey: ['conta-detail', contaId],
+    queryFn: () => contaId
+      ? contasApi.get(contaId).then(r => r.data as Record<string, unknown>)
+      : Promise.resolve(null),
+    enabled: !!contaId,
+  })
+
+  async function gerarBriefing() {
+    if (!contaId) return
+    setGerandoBriefing(true)
+    try {
+      const res = await contasApi.briefing(contaId)
+      const d = res.data as Record<string, unknown>
+      setBriefingGerado((d?.conteudo as Record<string, unknown>) || d)
+      refetch()
+    } catch (e) { console.error(e) }
+    finally { setGerandoBriefing(false) }
+  }
+
+  if (!contaId && !empresaNome) {
+    return <div className="text-center py-12 text-gray-400 text-sm">Selecione uma reunião para ver a ficha da conta.</div>
+  }
+
+  const papelCor = (p: string) =>
+    p === 'decisor' ? 'bg-emerald-100 text-emerald-700'
+    : p === 'gatekeeper' ? 'bg-red-100 text-red-700'
+    : p === 'influenciador' ? 'bg-blue-100 text-blue-700'
+    : 'bg-gray-100 text-gray-500'
+
+  const contaData = conta as Record<string, unknown> | null
+  const briefing = (briefingGerado || (contaData?.ultimo_briefing as Record<string, unknown> | undefined)?.conteudo) as Record<string, unknown> | null
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">{(contaData?.nome as string) || empresaNome || '—'}</h3>
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+              {!!contaData?.setor && <span>{contaData!.setor as string}</span>}
+              {!!contaData?.porte && <span>· {contaData!.porte as string}</span>}
+              {!!contaData?.estado && <span>· {contaData!.estado as string}</span>}
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-600">
+              {(contaData?.status as string) || 'prospect'}
+            </span>
+            <p className="text-xs text-gray-400 mt-1">{(contaData?.total_toques as number) || 0} toques · interesse: {(contaData?.nivel_interesse as string) || '—'}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {(['stakeholders', 'timeline', 'briefing'] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${subTab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            {t === 'stakeholders' ? 'Stakeholders' : t === 'timeline' ? 'Timeline' : 'Briefing'}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'stakeholders' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">Mapa de stakeholders</h4>
+          {!(contaData?.stakeholders as unknown[] | undefined)?.length ? (
+            <p className="text-xs text-gray-400">Nenhum stakeholder identificado ainda. Mapeamento automático acontece conforme as ligações ocorrem.</p>
+          ) : (
+            <div className="space-y-3">
+              {(contaData!.stakeholders as Record<string, unknown>[]).map((s, i) => {
+                const c = (s.contatos || {}) as Record<string, unknown>
+                return (
+                  <div key={i} className="flex items-start gap-3 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0">
+                      {((c.nome as string) || '?').charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm font-semibold text-gray-800">{(c.nome as string) || 'Desconhecido'}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${papelCor(s.papel as string)}`}>{s.papel as string}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">{(c.cargo as string) || 'cargo desconhecido'}</p>
+                      {!!c.observacoes_ia && <p className="text-xs text-gray-400 mt-1 italic">{c.observacoes_ia as string}</p>}
+                    </div>
+                    {!!c.nivel_interesse && <span className="text-xs text-gray-400 shrink-0">interesse: {c.nivel_interesse as string}</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === 'timeline' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">Histórico de contatos</h4>
+          {!(contaData?.timeline as unknown[] | undefined)?.length ? (
+            <p className="text-xs text-gray-400">Nenhum contato registrado ainda para esta conta.</p>
+          ) : (
+            <div className="space-y-3">
+              {(contaData!.timeline as Record<string, unknown>[]).map((t, i) => {
+                const total = (contaData!.timeline as unknown[]).length
+                return (
+                  <div key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${t.resultado === 'agendou' || t.resultado === 'transferida' ? 'bg-emerald-500' : t.resultado === 'recusou' ? 'bg-red-400' : 'bg-gray-300'}`} />
+                      {i < total - 1 && <div className="w-px flex-1 bg-gray-200 mt-1" />}
+                    </div>
+                    <div className="pb-3 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-gray-700">{(t.contato_nome as string) || '—'}</span>
+                        {!!t.contato_cargo && <span className="text-xs text-gray-400">{t.contato_cargo as string}</span>}
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${t.resultado === 'agendou' || t.resultado === 'transferida' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {(t.resultado as string) || '—'}
+                        </span>
+                      </div>
+                      {!!t.resumo_ia && <p className="text-xs text-gray-500 mt-0.5">{(t.resumo_ia as string).substring(0, 200)}</p>}
+                      <p className="text-xs text-gray-300 mt-0.5">{t.data ? new Date(t.data as string).toLocaleDateString('pt-BR') : '—'}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === 'briefing' && (
+        <div className="space-y-3">
+          <button onClick={gerarBriefing} disabled={gerandoBriefing || !contaId}
+            className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2">
+            {gerandoBriefing ? 'Gerando com IA...' : '✨ Gerar briefing para a reunião'}
+          </button>
+          {briefing && (
+            <div className="space-y-3">
+              {!!briefing.resumo_executivo && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-1">RESUMO EXECUTIVO</p>
+                  <p className="text-sm text-gray-800">{briefing.resumo_executivo as string}</p>
+                </div>
+              )}
+              {!!briefing.sugestao_abertura && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-blue-600 mb-1">SUGESTÃO DE ABERTURA</p>
+                  <p className="text-sm text-blue-800 italic">"{briefing.sugestao_abertura as string}"</p>
+                </div>
+              )}
+              {!!briefing.objetivo_da_reuniao && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">OBJETIVO DA REUNIÃO</p>
+                  <p className="text-sm text-emerald-800">{briefing.objetivo_da_reuniao as string}</p>
+                </div>
+              )}
+              {(briefing.o_que_funcionou as string[] | undefined)?.length ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">O QUE FUNCIONOU</p>
+                  {(briefing.o_que_funcionou as string[]).map((f, i) => (
+                    <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500">✓</span>{f}</p>
+                  ))}
+                </div>
+              ) : null}
+              {(briefing.alertas as string[] | undefined)?.length ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-red-600 mb-1">ALERTAS PARA O CLOSER</p>
+                  {(briefing.alertas as string[]).map((a, i) => (
+                    <p key={i} className="text-xs text-red-700">! {a}</p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -951,6 +1138,12 @@ export default function VendedorPage() {
           />
         )}
         {activeTab === 'ficha' && <TabFicha fichaData={fichaData} />}
+        {activeTab === 'conta' && (
+          <TabFichaConta
+            contaId={fichaData?.conta_id || null}
+            empresaNome={fichaData?.empresa || ''}
+          />
+        )}
         {activeTab === 'resultados' && (
           <TabResultados reunioes={reunioesData} highlightId={highlightResultadoId} />
         )}

@@ -347,6 +347,14 @@ export const qualidadeCalcularApi = {
     api.post('/inteligencia/qualidade/calcular', { periodo }),
 }
 
+export const contasApi = {
+  list:     ()                          => api.get('/contas'),
+  get:      (id: string)                => api.get(`/contas/${id}`),
+  create:   (data: unknown)             => api.post('/contas', data),
+  update:   (id: string, data: unknown) => api.patch(`/contas/${id}`, data),
+  briefing: (id: string)                => api.post(`/contas/${id}/briefing`, {}),
+}
+
 // Telnyx — provisionamento de números
 export const telnyxApi = {
   buscarNumeros: (ddd: string, tipo?: string) =>
