@@ -2860,6 +2860,24 @@ function TabAjusteFino() {
     Sudeste: 'Direto', Sul: 'Formal', Nordeste: 'Próximo / Informal', 'Centro-Oeste': 'Consultivo', Norte: 'Próximo / Informal',
   })
   const [salvoSotaque, setSalvoSotaque] = useState(false)
+  const [salvandoSotaque, setSalvandoSotaque] = useState(false)
+
+  useQuery({
+    queryKey: ['tom-regiao'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/tom-regiao')
+      .then(r => { if (r.data && Object.keys(r.data).length > 0) setTonsPorRegiao(r.data); return r.data }).catch(() => null),
+  })
+
+  const salvarTomRegiao = async () => {
+    setSalvandoSotaque(true)
+    try {
+      await api.post('https://app.etztech.com/api/v1/inteligencia/tom-regiao', { tons: tonsPorRegiao })
+      setSalvoSotaque(true)
+      setTimeout(() => setSalvoSotaque(false), 4000)
+    } catch { /* silencioso */ } finally {
+      setSalvandoSotaque(false)
+    }
+  }
 
   const toggleId = (id: string) =>
     setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
@@ -2969,7 +2987,16 @@ function TabAjusteFino() {
         {/* Painel esquerdo — selecionar ligações */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-1">Ligações para aprender</h3>
-          <p className="text-[11px] text-gray-400 mb-3">Apenas ligações convertidas (agendou / transferida)</p>
+          <p className="text-[11px] text-gray-400 mb-1">Apenas ligações convertidas (agendou / transferida)</p>
+          <div className="flex items-center gap-1.5 mb-3">
+            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Selecione</span>
+            <span className="text-[10px] text-gray-300">→</span>
+            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Registre</span>
+            <span className="text-[10px] text-gray-300">→</span>
+            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">IC aprova</span>
+            <span className="text-[10px] text-gray-300">→</span>
+            <span className="text-[10px] bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full font-medium">Sincronizar com CI</span>
+          </div>
 
           {!temDados ? (
             <div className="text-center py-8 text-gray-400">
@@ -3096,15 +3123,25 @@ function TabAjusteFino() {
             <span className="bg-purple-50 text-purple-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">SOTAQUE REGIONAL</span>
           </div>
           <button
-            onClick={() => { setSalvoSotaque(true); setTimeout(() => setSalvoSotaque(false), 3000) }}
-            className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors font-medium flex items-center gap-1.5"
+            onClick={salvarTomRegiao}
+            disabled={salvandoSotaque}
+            className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors font-medium flex items-center gap-1.5 disabled:opacity-60"
           >
-            {salvoSotaque ? <><CheckCircle size={12} /> Salvo</> : <><Sliders size={12} /> Salvar preferências</>}
+            {salvoSotaque ? <><CheckCircle size={12} /> Salvo</> : salvandoSotaque ? <><Loader2 size={12} className="animate-spin" /> Salvando…</> : <><Sliders size={12} /> Salvar preferências</>}
           </button>
         </div>
-        <p className="text-[11px] text-gray-400 mb-4">
+        <p className="text-[11px] text-gray-400 mb-3">
           O agente detecta automaticamente a região do contato e adapta o tom durante a ligação. Conforme as ligações acontecem, o sistema mostra qual tom converte mais em cada região — você ajusta aqui e o agente obedece nas próximas chamadas.
         </p>
+
+        {salvoSotaque && (
+          <div className="mb-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-2">
+            <CheckCircle size={13} className="text-emerald-600 flex-shrink-0" />
+            <p className="text-[11px] text-emerald-700">
+              Preferências salvas. Para aplicar nos agentes, vá em <strong>Meus Agentes → Sincronizar com CI</strong>.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-3">
           {REGIOES_BR.map(r => {
