@@ -2235,10 +2235,10 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
         desc: primeiroAgente
           ? `Agente "${primeiroAgente.nome}" configurado. ${totalMateriais} materiais na base, ${totalBanco} argumentos no banco.`
           : 'Agente ainda não configurado.',
-        tags: [
+        tags: ([
           totalBanco > 0 ? `${totalBanco} argumentos no banco` : null,
           totalMateriais > 0 ? `${totalMateriais} materiais na base` : null,
-        ].filter(Boolean),
+        ] as (string | null)[]).filter((x): x is string => x !== null),
         ativo: !!primeiroAgente,
       },
       {
