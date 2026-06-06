@@ -3978,23 +3978,37 @@ interface PadraoArg {
 }
 
 function TabPadroes() {
-  const [autoAprovacao, setAutoAprovacao] = useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem('etz_auto_aprovacao') ?? 'false') } catch { return false }
-  })
-  const [threshold, setThreshold] = useState<number>(() => {
-    try { return Number(localStorage.getItem('etz_auto_aprovacao_threshold') ?? '2') } catch { return 2 }
-  })
+  const [autoAprovacao, setAutoAprovacao] = useState(false)
+  const [threshold, setThreshold] = useState(2)
   const [salvandoAuto, setSalvandoAuto] = useState(false)
   const [salvoAuto, setSalvoAuto] = useState(false)
 
-  function toggleAutoAprovacao(val: boolean) {
+  // Carrega config do backend ao montar
+  useEffect(() => {
+    api.get('https://app.etztech.com/api/v1/inteligencia/auto-aprovacao')
+      .then(r => {
+        const cfg = r.data as { ativo: boolean; threshold: number }
+        setAutoAprovacao(cfg.ativo ?? false)
+        setThreshold(cfg.threshold ?? 2)
+      })
+      .catch(() => {})
+  }, [])
+
+  async function toggleAutoAprovacao(val: boolean) {
     setAutoAprovacao(val)
-    localStorage.setItem('etz_auto_aprovacao', JSON.stringify(val))
+    try {
+      await api.post('https://app.etztech.com/api/v1/inteligencia/auto-aprovacao', { ativo: val, threshold })
+    } catch { /* silencioso */ }
   }
-  function salvarThreshold() {
+
+  async function salvarThreshold() {
     setSalvandoAuto(true)
-    localStorage.setItem('etz_auto_aprovacao_threshold', String(threshold))
-    setTimeout(() => { setSalvandoAuto(false); setSalvoAuto(true); setTimeout(() => setSalvoAuto(false), 2500) }, 400)
+    try {
+      await api.post('https://app.etztech.com/api/v1/inteligencia/auto-aprovacao', { ativo: autoAprovacao, threshold })
+      setSalvoAuto(true)
+      setTimeout(() => setSalvoAuto(false), 2500)
+    } catch { /* silencioso */ }
+    finally { setSalvandoAuto(false) }
   }
 
   const { data: padroes = [], isFetching, refetch } = useQuery({
