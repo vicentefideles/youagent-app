@@ -5801,6 +5801,8 @@ function TabMercado() {
     </div>
   )
 
+  const [mostrarGuia, setMostrarGuia] = useState(false)
+
   return (
     <div className="space-y-4">
 
@@ -5828,6 +5830,11 @@ function TabMercado() {
                 <span className={`text-xs font-semibold ${momentoCfg.color}`}>Mercado {momentoCfg.label}</span>
               </div>
             )}
+            <button onClick={() => setMostrarGuia(v => !v)}
+              className="border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs px-3 py-2 rounded-xl transition-colors flex items-center gap-1.5">
+              <AlertCircle size={13} />
+              Como usar
+            </button>
             <button onClick={gerarRelatorio} disabled={gerando}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-xl transition-colors font-semibold flex items-center gap-2 disabled:opacity-60">
               {gerando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -5837,6 +5844,74 @@ function TabMercado() {
         </div>
         {erroGerar && <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{erroGerar}</p>}
       </div>
+
+      {/* ── Guia de uso ── */}
+      {mostrarGuia && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Globe size={13} className="text-blue-600" />
+              </div>
+              <p className="text-sm font-bold text-blue-900">Como usar a Inteligência de Mercado</p>
+            </div>
+            <button onClick={() => setMostrarGuia(false)} className="text-blue-400 hover:text-blue-600 transition-colors">
+              <X size={15} />
+            </button>
+          </div>
+
+          {/* Fluxo de uso */}
+          <div className="flex items-stretch gap-0 mb-5 overflow-x-auto">
+            {[
+              { step: '1', icon: <Zap size={13} />, color: 'bg-blue-100 text-blue-600', title: 'Agentes fazem ligações', desc: 'Cada chamada é transcrita e os gatilhos detectados automaticamente (preço, concorrente, urgência...)' },
+              { step: '2', icon: <BarChart2 size={13} />, color: 'bg-blue-100 text-blue-600', title: 'Mercado agrega padrões', desc: 'Esta aba consolida o que aconteceu em todas as ligações dos últimos 30 dias em tempo real' },
+              { step: '3', icon: <Brain size={13} />, color: 'bg-purple-100 text-purple-600', title: 'Gere o relatório IA', desc: 'Clique "Gerar relatório agora" — a IA analisa e identifica oportunidades, riscos e recomendações' },
+              { step: '4', icon: <Database size={13} />, color: 'bg-amber-100 text-amber-600', title: 'Adicione ao Banco', desc: 'Use as recomendações da IA para criar novos argumentos na aba Banco (ex: resposta a objeção de preço)' },
+              { step: '5', icon: <Share2 size={13} />, color: 'bg-emerald-100 text-emerald-600', title: 'Aprove no Cross', desc: 'O argumento entra como pendente no Cross — você aprova e ele é propagado para todos os agentes' },
+            ].map((s, i, arr) => (
+              <div key={i} className="flex items-stretch">
+                <div className="bg-white border border-blue-100 rounded-xl px-3 py-3 flex gap-2.5 min-w-[160px] max-w-[180px]">
+                  <div className="shrink-0 mt-0.5">
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${s.color}`}>{s.icon}</div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-800 leading-tight mb-0.5">{s.title}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
+                  </div>
+                </div>
+                {i < arr.length - 1 && (
+                  <div className="flex items-center px-1 shrink-0">
+                    <ArrowRight size={14} className="text-blue-300" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Dicas por bloco */}
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">O que cada bloco mostra</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { titulo: 'Objeções mais frequentes', desc: 'Tipos de resistência detectados nas transcrições: preço, concorrente, sem verba, sem urgência. Quanto maior a barra, mais comum a objeção. Use para priorizar o que treinar no agente.' },
+              { titulo: 'Concorrentes mencionados', desc: 'Nomes que apareceram nas chamadas quando o cliente mencionou um concorrente. Identifique quem está disputando seus negócios e prepare contra-argumentos específicos.' },
+              { titulo: 'Sinalizações de Budget', desc: 'Quantas vezes os clientes trouxeram o tema de preço, proposta ou orçamento. Alto número = momento de negociação ativo — considere ajustar o script de abertura de preço.' },
+              { titulo: 'Banco de argumentos', desc: 'Prévia dos argumentos que seus agentes já têm disponíveis para este cenário de mercado. Se estiver vazio, vá à aba Banco e adicione respostas às objeções mais frequentes.' },
+            ].map((b, i) => (
+              <div key={i} className="bg-white border border-blue-100 rounded-xl px-3 py-2.5">
+                <p className="text-xs font-semibold text-blue-800 mb-0.5">{b.titulo}</p>
+                <p className="text-xs text-gray-600 leading-relaxed">{b.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 bg-blue-100 rounded-xl px-3 py-2.5 flex gap-2">
+            <Sparkles size={13} className="text-blue-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-800 leading-relaxed">
+              <strong>Dica:</strong> Gere o relatório uma vez por semana. A IA lê as transcrições reais e dá recomendações de ação — como "criar argumento contra objeção de preço". Cada recomendação aplicada no Banco vira aprendizado permanente para todos os agentes.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Resumo IA ── */}
       {ia?.resumo && (
@@ -5883,10 +5958,13 @@ function TabMercado() {
 
         {/* ── Objeções ── */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-gray-900">Objeções mais frequentes</h3>
             <span className="text-xs text-gray-400">{data?.total_ligacoes?.toLocaleString('pt-BR') || 0} lig.</span>
           </div>
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+            Detectadas automaticamente nas transcrições. As mais altas são as que mais travam suas vendas — crie contra-argumentos na aba <strong className="text-gray-600">Banco</strong>.
+          </p>
           {data?.objecoes && data.objecoes.length > 0 ? (
             <div className="space-y-3">
               {data.objecoes.map((o, i) => (
@@ -5913,10 +5991,13 @@ function TabMercado() {
 
         {/* ── Concorrentes ── */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-gray-900">Concorrentes mencionados</h3>
             <span className="text-xs text-gray-400">detecção automática</span>
           </div>
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+            Nomes identificados nas chamadas quando o cliente trouxe um concorrente. Adicione um argumento de diferenciação no <strong className="text-gray-600">Banco</strong> para cada um.
+          </p>
           {data?.concorrentes && data.concorrentes.length > 0 ? (
             <div className="space-y-2">
               {data.concorrentes.map((c, i) => (
@@ -5945,7 +6026,10 @@ function TabMercado() {
 
         {/* ── Sinalizações de Budget ── */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Sinalizações de Budget</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Sinalizações de Budget</h3>
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+            Vezes que o tema de preço ou orçamento apareceu nas ligações. Alto volume indica que o script de abertura de valor precisa ser reforçado antes de chegar no preço.
+          </p>
           {data?.budget && data.budget.length > 0 ? (
             <div className="space-y-2">
               {data.budget.map((b, i) => (
@@ -5969,7 +6053,10 @@ function TabMercado() {
 
         {/* ── Padrões detectados / Banco de argumentos ── */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Banco de argumentos de mercado</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Banco de argumentos de mercado</h3>
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+            Argumentos que seus agentes já têm disponíveis. Cada argumento aprovado no <strong className="text-gray-600">Cross</strong> é herdado automaticamente por todos os agentes na próxima sincronização.
+          </p>
           {data?.banco && data.banco.length > 0 ? (
             <div className="space-y-2">
               {data.banco.slice(0, 5).map((b, i) => (
@@ -5995,7 +6082,12 @@ function TabMercado() {
       {/* ── Alertas IA ── */}
       {ia?.alertas && ia.alertas.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Alertas gerados pela IA</p>
+          <div className="flex items-start justify-between mb-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Alertas gerados pela IA</p>
+          </div>
+          <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+            Situações que a IA identificou como urgentes com base nos padrões das ligações. Alertas <span className="text-red-500 font-medium">vermelhos</span> exigem ação imediata — normalmente criar um argumento novo ou revisar o script.
+          </p>
           <div className="grid grid-cols-3 gap-3">
             {ia.alertas.map((a, i) => {
               const urgCfg = a.urgencia === 'alta'
@@ -6017,7 +6109,10 @@ function TabMercado() {
       {/* ── Recomendações IA ── */}
       {ia?.recomendacoes && ia.recomendacoes.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recomendações de ação</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Recomendações de ação</p>
+          <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+            Ações concretas sugeridas pela IA com impacto esperado. O fluxo recomendado: leia → vá à aba <strong className="text-gray-600">Banco</strong> → adicione o argumento → aprove no <strong className="text-gray-600">Cross</strong> → todos os agentes herdam automaticamente.
+          </p>
           <div className="space-y-2">
             {ia.recomendacoes.map((r, i) => (
               <div key={i} className="flex items-start gap-3 border border-gray-100 rounded-xl px-4 py-3">
