@@ -2841,108 +2841,287 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
 }
 
 function TabAjusteFino() {
-  const [selected, setSelected] = useState<number[]>([0, 1])
-  const [gatilhoSel, setGatilhoSel] = useState('Urgência')
-  const [keywordsExtra, setKeywordsExtra] = useState('')
-  const toggle = (i: number) => setSelected(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i])
-  const calls = [
-    { id: 0, label: 'Supermercados Norte — 12 min', sub: 'Conversão: Agendou' },
-    { id: 1, label: 'Grupo ABC — 8 min', sub: 'Conversão: Agendou' },
-    { id: 2, label: 'Delta Ind. — 6 min', sub: 'Conversão: Retornar' },
+  const qc = useQueryClient()
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [gatilhoSel, setGatilhoSel] = useState('urgencia')
+  const [frase, setFrase] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [sucesso, setSucesso] = useState(false)
+
+  const toggleId = (id: string) =>
+    setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
+
+  // ── Ligações convertidas reais ────────────────────────────────────────────
+  const { data: ligsRaw = [] } = useQuery({
+    queryKey: ['ajuste-ligacoes'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
+  })
+  const ligsConvertidas: any[] = ligsRaw.filter((l: any) =>
+    l.resultado === 'agendou' || l.resultado === 'transferida'
+  ).slice(0, 10)
+
+  // ── Cross argumentos aprovados (histórico de aprendizados) ────────────────
+  const { data: crossAprovados = [] } = useQuery({
+    queryKey: ['ajuste-cross-aprovados'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross?status=aprovado')
+      .then(r => r.data as any[]).catch(() => []),
+  })
+
+  // ── Qualidade para impacto acumulado ─────────────────────────────────────
+  const { data: qualidade = [] } = useQuery({
+    queryKey: ['ajuste-qualidade'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/qualidade')
+      .then(r => r.data as any[]).catch(() => []),
+  })
+
+  // Calcula impacto: diferença entre melhor score atual e menor score histórico
+  const scores: number[] = (qualidade as any[]).map((q: any) => q.score_total ?? 0).filter((s: number) => s > 0)
+  const impactoAcumulado = scores.length >= 2
+    ? Math.max(...scores) - Math.min(...scores)
+    : null
+
+  // ── Taxa de conversão por estado (sotaque regional) ───────────────────────
+  const porEstado: Record<string, { total: number; sucesso: number }> = {}
+  ligsRaw.forEach((l: any) => {
+    const estado = l.contatos?.estado
+    if (!estado) return
+    if (!porEstado[estado]) porEstado[estado] = { total: 0, sucesso: 0 }
+    porEstado[estado].total++
+    if (l.resultado === 'agendou' || l.resultado === 'transferida') porEstado[estado].sucesso++
+  })
+  const regioes = Object.entries(porEstado)
+    .map(([estado, d]) => ({ estado, taxa: d.total > 0 ? Math.round((d.sucesso / d.total) * 100) : 0, total: d.total }))
+    .sort((a, b) => b.taxa - a.taxa)
+
+  const GATILHOS = [
+    { value: 'urgencia', label: 'Urgência' },
+    { value: 'proposta', label: 'Proposta de valor' },
+    { value: 'concorrente', label: 'Concorrente' },
+    { value: 'gatekeeper', label: 'Gatekeeper' },
+    { value: 'decisor', label: 'Decisor' },
+    { value: 'preco', label: 'Preço / Orçamento' },
   ]
-  const history = [
-    { num: 4, delta: '+1.8%', desc: 'Reforço no gatilho de urgência', date: '22/05' },
-    { num: 3, delta: '+0.9%', desc: 'Ajuste de tom para setor industrial', date: '15/05' },
-    { num: 2, delta: '+1.2%', desc: 'Otimização de abertura da ligação', date: '08/05' },
-  ]
+
+  async function registrarAprendizado() {
+    if (selectedIds.length === 0) return
+    if (!frase.trim()) return
+    setSalvando(true)
+    try {
+      const ligsSelecionadas = ligsConvertidas.filter((l: any) => selectedIds.includes(l.id))
+      const empresas = ligsSelecionadas.map((l: any) => l.contatos?.empresa || l.numero_destino).join(', ')
+      const argumento = `[Aprendizado de ${ligsSelecionadas.length} ligação(ões) convertidas — ${empresas}] ${frase.trim()}`
+      await api.post('https://app.etztech.com/api/v1/inteligencia/cross', {
+        argumento,
+        gatilho: gatilhoSel,
+        campanhas: [],
+      })
+      await qc.invalidateQueries({ queryKey: ['ajuste-cross-aprovados'] })
+      setSelectedIds([])
+      setFrase('')
+      setSucesso(true)
+      setTimeout(() => setSucesso(false), 4000)
+    } catch (_e) {
+      // silencia — botão fica habilitado novamente
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const temDados = ligsConvertidas.length > 0
+
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#312e81)' }}
-      >
-        <h2 className="text-lg font-semibold">Ajuste Fino por Conversas Reais</h2>
-        <p className="text-sm text-white/60 mt-0.5">Selecione ligações de alto desempenho para refinar o comportamento dos agentes</p>
+
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <Sliders size={20} className="text-brand-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-base font-semibold text-gray-900">Ajuste Fino por Conversas Reais</h2>
+              <span className="bg-brand-50 text-brand-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">APRENDIZADO SUPERVISIONADO</span>
+            </div>
+            <p className="text-xs text-gray-500">Selecione ligações que converteram bem, identifique o gatilho e registre o aprendizado — o agente herda isso na próxima configuração.</p>
+          </div>
+        </div>
+
+        {/* Card explicativo */}
+        <div className="grid grid-cols-4 gap-3 mt-4">
+          {[
+            { icon: <CheckCircle size={14} className="text-brand-600" />, titulo: 'Selecione', desc: 'Ligações que agendaram — você sabe quais foram genuinamente boas' },
+            { icon: <Zap size={14} className="text-amber-500" />, titulo: 'Identifique', desc: 'O gatilho que funcionou: urgência, proposta, concorrente, decisor...' },
+            { icon: <Brain size={14} className="text-purple-600" />, titulo: 'Registre', desc: 'O padrão vai para revisão no IC e é aprovado antes de propagar' },
+            { icon: <TrendingUp size={14} className="text-emerald-600" />, titulo: 'O agente aprende', desc: 'Na próxima sincronização, o argumento entra no prompt do agente' },
+          ].map((b, i) => (
+            <div key={i} className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-1">{b.icon}<span className="text-xs font-semibold text-gray-800">{b.titulo}</span></div>
+              <p className="text-[11px] text-gray-500 leading-relaxed">{b.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* ── Grid principal ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
+
+        {/* Painel esquerdo — selecionar ligações */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Ajuste fino por conversas reais</h3>
-          <div className="space-y-2 mb-4">
-            {calls.map(c => (
-              <label key={c.id} className="flex items-center gap-2 p-2 border border-gray-100 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(c.id)}
-                  onChange={() => toggle(c.id)}
-                  className="rounded"
-                />
-                <div>
-                  <p className="text-xs font-semibold text-gray-800">{c.label}</p>
-                  <p className="text-xs text-gray-500">{c.sub}</p>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Ligações para aprender</h3>
+          <p className="text-[11px] text-gray-400 mb-3">Apenas ligações convertidas (agendou / transferida)</p>
+
+          {!temDados ? (
+            <div className="text-center py-8 text-gray-400">
+              <Sliders size={28} className="mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Nenhuma ligação convertida ainda.</p>
+              <p className="text-[11px] mt-1">Aparecerão aqui após as primeiras ligações que agendarem.</p>
+            </div>
+          ) : (
+            <div className="space-y-2 mb-4 max-h-48 overflow-y-auto pr-1">
+              {ligsConvertidas.map((l: any) => {
+                const empresa = l.contatos?.empresa || l.contatos?.nome || l.numero_destino || '—'
+                const agente = l.agentes?.nome || '—'
+                const data = l.criado_em ? new Date(l.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
+                const resultado = l.resultado === 'agendou' ? 'Agendou' : 'Transferida'
+                const corRes = l.resultado === 'agendou' ? 'text-emerald-600' : 'text-blue-600'
+                return (
+                  <label key={l.id} className="flex items-start gap-2 p-2.5 border border-gray-100 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(l.id)}
+                      onChange={() => toggleId(l.id)}
+                      className="mt-0.5 rounded accent-brand-600"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{empresa}</p>
+                      <p className="text-[11px] text-gray-400">{agente} · {data} · <span className={`font-semibold ${corRes}`}>{resultado}</span></p>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+          )}
+
+          {temDados && (
+            <>
+              <select
+                value={gatilhoSel}
+                onChange={e => setGatilhoSel(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-brand-200 bg-white"
+              >
+                {GATILHOS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+              <textarea
+                value={frase}
+                onChange={e => setFrase(e.target.value)}
+                rows={2}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:ring-2 focus:ring-brand-200 resize-none"
+                placeholder="Descreva o que funcionou nessa ligação — frase, abordagem, argumento..."
+              />
+              {sucesso && (
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-2">
+                  <CheckCircle size={13} className="text-emerald-600 flex-shrink-0" />
+                  <p className="text-xs text-emerald-700 font-medium">Aprendizado enviado para revisão no IC!</p>
                 </div>
-              </label>
-            ))}
-          </div>
-          <select
-            value={gatilhoSel}
-            onChange={e => setGatilhoSel(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-200"
-          >
-            <option>Urgência</option>
-            <option>Proposta</option>
-            <option>Concorrente</option>
-            <option>Gatekeeper</option>
-          </select>
-          <input
-            value={keywordsExtra}
-            onChange={e => setKeywordsExtra(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:ring-2 focus:ring-blue-200"
-            placeholder="Keywords adicionais (separadas por vírgula)"
-          />
-          <button
-            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
-            onClick={async () => {
-              if (selected.length === 0) { alert('Selecione pelo menos uma ligação'); return }
-              try {
-                await api.post('/inteligencia/ajuste-fino', { ligacoes_ids: selected, gatilho: gatilhoSel, keywords: keywordsExtra })
-                setSelected([])
-                alert('Ajuste fino iniciado! Resultados em ~24h.')
-              } catch { alert('Erro ao iniciar ajuste fino') }
-            }}
-          >
-            Iniciar ajuste fino
-          </button>
+              )}
+              <button
+                disabled={selectedIds.length === 0 || !frase.trim() || salvando}
+                className="w-full bg-brand-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={registrarAprendizado}
+              >
+                {salvando ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                {salvando ? 'Registrando...' : `Registrar aprendizado${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
+              </button>
+              <p className="text-[10px] text-gray-400 text-center mt-1.5">Vai para revisão no IC antes de ser aplicado</p>
+            </>
+          )}
         </div>
 
+        {/* Painel direito — histórico de aprendizados aprovados */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico de ajustes finos</h3>
-          <div className="space-y-3 mb-4">
-            {history.map((h, i) => (
-              <div key={i} className="border border-gray-100 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-xs font-semibold text-gray-800">Ajuste #{h.num}</span>
-                  <span className="text-emerald-600 font-mono font-bold text-sm">{h.delta}</span>
-                </div>
-                <p className="text-xs text-gray-500">{h.desc}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{h.date}</p>
-              </div>
-            ))}
-          </div>
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
-            <p className="text-xs text-emerald-700 font-semibold">Impacto acumulado: +3.9%</p>
-          </div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Aprendizados registrados</h3>
+          <p className="text-[11px] text-gray-400 mb-3">Argumentos aprovados no IC originados de ligações reais</p>
+
+          {crossAprovados.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <Brain size={28} className="mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Nenhum aprendizado registrado ainda.</p>
+              <p className="text-[11px] mt-1">Selecione ligações ao lado e registre o primeiro.</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1 mb-3">
+              {(crossAprovados as any[]).slice(0, 6).map((c: any, i: number) => {
+                const data = c.criado_em
+                  ? new Date(c.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  : c.aprovado_em
+                  ? new Date(c.aprovado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  : '—'
+                const gatilhoLabel = GATILHOS.find(g => g.value === c.gatilho)?.label ?? c.gatilho ?? '—'
+                return (
+                  <div key={c.id ?? i} className="border border-gray-100 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="bg-brand-50 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">{gatilhoLabel}</span>
+                      <span className="text-[10px] text-gray-400">{data}</span>
+                    </div>
+                    <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">{c.frase || c.argumento || '—'}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Impacto acumulado */}
+          {impactoAcumulado !== null && impactoAcumulado > 0 ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
+              <p className="text-xs text-emerald-700 font-semibold">
+                Variação de score acumulada: +{impactoAcumulado}pts
+              </p>
+              <p className="text-[10px] text-emerald-600 mt-0.5">Entre o menor e maior score dos agentes</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500">Impacto calculado após primeiros ajustes aprovados</p>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* ── Sotaque regional ─────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <h3 className="text-sm font-semibold text-gray-900">Ajuste fino por sotaque regional</h3>
-          <span className="bg-purple-50 text-purple-600 text-xs px-2 py-0.5 rounded-full font-semibold">AUTO-APRENDIZADO</span>
+        <div className="flex items-center gap-2 mb-1">
+          <Globe size={15} className="text-brand-600" />
+          <h3 className="text-sm font-semibold text-gray-900">Performance por região</h3>
+          <span className="bg-purple-50 text-purple-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">AUTO-APRENDIZADO</span>
         </div>
-        <p className="text-xs text-gray-500">
-          O sistema detecta padrões de conversão por sotaque e ajusta automaticamente o modelo de fala dos agentes.
-          Regiões com maior desvio de performance recebem sessões específicas de ajuste fino para maximizar rapport.
-        </p>
+        <p className="text-[11px] text-gray-400 mb-3">Taxa de conversão por estado — regiões com menor performance são candidatas a ajuste de tom e abordagem</p>
+
+        {regioes.length === 0 ? (
+          <div className="text-center py-6 text-gray-400">
+            <Globe size={24} className="mx-auto mb-2 opacity-30" />
+            <p className="text-xs">Dados regionais disponíveis após as primeiras ligações com contatos cadastrados.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {regioes.slice(0, 9).map((r, i) => {
+              const cor = r.taxa >= 60 ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                : r.taxa >= 35 ? 'text-amber-600 bg-amber-50 border-amber-200'
+                : 'text-red-600 bg-red-50 border-red-200'
+              return (
+                <div key={r.estado} className={`border rounded-lg p-3 ${i === 0 ? cor : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-bold text-gray-800">{r.estado}</span>
+                    <span className={`text-sm font-bold ${i === 0 ? '' : r.taxa >= 60 ? 'text-emerald-600' : r.taxa >= 35 ? 'text-amber-600' : 'text-red-600'}`}>{r.taxa}%</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500">{r.total} ligação{r.total !== 1 ? 'ões' : ''}</p>
+                  <div className="mt-1.5 h-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${r.taxa >= 60 ? 'bg-emerald-500' : r.taxa >= 35 ? 'bg-amber-500' : 'bg-red-400'}`} style={{ width: `${r.taxa}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
