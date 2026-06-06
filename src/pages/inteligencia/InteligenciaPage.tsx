@@ -5421,97 +5421,154 @@ function TabAB() {
       </div>
 
       {/* ── Criar novo experimento ── */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Novo experimento</p>
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        {/* Cabeçalho da seção */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-purple-50 rounded-lg flex items-center justify-center">
+              <Play size={11} className="text-purple-600" />
+            </div>
+            <span className="text-sm font-semibold text-gray-800">Novo experimento</span>
+          </div>
+          <span className="text-xs text-gray-400">Preencha os campos e inicie o teste</span>
+        </div>
+
+        <div className="p-6 space-y-5">
+
+          {/* Nome */}
           <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1.5">Nome do experimento</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Nome do experimento</label>
             <input value={nome} onChange={e => setNome(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 bg-gray-50"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 placeholder-gray-300 transition-all"
               placeholder="Ex: Abertura consultiva vs. direta" />
           </div>
+
+          {/* Trecho */}
           <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1.5">Agente (opcional)</label>
-            <div className="relative">
-              <select value={agenteId} onChange={e => setAgenteId(e.target.value)}
-                className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer pr-8">
-                <option value="">Todos os agentes</option>
-                {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 8L1 3h10L6 8z"/></svg>
-              </div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Trecho a testar</label>
+            <div className="grid grid-cols-5 gap-2">
+              {TRECHOS.map(t => (
+                <button key={t.id} onClick={() => setTrecho(t.id)}
+                  className={`text-left rounded-xl px-3 py-3 border-2 transition-all ${
+                    trecho === t.id
+                      ? 'border-purple-400 bg-purple-50 shadow-sm'
+                      : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  <p className={`text-xs font-semibold leading-snug ${trecho === t.id ? 'text-purple-700' : 'text-gray-700'}`}>{t.label}</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-tight">{t.desc}</p>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Trecho */}
-        <label className="text-xs font-semibold text-gray-600 block mb-2">Trecho a testar</label>
-        <div className="grid grid-cols-5 gap-2 mb-4">
-          {TRECHOS.map(t => (
-            <button key={t.id} onClick={() => setTrecho(t.id)}
-              className={`text-left border-2 rounded-xl px-3 py-2.5 transition-all ${trecho === t.id ? 'border-purple-500 bg-purple-50' : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}>
-              <p className={`text-xs font-semibold ${trecho === t.id ? 'text-purple-700' : 'text-gray-700'}`}>{t.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5 leading-tight">{t.desc}</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Gerar com IA */}
-        <button onClick={gerarComIA} disabled={gerando}
-          className="w-full mb-4 border-2 border-dashed border-purple-200 bg-purple-50 hover:bg-purple-100 rounded-xl py-3 text-sm font-semibold text-purple-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-60">
-          {gerando ? <Loader2 size={15} className="animate-spin"/> : <Sparkles size={15}/>}
-          {gerando ? 'Gerando sugestões com IA...' : 'Gerar versões A e B com IA'}
-        </button>
-
-        {racional && (
-          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-            <p className="text-xs font-semibold text-blue-700 mb-0.5">Racional da IA</p>
-            <p className="text-xs text-blue-800 leading-relaxed">{racional}</p>
-          </div>
-        )}
-
-        {/* Scripts A e B */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          {[
-            { label: 'Versão A', nome: vANome, setNome: setVANome, script: vA, setScript: setVA, color: 'border-blue-200 bg-blue-50', badge: 'bg-blue-100 text-blue-700' },
-            { label: 'Versão B', nome: vBNome, setNome: setVBNome, script: vB, setScript: setVB, color: 'border-emerald-200 bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700' },
-          ].map((v, i) => (
-            <div key={i} className={`border-2 rounded-xl p-4 ${v.color}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${v.badge}`}>{v.label}</span>
-                <input value={v.nome} onChange={e => v.setNome(e.target.value)}
-                  className="flex-1 text-xs font-semibold text-gray-700 bg-transparent outline-none border-b border-gray-200 pb-0.5"
-                  placeholder={`Nome da ${v.label.toLowerCase()}...`} />
-              </div>
-              <textarea rows={4} value={v.script} onChange={e => v.setScript(e.target.value)}
-                className="w-full text-sm text-gray-800 bg-transparent outline-none resize-none leading-relaxed"
-                placeholder={`Script da ${v.label.toLowerCase()}...`} />
+          {/* Agente */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+              Agente <span className="text-gray-300 font-normal normal-case">(opcional — deixe em branco para todos)</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setAgenteId('')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  agenteId === ''
+                    ? 'bg-gray-800 text-white border-gray-800'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                }`}>
+                Todos os agentes
+              </button>
+              {agentes.map(a => (
+                <button key={a.id} onClick={() => setAgenteId(a.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    agenteId === a.id
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-purple-200 hover:text-purple-600'
+                  }`}>
+                  {a.nome}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-
-        {/* Amostra + iniciar */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <label className="text-xs font-semibold text-gray-600 block mb-1.5">Tamanho da amostra</label>
-            <div className="flex items-center gap-3">
-              <input type="range" min={50} max={500} step={50} value={amostra} onChange={e => setAmostra(Number(e.target.value))}
-                className="flex-1 h-1.5 accent-purple-600 cursor-pointer" />
-              <span className="text-sm font-bold font-mono text-gray-800 w-20">{amostra} lig.</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">≈ {Math.ceil(amostra / 400)} dia{Math.ceil(amostra / 400) > 1 ? 's' : ''} com volume normal</p>
           </div>
-          <button onClick={iniciar} disabled={salvando}
-            className="bg-purple-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-60 flex items-center gap-2 shadow-sm">
-            {salvando ? <Loader2 size={14} className="animate-spin"/> : <Play size={14}/>}
-            Iniciar experimento
+
+          {/* Botão gerar com IA */}
+          <button onClick={gerarComIA} disabled={gerando}
+            className={`w-full rounded-xl py-3.5 text-sm font-semibold flex items-center justify-center gap-2 transition-all border-2 border-dashed ${
+              gerando
+                ? 'border-purple-200 bg-purple-50 text-purple-400 cursor-not-allowed'
+                : 'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-400'
+            }`}>
+            {gerando
+              ? <><Loader2 size={15} className="animate-spin" /> Gerando sugestões com IA...</>
+              : <><Sparkles size={15} /> Gerar versões A e B com IA</>}
           </button>
-        </div>
 
-        {erro   && <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{erro}</p>}
-        {sucesso && <p className="mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">✓ {sucesso}</p>}
+          {/* Racional */}
+          {racional && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex gap-3">
+              <Brain size={15} className="text-blue-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-blue-700 mb-0.5">Por que essas duas versões?</p>
+                <p className="text-xs text-blue-700 leading-relaxed opacity-80">{racional}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Cards A e B */}
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { label: 'Versão A', nomeVal: vANome, setNomeVal: setVANome, scriptVal: vA, setScriptVal: setVA,
+                ring: 'ring-blue-400', bg: 'bg-blue-50', border: 'border-blue-200', pill: 'bg-blue-100 text-blue-700', dot: 'bg-blue-400' },
+              { label: 'Versão B', nomeVal: vBNome, setNomeVal: setVBNome, scriptVal: vB, setScriptVal: setVB,
+                ring: 'ring-emerald-400', bg: 'bg-emerald-50', border: 'border-emerald-200', pill: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-400' },
+            ] as const).map((v, i) => (
+              <div key={i} className={`rounded-xl border-2 ${v.border} ${v.bg} overflow-hidden`}>
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/60">
+                  <span className={`w-2 h-2 rounded-full ${v.dot}`} />
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${v.pill}`}>{v.label}</span>
+                  <input value={v.nomeVal} onChange={e => v.setNomeVal(e.target.value)}
+                    className="flex-1 text-xs font-medium text-gray-600 bg-transparent outline-none placeholder-gray-400"
+                    placeholder="Nome desta versão..." />
+                </div>
+                <textarea rows={5} value={v.scriptVal} onChange={e => v.setScriptVal(e.target.value)}
+                  className="w-full text-sm text-gray-700 bg-transparent outline-none resize-none leading-relaxed px-4 py-3 placeholder-gray-400"
+                  placeholder={`Script da ${v.label.toLowerCase()}...`} />
+              </div>
+            ))}
+          </div>
+
+          {/* Amostra + botão iniciar */}
+          <div className="flex items-end gap-5 pt-1">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tamanho da amostra</label>
+                <span className="text-sm font-bold font-mono text-gray-800">{amostra} ligações</span>
+              </div>
+              <input type="range" min={50} max={500} step={50} value={amostra} onChange={e => setAmostra(Number(e.target.value))}
+                className="w-full h-1.5 accent-purple-600 cursor-pointer" />
+              <p className="text-xs text-gray-400 mt-1.5">
+                ≈ {Math.ceil(amostra / 400)} dia{Math.ceil(amostra / 400) > 1 ? 's' : ''} com volume normal
+              </p>
+            </div>
+            <button onClick={iniciar} disabled={salvando}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-7 py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 flex items-center gap-2 shadow-sm whitespace-nowrap">
+              {salvando ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              Iniciar experimento
+            </button>
+          </div>
+
+          {erro   && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+              <AlertCircle size={14} className="text-red-500 shrink-0" />
+              <p className="text-xs text-red-600">{erro}</p>
+            </div>
+          )}
+          {sucesso && (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+              <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+              <p className="text-xs text-emerald-700 font-medium">{sucesso}</p>
+            </div>
+          )}
+
+        </div>
       </div>
 
       {/* ── Banner ciclo fechado ── */}
