@@ -8,7 +8,7 @@ import {
   Upload, Trash2, RotateCcw, Zap,
   AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star, X,
 } from 'lucide-react'
-import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi } from '@/services/api'
+import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi, agentesApi } from '@/services/api'
 
 type TabId =
   | 'testes' | 'qualidade' | 'coletiva' | 'horarios' | 'campanhas'
@@ -4274,159 +4274,332 @@ function TabPadroes() {
   )
 }
 
-function TabSimulador({ simuladorVersoes: _simuladorVersoes }: { simuladorVersoes?: unknown[] }) {
-  const [running, setRunning] = useState(false)
-  const [certStatus, setCertStatus] = useState<Record<string, 'aprovado' | 'reprovado' | null>>({
-    preco: null, fornecedor: null, decisor: null, urgencia: null, negativa: null,
+interface SimResultado {
+  id?: string
+  agente_nome?: string
+  cenario: string
+  transcript: { who: string; text: string }[]
+  score: number
+  objecoes_total: number
+  objecoes_aprovadas: number
+  gatilhos_detectados: number
+  gatilhos_total: number
+  duracao_segundos: number
+  resultado: 'aprovado' | 'reprovado' | 'inconclusivo'
+  analise: {
+    gatilho_principal?: string
+    proxima_acao?: string
+    sentimento?: string
+    probabilidade_agendamento?: number
+    pontos_fortes?: string[]
+    pontos_melhoria?: string[]
+  }
+}
+
+const CERT_SCENARIOS = [
+  { id: 'preco',      label: 'Pergunta preço — redirecionar para reunião' },
+  { id: 'fornecedor', label: 'Já tem fornecedor — convencer a comparar'    },
+  { id: 'decisor',    label: 'Não é o decisor'                             },
+  { id: 'urgencia',   label: 'Sem tempo agora — criar urgência'            },
+  { id: 'negativa',   label: 'Negativa definitiva'                         },
+]
+
+function fmtDuracao(seg: number) {
+  const m = Math.floor(seg / 60)
+  const s = seg % 60
+  return `${m}m${String(s).padStart(2, '0')}s`
+}
+
+function TabSimulador() {
+  const queryClient = useQueryClient()
+
+  // Agentes reais
+  const { data: agentes = [] } = useQuery({
+    queryKey: ['agentes-lista'],
+    queryFn: () => agentesApi.list().then(r => r.data as { id: string; nome: string }[]),
   })
-  const transcript = [
-    { who: 'Agente', text: 'Bom dia! Falo com o responsável pela área comercial?' },
-    { who: 'Lead', text: 'Sim, sou eu. Quem fala?' },
-    { who: 'Agente', text: 'Meu nome é Ana, da ETZ. Reduzimos 40% do tempo de prospecção de empresas como a sua.' },
-    { who: 'Lead', text: 'Quanto custa isso?' },
-    { who: 'Agente', text: 'O investimento depende do volume. Posso mostrar os números exatos numa reunião de 20 minutos?' },
-  ]
-  const certScenarios = [
-    { id: 'preco', label: 'Pergunta preço — redirecionar para reunião', score: 91 },
-    { id: 'fornecedor', label: 'Já tem fornecedor — convencer a comparar', score: 84 },
-    { id: 'decisor', label: 'Não é o decisor', score: 88 },
-    { id: 'urgencia', label: 'Sem tempo agora — criar urgência', score: 79 },
-    { id: 'negativa', label: 'Negativa definitiva', score: 95 },
-  ]
+
+  // Histórico de simulações
+  const { data: historico = [], isFetching: loadingHist } = useQuery({
+    queryKey: ['inteligencia-simulador'],
+    queryFn: () => inteligenciaSimuladorApi.list().then(r => r.data as SimResultado[]),
+  })
+
+  const [agenteId, setAgenteId] = useState('')
+  const [cenario, setCenario] = useState('preco')
+  const [loading, setLoading] = useState(false)
+  const [certLoading, setCertLoading] = useState<Record<string, boolean>>({})
+  const [resultado, setResultado] = useState<SimResultado | null>(null)
+  const [visibleLines, setVisibleLines] = useState(0)
+  const [certResultados, setCertResultados] = useState<Record<string, SimResultado>>({})
+
+  // Anima o transcript linha a linha após receber resultado
+  useEffect(() => {
+    if (!resultado) return
+    setVisibleLines(0)
+    const total = resultado.transcript.length
+    let i = 0
+    const timer = setInterval(() => {
+      i++
+      setVisibleLines(i)
+      if (i >= total) clearInterval(timer)
+    }, 380)
+    return () => clearInterval(timer)
+  }, [resultado])
+
+  async function rodarSimulacao(cenarioId: string, para: 'principal' | string = 'principal') {
+    if (para === 'principal') setLoading(true)
+    else setCertLoading(p => ({ ...p, [cenarioId]: true }))
+
+    try {
+      const res = await inteligenciaSimuladorApi.create({ agente_id: agenteId || null, cenario: cenarioId })
+      const data = res.data as SimResultado
+      if (para === 'principal') {
+        setResultado(data)
+      } else {
+        setCertResultados(p => ({ ...p, [cenarioId]: data }))
+      }
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-simulador'] })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      if (para === 'principal') setLoading(false)
+      else setCertLoading(p => ({ ...p, [cenarioId]: false }))
+    }
+  }
+
+  const sentimentoCor = (s?: string) =>
+    s === 'positivo' ? 'text-emerald-600' : s === 'negativo' ? 'text-red-600' : 'text-gray-600'
+
+  const resultadoBadge = (r: string) =>
+    r === 'aprovado'
+      ? 'bg-emerald-100 text-emerald-700'
+      : r === 'reprovado'
+      ? 'bg-red-100 text-red-700'
+      : 'bg-amber-100 text-amber-700'
+
   return (
     <div className="space-y-4">
       <div
-        className="rounded-xl p-5 text-white"
+        className="rounded-xl p-5 text-white flex items-center justify-between"
         style={{ background: 'linear-gradient(135deg,#1a1f35,#3d4a1a)' }}
       >
-        <h2 className="text-lg font-semibold">Simulador de Ligações</h2>
-        <p className="text-sm text-white/70 mt-0.5">Teste cenários antes de ir para produção — v2.4</p>
+        <div>
+          <h2 className="text-lg font-semibold">Simulador de Ligações</h2>
+          <p className="text-sm text-white/70 mt-0.5">Teste cenários de objeção com o agente real antes de ir para produção</p>
+        </div>
+        <div className="text-right text-xs text-white/50">
+          <p>{historico.length} simulações realizadas</p>
+        </div>
       </div>
 
+      {/* Configuração */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Configuração da simulação</h3>
         <div className="grid grid-cols-3 gap-3 mb-3">
-          <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
-            <option>Ana</option><option>Carlos</option><option>Julia</option>
+          <select
+            value={agenteId}
+            onChange={e => setAgenteId(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          >
+            <option value="">Qualquer agente</option>
+            {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
           </select>
-          <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 col-span-2">
-            <option>Pergunta preço — redirecionar para reunião</option>
-            <option>Já tem fornecedor — convencer a comparar</option>
-            <option>Não é o decisor</option>
-            <option>Sem tempo agora — criar urgência</option>
-            <option>Negativa definitiva</option>
+          <select
+            value={cenario}
+            onChange={e => setCenario(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 col-span-2"
+          >
+            {CERT_SCENARIOS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
         </div>
         <button
-          onClick={() => setRunning(p => !p)}
-          className={`w-full py-2 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${running ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          onClick={() => rodarSimulacao(cenario)}
+          disabled={loading}
+          className="w-full py-2 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
         >
-          <Play size={14} /> {running ? 'Parar simulação' : 'Rodar simulação'}
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+          {loading ? 'Simulando com IA...' : 'Rodar simulação'}
         </button>
       </div>
 
-      {running && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <h3 className="text-sm font-semibold text-gray-900">Painel ao vivo</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div>
-              <p className="text-xs text-gray-400 mb-1 font-semibold">POTENCIAL</p>
-              <Bar pct={72} color="bg-blue-500" />
-              <p className="text-xs text-gray-500 mt-0.5">72%</p>
+      {/* Resultado da simulação */}
+      {resultado && (
+        <>
+          {/* KPIs */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">Resultado da simulação</h3>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(resultado.resultado)}`}>
+                {resultado.resultado.toUpperCase()}
+              </span>
             </div>
-            <div className="flex gap-4">
-              <div>
-                <p className="text-xs text-gray-400">ICP</p>
-                <p className="text-lg font-mono font-bold text-blue-600">74</p>
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              {[
+                { label: 'Score',     value: String(resultado.score ?? '—') },
+                { label: 'Objeções',  value: `${resultado.objecoes_aprovadas}/${resultado.objecoes_total}` },
+                { label: 'Gatilhos',  value: `${resultado.gatilhos_detectados}/${resultado.gatilhos_total}` },
+                { label: 'Duração',   value: fmtDuracao(resultado.duracao_segundos) },
+              ].map((k, i) => (
+                <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
+                  <p className="text-lg font-mono font-bold text-gray-800">{k.value}</p>
+                  <p className="text-xs text-gray-500">{k.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Score bar */}
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Desempenho do agente</span>
+                <span className="font-mono font-bold">{resultado.score ?? 0}/100</span>
               </div>
-              <div>
-                <p className="text-xs text-gray-400">Tempo</p>
-                <p className="text-lg font-mono font-bold text-gray-800">02:14</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Fase</p>
-                <p className="text-xs font-semibold text-purple-600 mt-1">Qualificação</p>
-              </div>
+              <Bar pct={resultado.score ?? 0} color={resultado.score >= 80 ? 'bg-emerald-500' : resultado.score >= 60 ? 'bg-amber-400' : 'bg-red-400'} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-400 mb-2 font-semibold">TRANSCRIÇÃO</p>
-              <div className="bg-gray-950 rounded-lg p-3 space-y-2 font-mono text-xs max-h-40 overflow-y-auto">
-                {transcript.map((t, i) => (
-                  <div key={i}>
-                    <span className={`font-bold ${t.who === 'Agente' ? 'text-blue-400' : 'text-emerald-400'}`}>{t.who}: </span>
-                    <span className="text-gray-300">{t.text}</span>
+
+          {/* Painel transcript + análise */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <h3 className="text-sm font-semibold text-gray-900">Transcrição simulada</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-2 font-semibold">CONVERSA</p>
+                <div className="bg-gray-950 rounded-lg p-3 space-y-2 font-mono text-xs max-h-52 overflow-y-auto">
+                  {resultado.transcript.slice(0, visibleLines).map((t, i) => (
+                    <div key={i}>
+                      <span className={`font-bold ${t.who === 'Agente' ? 'text-blue-400' : 'text-emerald-400'}`}>{t.who}: </span>
+                      <span className="text-gray-300">{t.text}</span>
+                    </div>
+                  ))}
+                  {visibleLines < resultado.transcript.length && (
+                    <span className="text-gray-600 animate-pulse">▊</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-2 font-semibold">ANÁLISE IA</p>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Gatilho principal',  value: resultado.analise?.gatilho_principal  || '—', color: 'text-amber-600' },
+                    { label: 'Próxima ação',        value: resultado.analise?.proxima_acao       || '—', color: 'text-blue-600' },
+                    { label: 'Sentimento',          value: resultado.analise?.sentimento         || '—', color: sentimentoCor(resultado.analise?.sentimento) },
+                    { label: 'Prob. agendamento',   value: `${resultado.analise?.probabilidade_agendamento ?? '—'}%`, color: 'text-emerald-600' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-1.5">
+                      <span className="text-xs text-gray-500">{item.label}</span>
+                      <span className={`text-xs font-mono font-semibold ${item.color}`}>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {resultado.analise?.pontos_fortes && resultado.analise.pontos_fortes.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-emerald-700 mb-1">Pontos fortes</p>
+                    <ul className="space-y-0.5">
+                      {resultado.analise.pontos_fortes.map((p, i) => (
+                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500">✓</span>{p}</li>
+                      ))}
+                    </ul>
                   </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-2 font-semibold">ANÁLISE IA</p>
-              <div className="space-y-2">
-                {[
-                  { label: 'Gatilho detectado', value: 'Preço', color: 'text-amber-600' },
-                  { label: 'Próxima ação', value: 'Redirecionar', color: 'text-blue-600' },
-                  { label: 'Sentimento', value: 'Neutro', color: 'text-gray-600' },
-                  { label: 'Probabilidade', value: '68%', color: 'text-emerald-600' },
-                ].map((item, i) => (
-                  <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-1.5">
-                    <span className="text-xs text-gray-500">{item.label}</span>
-                    <span className={`text-xs font-mono font-semibold ${item.color}`}>{item.value}</span>
+                )}
+                {resultado.analise?.pontos_melhoria && resultado.analise.pontos_melhoria.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">Melhorias</p>
+                    <ul className="space-y-0.5">
+                      {resultado.analise.pontos_melhoria.map((p, i) => (
+                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500">→</span>{p}</li>
+                      ))}
+                    </ul>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="grid grid-cols-4 gap-3 mb-3">
-          {[
-            { label: 'Objeções', value: '2' },
-            { label: 'Score', value: '84' },
-            { label: 'Gatilhos', value: '1/3' },
-            { label: 'Duração', value: '4m12s' },
-          ].map((k, i) => (
-            <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
-              <p className="text-lg font-mono font-bold text-gray-800">{k.value}</p>
-              <p className="text-xs text-gray-500">{k.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      {/* Certificações obrigatórias */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-gray-900">Certificações obrigatórias</h3>
-          <span className="text-xs text-gray-400">Próxima recertificação: 15/06/2026</span>
+          <span className="text-xs text-gray-400">Teste todos os cenários antes de ir para produção</span>
         </div>
-        <p className="text-xs text-gray-500 mb-3">O agente deve ser aprovado em todos os cenários abaixo antes de ir para produção.</p>
+        <p className="text-xs text-gray-500 mb-3">O agente deve ser aprovado em todos os cenários abaixo. Cada teste usa IA real para simular a situação.</p>
         <div className="space-y-2">
-          {certScenarios.map((c) => (
-            <div key={c.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 ${certStatus[c.id] === 'aprovado' ? 'border-emerald-200 bg-emerald-50' : certStatus[c.id] === 'reprovado' ? 'border-red-100 bg-red-50' : 'border-gray-100'}`}>
-              <span className="text-xs text-gray-700 flex-1">{c.label}</span>
-              {certStatus[c.id] ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-gray-700">{c.score}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded font-semibold ${certStatus[c.id] === 'aprovado' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{certStatus[c.id] === 'aprovado' ? 'APROVADO' : 'REPROVADO'}</span>
-                </div>
-              ) : (
-                <div className="flex gap-1.5">
-                  <button onClick={() => setCertStatus(p => ({ ...p, [c.id]: 'aprovado' }))} className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100">Testar</button>
-                </div>
-              )}
-            </div>
-          ))}
+          {CERT_SCENARIOS.map((c) => {
+            const cert = certResultados[c.id]
+            const loadingCert = certLoading[c.id]
+            return (
+              <div key={c.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 ${cert?.resultado === 'aprovado' ? 'border-emerald-200 bg-emerald-50' : cert?.resultado === 'reprovado' ? 'border-red-100 bg-red-50' : 'border-gray-100'}`}>
+                <span className="text-xs text-gray-700 flex-1">{c.label}</span>
+                {cert ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-gray-700">{cert.score}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded font-semibold ${resultadoBadge(cert.resultado)}`}>
+                      {cert.resultado.toUpperCase()}
+                    </span>
+                    <button
+                      onClick={() => rodarSimulacao(c.id, c.id)}
+                      disabled={loadingCert}
+                      className="text-xs text-gray-400 hover:text-gray-600 ml-1"
+                      title="Repetir teste"
+                    >
+                      ↺
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => rodarSimulacao(c.id, c.id)}
+                    disabled={loadingCert}
+                    className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 flex items-center gap-1"
+                  >
+                    {loadingCert ? <Loader2 size={10} className="animate-spin" /> : null}
+                    {loadingCert ? 'Testando...' : 'Testar'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
-        <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-2">
-          <p className="text-xs text-amber-700">⚠ Agente não pode entrar em produção com certificações pendentes. Conclua todos os testes antes do deploy.</p>
-        </div>
+        {Object.keys(certResultados).length < CERT_SCENARIOS.length && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-2">
+            <p className="text-xs text-amber-700">⚠ Agente não pode entrar em produção com certificações pendentes. Conclua todos os testes antes do deploy.</p>
+          </div>
+        )}
+        {Object.keys(certResultados).length === CERT_SCENARIOS.length && Object.values(certResultados).every(r => r.resultado === 'aprovado') && (
+          <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+            <p className="text-xs text-emerald-700 font-semibold">✓ Todos os cenários aprovados — agente certificado para produção.</p>
+          </div>
+        )}
       </div>
+
+      {/* Histórico */}
+      {historico.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico de simulações</h3>
+          {loadingHist && <div className="text-xs text-gray-400">Carregando...</div>}
+          <div className="space-y-2">
+            {historico.slice(0, 8).map((h, i) => (
+              <div key={i} className="flex items-center justify-between text-xs border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                <div>
+                  <span className="font-medium text-gray-700">{CERT_SCENARIOS.find(c => c.id === h.cenario)?.label || h.cenario}</span>
+                  <span className="text-gray-400 ml-2">{h.agente_nome || '—'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-gray-600">{h.score ?? '—'}</span>
+                  <span className={`px-2 py-0.5 rounded font-semibold ${resultadoBadge(h.resultado || 'inconclusivo')}`}>
+                    {(h.resultado || 'inconclusivo').toUpperCase()}
+                  </span>
+                  <span className="text-gray-400">{new Date((h as any).criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -5096,11 +5269,6 @@ export default function InteligenciaPage() {
       .catch(() => {})
   }, [])
 
-  const { data: simuladorData = [] } = useQuery({
-    queryKey: ['inteligencia-simulador'],
-    queryFn: () => inteligenciaSimuladorApi.list().then(r => r.data),
-  })
-
   const tabContent: Record<TabId, React.ReactNode> = {
     testes: <TabTestes />,
     qualidade: <TabQualidade />,
@@ -5114,7 +5282,7 @@ export default function InteligenciaPage() {
     evolucao: <TabEvolucao />,
     cross: <TabCross />,
     padroes: <TabPadroes />,
-    simulador: <TabSimulador simuladorVersoes={(simuladorData as any[]).length > 0 ? (simuladorData as any[]).map((s: any) => ({ ver: s.versao ?? '—', data: new Date(s.criado_em ?? Date.now()).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }), score: s.score_total != null ? `${s.score_total}%` : '—', objecoes: s.objecoes_aprovadas != null ? `${s.objecoes_aprovadas}/${s.objecoes_total ?? '?'}` : '—', status: s.status ?? '—' })) : undefined} />,
+    simulador: <TabSimulador />,
     icp: <TabICP />,
     ab: <TabAB />,
     mercado: <TabMercado />,
