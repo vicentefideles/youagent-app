@@ -5742,96 +5742,316 @@ function TabAB() {
   )
 }
 
+interface MercadoData {
+  total_ligacoes: number
+  periodo_dias: number
+  atualizado: string
+  objecoes: { tipo: string; label: string; count: number; pct: number }[]
+  concorrentes: { termo: string; count: number; pct: number }[]
+  budget: { label: string; count: number }[]
+  alertas: { frase: string; gatilho: string; eficacia: number | null; criado_em: string }[]
+  banco: { categoria: string; descricao: string; fonte: string | null; criado_em: string }[]
+}
+
+interface MercadoIA {
+  resumo?: string; oportunidade_principal?: string; risco_principal?: string
+  alertas?: { titulo: string; descricao: string; urgencia: string }[]
+  recomendacoes?: { acao: string; impacto_esperado: string }[]
+  concorrentes_detectados?: string[]
+  momento_mercado?: string; confianca?: number; gerado_em?: string; total_ligacoes?: number
+}
+
+const OBJECAO_COLOR = ['bg-red-400','bg-orange-400','bg-amber-400','bg-yellow-400','bg-gray-300','bg-gray-200']
+const MOMENTO_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  favoravel:    { label: 'Favorável',    color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+  neutro:       { label: 'Neutro',       color: 'text-gray-600',    bg: 'bg-gray-50 border-gray-200' },
+  desfavoravel: { label: 'Desfavorável', color: 'text-red-700',     bg: 'bg-red-50 border-red-200' },
+}
+
 function TabMercado() {
+  const [gerando, setGerando] = useState(false)
+  const [erroGerar, setErroGerar] = useState('')
+  const [ia, setIa] = useState<MercadoIA | null>(null)
+
+  const { data, isLoading } = useQuery<MercadoData>({
+    queryKey: ['mercado'],
+    queryFn: () => inteligenciaApi.mercado().then(r => r.data),
+    staleTime: 60000,
+  })
+
+  async function gerarRelatorio() {
+    setGerando(true); setErroGerar('')
+    try {
+      const res = await inteligenciaApi.mercadoGerar()
+      setIa(res.data as MercadoIA)
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Erro ao gerar relatório.'
+      setErroGerar(msg)
+    } finally { setGerando(false) }
+  }
+
+  const momentoCfg = MOMENTO_CONFIG[ia?.momento_mercado || 'neutro']
+  const ultimaAtualizacao = ia?.gerado_em
+    ? new Date(ia.gerado_em).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+    : 'nunca'
+
+  if (isLoading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 size={24} className="animate-spin text-gray-300" />
+    </div>
+  )
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Inteligência de Mercado</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Última atualização: nunca</p>
+
+      {/* ── Header ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+              <Globe size={17} className="text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Inteligência de Mercado</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {data?.total_ligacoes
+                  ? `${data.total_ligacoes.toLocaleString('pt-BR')} ligações analisadas — últimos ${data.periodo_dias} dias`
+                  : 'Nenhuma ligação no período'}
+                {' · '}Último relatório: {ultimaAtualizacao}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {ia?.momento_mercado && (
+              <div className={`border rounded-xl px-3 py-1.5 flex items-center gap-1.5 ${momentoCfg.bg}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${ia.momento_mercado === 'favoravel' ? 'bg-emerald-500' : ia.momento_mercado === 'desfavoravel' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                <span className={`text-xs font-semibold ${momentoCfg.color}`}>Mercado {momentoCfg.label}</span>
+              </div>
+            )}
+            <button onClick={gerarRelatorio} disabled={gerando}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-xl transition-colors font-semibold flex items-center gap-2 disabled:opacity-60">
+              {gerando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {gerando ? 'Analisando...' : 'Gerar relatório agora'}
+            </button>
+          </div>
         </div>
-        <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors font-semibold flex items-center gap-2">
-          <RefreshCw size={14} /> Gerar relatório agora
-        </button>
+        {erroGerar && <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{erroGerar}</p>}
       </div>
+
+      {/* ── Resumo IA ── */}
+      {ia?.resumo && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-7 h-7 bg-purple-50 rounded-lg flex items-center justify-center shrink-0">
+              <Brain size={14} className="text-purple-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Análise IA — {ia.total_ligacoes} ligações</p>
+              <p className="text-sm text-gray-800 leading-relaxed">{ia.resumo}</p>
+            </div>
+            {ia.confianca != null && (
+              <div className="text-right shrink-0">
+                <p className="text-xl font-bold font-mono text-gray-800">{ia.confianca}%</p>
+                <p className="text-xs text-gray-400">confiança</p>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {ia.oportunidade_principal && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex gap-2.5">
+                <TrendingUp size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 mb-0.5">Oportunidade</p>
+                  <p className="text-xs text-emerald-800 leading-relaxed">{ia.oportunidade_principal}</p>
+                </div>
+              </div>
+            )}
+            {ia.risco_principal && (
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex gap-2.5">
+                <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-red-700 mb-0.5">Risco</p>
+                  <p className="text-xs text-red-800 leading-relaxed">{ia.risco_principal}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Objeções mais frequentes</h3>
-          <p className="text-xs text-gray-400 mb-2">Extraídas de 1.842 ligações — últimos 30 dias</p>
-          <div className="space-y-2">
-            {[
-              { label: 'Preço / orçamento', pct: 38 },
-              { label: 'Já tem fornecedor', pct: 27 },
-              { label: 'Sem tempo agora', pct: 19 },
-              { label: 'Não é o decisor', pct: 11 },
-              { label: 'Outros', pct: 5 },
-            ].map((o, i) => (
-              <div key={i}>
-                <div className="flex justify-between text-xs mb-0.5">
-                  <span className="text-gray-600">{o.label}</span>
-                  <span className="font-mono font-semibold text-gray-800">{o.pct}%</span>
+
+        {/* ── Objeções ── */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">Objeções mais frequentes</h3>
+            <span className="text-xs text-gray-400">{data?.total_ligacoes?.toLocaleString('pt-BR') || 0} lig.</span>
+          </div>
+          {data?.objecoes && data.objecoes.length > 0 ? (
+            <div className="space-y-3">
+              {data.objecoes.map((o, i) => (
+                <div key={i}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-700 font-medium">{o.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400">{o.count}x</span>
+                      <span className="font-mono font-bold text-gray-800 w-8 text-right">{o.pct}%</span>
+                    </div>
+                  </div>
+                  <Bar pct={o.pct} color={OBJECAO_COLOR[i] || 'bg-gray-200'} />
                 </div>
-                <Bar pct={o.pct} color={i === 0 ? 'bg-red-400' : 'bg-amber-400'} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BarChart2 size={24} className="text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-gray-400">Sem dados de gatilhos ainda.</p>
+              <p className="text-xs text-gray-400">Gere um relatório para analisar.</p>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Concorrentes mencionados</h3>
-          <p className="text-xs text-gray-400 mb-2">Frequência de menção nas ligações</p>
-          <div className="space-y-2">
-            {[
-              { label: 'Concorrente A', pct: 44, action: 'Script de diferenciação ativo' },
-              { label: 'Concorrente B', pct: 31, action: 'Argumentação de ROI disponível' },
-              { label: 'Concorrente C', pct: 18, action: 'Sem contraponto cadastrado' },
-              { label: 'Outros', pct: 7, action: '' },
-            ].map((c, i) => (
-              <div key={i} className="border border-gray-100 rounded-lg px-3 py-2">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-medium text-gray-800">{c.label}</span>
-                  <span className="font-mono text-gray-600">{c.pct}%</span>
+        {/* ── Concorrentes ── */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">Concorrentes mencionados</h3>
+            <span className="text-xs text-gray-400">detecção automática</span>
+          </div>
+          {data?.concorrentes && data.concorrentes.length > 0 ? (
+            <div className="space-y-2">
+              {data.concorrentes.map((c, i) => (
+                <div key={i} className="border border-gray-100 rounded-xl px-3 py-2.5 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-800 capitalize">{c.termo}</p>
+                    <Bar pct={c.pct} color="bg-blue-300" />
+                  </div>
+                  <span className="text-xs font-mono font-bold text-gray-600 shrink-0">{c.pct}%</span>
                 </div>
-                {c.action && <p className="text-xs text-blue-600">{c.action}</p>}
-              </div>
-            ))}
-          </div>
+              ))}
+              {ia?.concorrentes_detectados && ia.concorrentes_detectados.length > 0 && (
+                <p className="text-xs text-blue-600 mt-2 pt-2 border-t border-gray-100">
+                  IA também detectou: {ia.concorrentes_detectados.join(', ')}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Users size={24} className="text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-gray-400">Nenhum concorrente identificado</p>
+              <p className="text-xs text-gray-400 mt-0.5">nas transcrições dos últimos 30 dias.</p>
+            </div>
+          )}
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-amber-800 mb-3">Sinalizações de Budget</h3>
-          <div className="space-y-2">
-            {[
-              { icon: '📉', label: 'Corte de custos mencionado', count: 47 },
-              { icon: '💰', label: 'Pediu proposta com preço', count: 38 },
-              { icon: '📋', label: 'Citou processo de aprovação', count: 22 },
-            ].map((s, i) => (
-              <div key={i} className="flex items-center gap-2 bg-white/60 rounded-lg px-3 py-2">
-                <span>{s.icon}</span>
-                <span className="text-xs text-amber-800 flex-1">{s.label}</span>
-                <span className="font-mono font-bold text-amber-700 text-xs">{s.count}x</span>
-              </div>
-            ))}
-          </div>
+        {/* ── Sinalizações de Budget ── */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Sinalizações de Budget</h3>
+          {data?.budget && data.budget.length > 0 ? (
+            <div className="space-y-2">
+              {data.budget.map((b, i) => (
+                <div key={i} className="flex items-center gap-3 border border-gray-100 rounded-xl px-3 py-2.5">
+                  <div className="w-7 h-7 bg-amber-50 rounded-lg flex items-center justify-center shrink-0">
+                    <Zap size={13} className="text-amber-500" />
+                  </div>
+                  <span className="text-xs text-gray-700 flex-1">{b.label}</span>
+                  <span className="font-mono font-bold text-amber-600 text-sm">{b.count}x</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Zap size={24} className="text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-gray-400">Sem sinalizações detectadas</p>
+              <p className="text-xs text-gray-400 mt-0.5">Gere um relatório para analisar.</p>
+            </div>
+          )}
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-amber-800 mb-3">Alertas cross-cliente</h3>
-          <div className="space-y-2">
-            {[
-              { icon: '⚡', label: 'Setor industrial: crescimento de 12% na demanda', urgente: true },
-              { icon: '⚠', label: 'Concorrente C lançando novo produto em Jun/26', urgente: true },
-              { icon: '📊', label: 'Taxa de conversão de Tecnologia subiu 8pp vs. mês anterior', urgente: false },
-            ].map((a, i) => (
-              <div key={i} className={`flex items-start gap-2 rounded-lg px-3 py-2 ${a.urgente ? 'bg-amber-100' : 'bg-white/60'}`}>
-                <span className="shrink-0 mt-0.5">{a.icon}</span>
-                <p className="text-xs text-amber-800">{a.label}</p>
-              </div>
-            ))}
-          </div>
+        {/* ── Padrões detectados / Banco de argumentos ── */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Banco de argumentos de mercado</h3>
+          {data?.banco && data.banco.length > 0 ? (
+            <div className="space-y-2">
+              {data.banco.slice(0, 5).map((b, i) => (
+                <div key={i} className="border border-gray-100 rounded-xl px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2 mb-0.5">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{b.categoria}</span>
+                    {b.fonte && <span className="text-xs text-gray-300 shrink-0">{b.fonte}</span>}
+                  </div>
+                  <p className="text-xs text-gray-700 leading-relaxed">{b.descricao}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Database size={24} className="text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-gray-400">Nenhum argumento cadastrado.</p>
+              <p className="text-xs text-gray-400 mt-0.5">Adicione na aba <strong>Banco</strong>.</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Alertas IA ── */}
+      {ia?.alertas && ia.alertas.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Alertas gerados pela IA</p>
+          <div className="grid grid-cols-3 gap-3">
+            {ia.alertas.map((a, i) => {
+              const urgCfg = a.urgencia === 'alta'
+                ? { border: 'border-red-200 bg-red-50', title: 'text-red-700', desc: 'text-red-600' }
+                : a.urgencia === 'media'
+                ? { border: 'border-amber-200 bg-amber-50', title: 'text-amber-700', desc: 'text-amber-600' }
+                : { border: 'border-gray-100 bg-gray-50', title: 'text-gray-700', desc: 'text-gray-500' }
+              return (
+                <div key={i} className={`border rounded-xl px-4 py-3 ${urgCfg.border}`}>
+                  <p className={`text-xs font-semibold mb-1 ${urgCfg.title}`}>{a.titulo}</p>
+                  <p className={`text-xs leading-relaxed ${urgCfg.desc}`}>{a.descricao}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recomendações IA ── */}
+      {ia?.recomendacoes && ia.recomendacoes.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recomendações de ação</p>
+          <div className="space-y-2">
+            {ia.recomendacoes.map((r, i) => (
+              <div key={i} className="flex items-start gap-3 border border-gray-100 rounded-xl px-4 py-3">
+                <div className="w-5 h-5 bg-blue-50 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-blue-600">{i + 1}</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-800">{r.acao}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{r.impacto_esperado}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state — sem dados e sem relatório IA */}
+      {!ia && (!data?.objecoes || data.objecoes.length === 0) && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
+          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <Globe size={22} className="text-blue-400" />
+          </div>
+          <p className="text-gray-700 font-semibold text-sm mb-1">Nenhum dado de mercado ainda</p>
+          <p className="text-gray-400 text-xs max-w-sm mx-auto leading-relaxed mb-4">
+            Clique em "Gerar relatório agora" para analisar suas ligações e descobrir padrões de objeções, concorrentes mencionados e sinalizações de budget.
+          </p>
+          <button onClick={gerarRelatorio} disabled={gerando}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2.5 rounded-xl font-semibold transition-colors flex items-center gap-2 mx-auto disabled:opacity-60">
+            {gerando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {gerando ? 'Analisando...' : 'Gerar relatório agora'}
+          </button>
+        </div>
+      )}
+
     </div>
   )
 }

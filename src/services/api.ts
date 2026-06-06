@@ -136,10 +136,13 @@ export const inteligenciaApi = {
   getIcpPerfil: () => api.get('/inteligencia/icp/perfil'),
   getHorariosAnalise: () => api.get('/inteligencia/horarios/analise'),
   // A/B Tests
-  abList:   ()                          => api.get('/inteligencia/ab-tests'),
-  abGerar:  (data: unknown)             => api.post('/inteligencia/ab-tests/gerar', data),
-  abCreate: (data: unknown)             => api.post('/inteligencia/ab-tests', data),
-  abPatch:  (id: string, data: unknown) => api.patch(`/inteligencia/ab-tests/${id}`, data),
+  abList:       ()                          => api.get('/inteligencia/ab-tests'),
+  abGerar:      (data: unknown)             => api.post('/inteligencia/ab-tests/gerar', data),
+  abCreate:     (data: unknown)             => api.post('/inteligencia/ab-tests', data),
+  abPatch:      (id: string, data: unknown) => api.patch(`/inteligencia/ab-tests/${id}`, data),
+  // Mercado
+  mercado:      ()                          => api.get('/inteligencia/mercado'),
+  mercadoGerar: ()                          => api.post('/inteligencia/mercado/gerar', {}),
 }
 
 // WhatsApp — templates via Telnyx (automações)
