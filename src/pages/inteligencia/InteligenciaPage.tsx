@@ -7,7 +7,7 @@ import {
   Target, TestTube2, Globe, Cpu, CheckCircle,
   Upload, Trash2, RotateCcw, Zap,
   AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star, X,
-  MessageSquare, Send,
+  MessageSquare, Send, MapPin,
 } from 'lucide-react'
 import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi, agentesApi } from '@/services/api'
 
@@ -5093,18 +5093,49 @@ function TabICP() {
 
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white flex items-center justify-between"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#1e3a5f)' }}
-      >
-        <div>
-          <h2 className="text-lg font-semibold">🎯 Perfil de Cliente Ideal — ICP</h2>
-          <p className="text-sm text-white/70 mt-0.5">
-            {perfil ? `Calculado com base em ${perfil.total.toLocaleString('pt-BR')} ligações reais` : 'Calculando com base nas suas ligações reais...'}
-          </p>
+
+      {/* ── Header ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                <Target size={14} className="text-purple-600" />
+              </div>
+              <h2 className="text-base font-bold text-gray-900">Perfil de Cliente Ideal — ICP</h2>
+            </div>
+            <p className="text-sm text-gray-500 leading-relaxed max-w-xl">
+              A IA analisa todas as ligações realizadas e identifica <span className="text-gray-800 font-medium">quais perfis de empresa e cargo convertem mais</span>. Esse perfil alimenta automaticamente a Discadora e as Campanhas.
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            {perfil && perfil.total > 0 ? (
+              <>
+                <p className="text-2xl font-bold font-mono text-gray-900">{perfil.total.toLocaleString('pt-BR')}</p>
+                <p className="text-xs text-gray-400">ligações analisadas</p>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">Sem dados ainda</span>
+            )}
+          </div>
         </div>
-        <div className="text-right text-xs text-white/60">
-          {perfil?.atualizado && <p>Atualizado agora</p>}
+        {/* Conexões */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { title: 'Discadora', desc: 'Score ICP exibido em cada ligação ao vivo e no histórico', color: 'bg-blue-50 text-blue-600', dot: 'bg-blue-500' },
+            { title: 'Campanhas', desc: 'ICP mínimo configurável por campanha — filtro automático de leads', color: 'bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500' },
+            { title: 'Relatórios', desc: 'Taxa de conversão por perfil para refinar a lista de prospecção', color: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500' },
+          ].map(c => (
+            <div key={c.title} className="border border-gray-100 rounded-xl px-3 py-3 flex gap-2.5">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${c.color}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-700">{c.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{c.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -5113,51 +5144,62 @@ function TabICP() {
           <Loader2 size={18} className="animate-spin" /> Analisando ligações...
         </div>
       ) : semDados ? (
-        <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
-          <p className="text-3xl mb-3">🎯</p>
-          <p className="text-gray-600 font-semibold text-sm mb-1">Nenhuma ligação analisada ainda</p>
-          <p className="text-gray-400 text-xs">O ICP é calculado automaticamente após as primeiras ligações realizadas.</p>
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
+          <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <Target size={22} className="text-purple-400" />
+          </div>
+          <p className="text-gray-700 font-semibold text-sm mb-1">Nenhuma ligação analisada ainda</p>
+          <p className="text-gray-400 text-xs max-w-sm mx-auto leading-relaxed">
+            O ICP é calculado automaticamente após as primeiras ligações. Inicie uma campanha na Discadora e os dados aparecerão aqui em tempo real.
+          </p>
+          <button onClick={() => navigate('/campanhas')}
+            className="mt-4 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-xl transition-colors">
+            Criar primeira campanha →
+          </button>
         </div>
       ) : (
         <>
           {/* Top picks */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Setor top', value: perfil?.top.setor ?? '—', icon: '🏆', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-              { label: 'Cargo decisor', value: perfil?.top.cargo ?? '—', icon: '👤', color: 'text-blue-600 bg-blue-50 border-blue-100' },
-              { label: 'Estado top', value: perfil?.top.estado ?? '—', icon: '📍', color: 'text-purple-600 bg-purple-50 border-purple-100' },
+              { label: 'Setor com mais conversões', value: perfil?.top.setor ?? '—', icon: <Target size={16}/>, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+              { label: 'Cargo do decisor ideal',    value: perfil?.top.cargo  ?? '—', icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>, color: 'text-blue-600 bg-blue-50 border-blue-100' },
+              { label: 'Estado com mais negócios',  value: perfil?.top.estado ?? '—', icon: <MapPin size={16}/>, color: 'text-purple-600 bg-purple-50 border-purple-100' },
             ].map((k, i) => (
-              <div key={i} className={`border rounded-xl p-4 text-center ${k.color}`}>
-                <p className="text-xl mb-1">{k.icon}</p>
-                <p className="text-xs font-medium opacity-70 mb-0.5">{k.label}</p>
-                <p className="text-base font-bold">{k.value}</p>
+              <div key={i} className={`border-2 rounded-2xl p-4 ${k.color}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {k.icon}
+                  <p className="text-xs font-medium opacity-70">{k.label}</p>
+                </div>
+                <p className="text-lg font-bold truncate">{k.value}</p>
               </div>
             ))}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             {/* Conversão por setor */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Conversão por setor</h3>
-                <button onClick={exportarCSV} className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1">
-                  <Download size={11}/> Exportar
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Conversão por setor</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Taxa de agendamentos por segmento de mercado</p>
+                </div>
+                <button onClick={exportarCSV} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 border border-blue-100 bg-blue-50 rounded-lg px-2 py-1">
+                  <Download size={11}/> CSV
                 </button>
               </div>
               <div className="space-y-3">
-                {setores.length === 0 ? (
-                  <p className="text-xs text-gray-400">Sem dados de segmento nos contatos.</p>
-                ) : setores.map((s, i) => (
+                {setores.map((s, i) => (
                   <div key={i}>
-                    <div className="flex justify-between text-xs mb-0.5">
-                      <span className="text-gray-700 font-medium flex items-center gap-1">
-                        {i === 0 && <span className="text-amber-500 text-xs">TOP</span>}
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700 font-medium flex items-center gap-1.5">
+                        {i === 0 && <span className="bg-amber-100 text-amber-700 text-2xs font-bold px-1.5 py-0.5 rounded-full">TOP</span>}
                         {s.label}
                       </span>
                       <span className="font-mono font-bold text-gray-900">{s.pct}%</span>
                     </div>
-                    <Bar pct={s.pct} color={i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-amber-400' : 'bg-blue-400'} />
-                    <p className="text-xs text-gray-400 mt-0.5">{s.total} ligações · {s.sucesso} conversões</p>
+                    <Bar pct={s.pct} color={i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-blue-400' : 'bg-gray-300'} />
+                    <p className="text-xs text-gray-400 mt-0.5">{s.total} ligações · {s.sucesso} agendamentos</p>
                   </div>
                 ))}
               </div>
@@ -5165,62 +5207,67 @@ function TabICP() {
 
             <div className="space-y-4">
               {/* Por cargo */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Por cargo do decisor</h3>
-                {cargos.length === 0 ? (
-                  <p className="text-xs text-gray-400">Sem dados de cargo nos contatos.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {cargos.slice(0, 5).map((c, i) => (
-                      <div key={i}>
-                        <div className="flex justify-between text-xs mb-0.5">
-                          <span className="text-gray-600 truncate max-w-[140px]">{c.label}</span>
-                          <span className="font-mono text-gray-900">{c.pct}%</span>
-                        </div>
-                        <Bar pct={c.pct} color="bg-purple-500" />
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Por cargo do decisor</p>
+                <p className="text-xs text-gray-400 mb-3">Quais cargos agendaram mais</p>
+                <div className="space-y-2.5">
+                  {cargos.slice(0, 5).map((c, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-700 font-medium truncate max-w-[150px] flex items-center gap-1.5">
+                          {i === 0 && <span className="bg-purple-100 text-purple-700 text-2xs font-bold px-1.5 py-0.5 rounded-full">TOP</span>}
+                          {c.label}
+                        </span>
+                        <span className="font-mono font-bold text-gray-900">{c.pct}%</span>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <Bar pct={c.pct} color={i === 0 ? 'bg-purple-500' : 'bg-purple-200'} />
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Por estado */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Por estado / região</h3>
-                {estados.length === 0 ? (
-                  <p className="text-xs text-gray-400">Sem dados de estado nos contatos.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {estados.slice(0, 4).map((e, i) => (
-                      <div key={i}>
-                        <div className="flex justify-between text-xs mb-0.5">
-                          <span className="text-gray-600">{e.label}</span>
-                          <span className="font-mono text-gray-900">{e.pct}%</span>
-                        </div>
-                        <Bar pct={e.pct} color="bg-amber-400" />
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Por estado / região</p>
+                <p className="text-xs text-gray-400 mb-3">Concentração geográfica dos agendamentos</p>
+                <div className="space-y-2.5">
+                  {estados.slice(0, 4).map((e, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-700 font-medium flex items-center gap-1.5">
+                          {i === 0 && <span className="bg-amber-100 text-amber-700 text-2xs font-bold px-1.5 py-0.5 rounded-full">TOP</span>}
+                          {e.label}
+                        </span>
+                        <span className="font-mono font-bold text-gray-900">{e.pct}%</span>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <Bar pct={e.pct} color={i === 0 ? 'bg-amber-400' : 'bg-amber-200'} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Recomendação estratégica */}
           {perfil && perfil.total > 0 && (
-            <div className="rounded-xl p-5 text-white" style={{ background: 'linear-gradient(135deg,#1a56e8,#2d1b69)' }}>
-              <div className="flex items-start justify-between">
+            <div className="bg-white border-2 border-blue-100 rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs text-white/60 mb-1 uppercase tracking-wide">Recomendação estratégica</p>
-                  <p className="text-sm font-semibold mb-0.5">
-                    Foque em <strong>{perfil.top.setor}</strong> no estado <strong>{perfil.top.estado}</strong>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M8 1v14M1 8h14"/></svg>
+                    </div>
+                    <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Recomendação estratégica</p>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900 mb-1">
+                    Foque em <span className="text-blue-600">{perfil.top.setor}</span> no estado <span className="text-blue-600">{perfil.top.estado}</span>
                   </p>
-                  <p className="text-xs text-white/70">
-                    Decisor ideal: <strong>{perfil.top.cargo}</strong> · {setores[0]?.pct ?? 0}% de conversão nesse perfil
+                  <p className="text-xs text-gray-500">
+                    Decisor ideal: <span className="font-semibold text-gray-700">{perfil.top.cargo}</span> · {setores[0]?.pct ?? 0}% de conversão nesse perfil
                   </p>
                 </div>
                 <button
-                  className="bg-white text-blue-600 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors shrink-0 ml-4"
+                  className="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-blue-700 transition-colors shrink-0 shadow-sm"
                   onClick={() => navigate('/campanhas')}
                 >Criar campanha →</button>
               </div>
