@@ -143,6 +143,10 @@ export const inteligenciaApi = {
   // Mercado
   mercado:      ()                          => api.get('/inteligencia/mercado'),
   mercadoGerar: ()                          => api.post('/inteligencia/mercado/gerar', {}),
+  // Sandbox
+  sandboxDiagnostico: ()                   => api.get('/inteligencia/sandbox/diagnostico'),
+  sandboxInterativo:  (data: unknown)      => api.post('/inteligencia/simulador/interativo', data),
+  sandboxScore:       (data: unknown)      => api.post('/inteligencia/sandbox/score', data),
 }
 
 // WhatsApp — templates via Telnyx (automações)

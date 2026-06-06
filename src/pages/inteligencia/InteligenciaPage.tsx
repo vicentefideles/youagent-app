@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -6150,123 +6150,373 @@ function TabMercado() {
   )
 }
 
+interface DiagAgente { id: string; nome: string; status: string; telnyx_ok: boolean; telnyx_assistant_id: string | null; score_certificacao: number | null; certificado: boolean }
+interface DiagData { timestamp: string; latencia_ms: number; webhook_url: string; resumo: { total_agentes: number; com_telnyx: number; sem_telnyx: number; ativos: number; certificados: number; integracao_ok: boolean }; agentes: DiagAgente[] }
+interface SandboxScore { score_geral: number; dimensoes: { label: string; score: number; comentario: string }[]; ponto_forte: string; ponto_melhoria: string; nota: string }
+
 function TabSandbox() {
-  const [simStarted, setSimStarted] = useState(false)
-  const [showScore, setShowScore] = useState(false)
-  const lines = [
-    { who: 'Agente', text: 'Bom dia! Falo com o responsável pelas decisões de tecnologia?' },
-    { who: 'Lead', text: 'Sim. Quem fala e o que deseja?' },
-    { who: 'Agente', text: 'Meu nome é Julia, da ETZ. Tenho uma solução que pode reduzir em 40% o tempo do seu time de SDR.' },
-  ]
+  const [modo, setModo] = useState<'treino' | 'diagnostico'>('treino')
+
+  // ── Treino de objeções ────────────────────────────────────────────────────
+  const { data: agentes = [] } = useQuery({
+    queryKey: ['agentes-lista'],
+    queryFn: () => agentesApi.list().then(r => r.data as { id: string; nome: string }[]),
+  })
+  const [agenteId, setAgenteId]   = useState('')
+  const [chat, setChat]           = useState<{ who: string; text: string; analise?: { gatilho?: string; sentimento?: string; fase?: string; probabilidade?: number } }[]>([])
+  const [input, setInput]         = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [iniciado, setIniciado]   = useState(false)
+  const [scoreLoading, setScoreLoading] = useState(false)
+  const [score, setScore]         = useState<SandboxScore | null>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat])
+  useEffect(() => { if (agentes.length > 0 && !agenteId) setAgenteId(agentes[0].id) }, [agentes])
+
+  async function enviar() {
+    if (!input.trim() || chatLoading) return
+    const msg = input.trim()
+    setInput('')
+    const novoChat = [...chat, { who: 'Você (Lead)', text: msg }]
+    setChat(novoChat)
+    setChatLoading(true)
+    try {
+      const res = await inteligenciaApi.sandboxInterativo({ agente_id: agenteId, historico: novoChat.map(h => ({ who: h.who.startsWith('Você') ? 'Lead' : 'Agente', text: h.text })), mensagem_lead: msg })
+      const d = res.data as { resposta: string; analise?: { gatilho?: string; sentimento?: string; fase?: string; probabilidade?: number } }
+      setChat(prev => [...prev, { who: 'Agente', text: d.resposta, analise: d.analise }])
+    } catch { setChat(prev => [...prev, { who: 'Agente', text: '(erro ao responder)' }]) }
+    finally { setChatLoading(false) }
+  }
+
+  async function finalizarEPontuar() {
+    if (chat.length < 2) return
+    setScoreLoading(true)
+    try {
+      const agNome = agentes.find(a => a.id === agenteId)?.nome || 'Agente'
+      const res = await inteligenciaApi.sandboxScore({ historico: chat.map(h => ({ who: h.who.startsWith('Você') ? 'Lead' : 'Agente', text: h.text })), agente_nome: agNome })
+      setScore(res.data as SandboxScore)
+    } catch { /* silent */ }
+    finally { setScoreLoading(false) }
+  }
+
+  function reiniciar() { setChat([]); setScore(null); setIniciado(false); setInput('') }
+
+  // ── Diagnóstico Telnyx ───────────────────────────────────────────────────
+  const { data: diag, isLoading: diagLoading, refetch: refetchDiag } = useQuery<DiagData>({
+    queryKey: ['sandbox-diagnostico'],
+    queryFn: () => inteligenciaApi.sandboxDiagnostico().then(r => r.data),
+    enabled: modo === 'diagnostico',
+    staleTime: 30000,
+  })
+
+  const notaCor = (n: string) =>
+    n?.startsWith('A') ? 'text-emerald-600' : n?.startsWith('B') ? 'text-amber-600' : 'text-red-600'
+  const scoreCor = (s: number) =>
+    s >= 80 ? 'text-emerald-600' : s >= 60 ? 'text-amber-600' : 'text-red-500'
+
   return (
-    <div className="grid grid-cols-2 gap-4" style={{ gridTemplateColumns: '320px 1fr' }}>
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Persona do lead</h3>
-        <div className="space-y-2">
-          <div>
-            <label className="text-xs text-gray-500 font-medium">Segmento</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-blue-200">
-              <option>Energia Solar</option>
-              <option>Construção Civil</option>
-              <option>Saúde</option>
-              <option>Tecnologia</option>
-              <option>Varejo B2B</option>
-              <option>Indústria</option>
-            </select>
+    <div className="space-y-4">
+
+      {/* ── Header com pill selector ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center shrink-0">
+              <Cpu size={17} className="text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Sandbox</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {modo === 'treino'
+                  ? 'Treine objeções ao vivo — você é o lead, o agente responde em tempo real'
+                  : 'Diagnóstico da integração Telnyx — webhook, latência e status de cada agente'}
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 font-medium">Cargo do decisor</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-blue-200">
-              <option>CEO</option>
-              <option>Gerente Comercial</option>
-              <option>Sócio</option>
-              <option>Coordenador</option>
-              <option>Analista</option>
-            </select>
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
+            {([['treino', 'Treino de Objeções'], ['diagnostico', 'Diagnóstico Telnyx']] as const).map(([id, label]) => (
+              <button key={id} onClick={() => setModo(id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${modo === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                {label}
+              </button>
+            ))}
           </div>
-          <div>
-            <label className="text-xs text-gray-500 font-medium">Dificuldade</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-blue-200">
-              <option>Fácil</option>
-              <option>Médio</option>
-              <option>Difícil</option>
-              <option>Gatekeeper</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 font-medium">Agente</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-blue-200">
-              <option>Ana</option>
-              <option>Carlos</option>
-              <option>Julia</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={() => { setSimStarted(true); setShowScore(false) }}
-            className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
-          >
-            <Play size={13} /> Iniciar
-          </button>
-          <button
-            onClick={() => { setSimStarted(false); setShowScore(false) }}
-            className="bg-gray-100 text-gray-600 rounded-lg py-2 px-3 text-sm hover:bg-gray-200 transition-colors"
-          >
-            <RotateCcw size={14} />
-          </button>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Simulação em andamento</h3>
-          {simStarted ? (
-            <>
-              <div className="bg-gray-950 rounded-lg p-3 font-mono text-xs max-h-40 overflow-y-auto mb-3 space-y-2">
-                {lines.map((l, i) => (
-                  <div key={i}>
-                    <span className={`font-bold ${l.who === 'Agente' ? 'text-blue-400' : 'text-emerald-400'}`}>{l.who}: </span>
-                    <span className="text-gray-300">{l.text}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button className="flex-1 bg-gray-100 text-gray-600 text-xs py-1.5 rounded-lg hover:bg-gray-200 transition-colors" onClick={() => setSimStarted(false)}>Pausar</button>
-                <button onClick={() => setShowScore(true)} className="flex-1 bg-emerald-600 text-white text-xs py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">Finalizar e pontuar</button>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8 text-gray-400">
-              <Play size={24} className="mx-auto mb-2" />
-              <p className="text-sm">Configure o lead e inicie a simulação</p>
-            </div>
-          )}
-        </div>
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* MODO TREINO                                                    */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {modo === 'treino' && (
+        <div className="grid gap-4" style={{ gridTemplateColumns: '280px 1fr' }}>
 
-        {showScore && (
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Score da simulação</h3>
-            <div className="grid grid-cols-4 gap-3 mb-3">
+          {/* Painel esquerdo — config */}
+          <div className="space-y-3">
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Configurar treino</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Agente</label>
+                  <select value={agenteId} onChange={e => setAgenteId(e.target.value)} disabled={iniciado}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-60">
+                    {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                  </select>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-3">
+                  <p className="text-xs font-semibold text-indigo-800 mb-1">Como funciona</p>
+                  <p className="text-xs text-indigo-700 leading-relaxed">Você digita como se fosse o lead. O agente responde usando os argumentos e o roteiro reais cadastrados. Ao finalizar, a IA calcula o score do agente por dimensão.</p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                {!iniciado ? (
+                  <button onClick={() => setIniciado(true)} disabled={!agenteId}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50">
+                    <Play size={13} /> Iniciar treino
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={finalizarEPontuar} disabled={scoreLoading || chat.length < 2}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50">
+                      {scoreLoading ? <Loader2 size={12} className="animate-spin" /> : <Star size={12} />}
+                      {scoreLoading ? 'Calculando...' : 'Finalizar e pontuar'}
+                    </button>
+                    <button onClick={reiniciar} className="bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl py-2 px-3 text-sm transition-colors">
+                      <RotateCcw size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Score */}
+            {score && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Score do agente</h3>
+                  <span className={`text-2xl font-bold font-mono ${notaCor(score.nota)}`}>{score.nota}</span>
+                </div>
+                <div className="space-y-2 mb-3">
+                  {score.dimensoes.map((d, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-gray-600">{d.label}</span>
+                        <span className={`font-bold font-mono ${scoreCor(d.score)}`}>{d.score}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${d.score >= 80 ? 'bg-emerald-400' : d.score >= 60 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${d.score}%` }} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{d.comentario}</p>
+                    </div>
+                  ))}
+                </div>
+                {score.ponto_forte && (
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 mb-2">
+                    <p className="text-xs font-semibold text-emerald-700 mb-0.5">✓ Ponto forte</p>
+                    <p className="text-xs text-emerald-700">{score.ponto_forte}</p>
+                  </div>
+                )}
+                {score.ponto_melhoria && (
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                    <p className="text-xs font-semibold text-amber-700 mb-0.5">↗ Melhorar</p>
+                    <p className="text-xs text-amber-700">{score.ponto_melhoria}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Painel direito — chat */}
+          <div className="bg-white border border-gray-200 rounded-2xl flex flex-col" style={{ minHeight: '480px' }}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">
+                {iniciado ? `Conversando com ${agentes.find(a => a.id === agenteId)?.nome || 'agente'}` : 'Simulação'}
+              </h3>
+              {chat.length > 0 && (
+                <span className="text-xs text-gray-400">{Math.ceil(chat.length / 2)} turnos</span>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {!iniciado ? (
+                <div className="flex flex-col items-center justify-center h-full py-16 text-center">
+                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <MessageSquare size={20} className="text-indigo-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Pronto para treinar?</p>
+                  <p className="text-xs text-gray-400 max-w-xs leading-relaxed">Selecione o agente, clique em "Iniciar treino" e comece a digitar como se você fosse um lead. O agente vai responder usando os argumentos reais do CI.</p>
+                </div>
+              ) : chat.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full py-16 text-center">
+                  <p className="text-xs text-gray-400">Digite sua primeira mensagem como lead...</p>
+                </div>
+              ) : (
+                chat.map((m, i) => {
+                  const isLead = m.who.startsWith('Você')
+                  return (
+                    <div key={i} className={`flex ${isLead ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${isLead ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                        <p className={`text-xs font-semibold mb-0.5 ${isLead ? 'text-indigo-200' : 'text-gray-500'}`}>{m.who}</p>
+                        <p className="text-sm leading-relaxed">{m.text}</p>
+                        {m.analise?.fase && (
+                          <p className={`text-xs mt-1 ${isLead ? 'text-indigo-300' : 'text-gray-400'}`}>
+                            fase: {m.analise.fase} · {m.analise.probabilidade ?? 0}% prob.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 rounded-2xl px-4 py-3 flex items-center gap-2">
+                    <Loader2 size={13} className="animate-spin text-gray-400" />
+                    <span className="text-xs text-gray-400">digitando...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {iniciado && !score && (
+              <div className="p-4 border-t border-gray-100">
+                <div className="flex gap-2">
+                  <input value={input} onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && enviar()}
+                    placeholder="Digite como o lead faria uma objeção..."
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200" />
+                  <button onClick={enviar} disabled={chatLoading || !input.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                    <Send size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* MODO DIAGNÓSTICO TELNYX                                       */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {modo === 'diagnostico' && (
+        <div className="space-y-4">
+
+          {/* Resumo geral */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <p className="text-xs text-gray-400 mb-1">Webhook URL</p>
+              {diagLoading ? <div className="h-4 bg-gray-100 rounded animate-pulse" /> : (
+                <p className="text-xs font-mono text-gray-700 break-all leading-relaxed">{diag?.webhook_url || '—'}</p>
+              )}
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <p className="text-xs text-gray-400 mb-1">Latência Railway</p>
+              {diagLoading ? <div className="h-6 bg-gray-100 rounded animate-pulse" /> : (
+                <div className="flex items-end gap-1">
+                  <span className="text-2xl font-bold font-mono text-gray-900">{diag?.latencia_ms ?? '—'}</span>
+                  <span className="text-xs text-gray-400 mb-0.5">ms</span>
+                </div>
+              )}
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Integração Telnyx</p>
+                {diagLoading ? <div className="h-6 bg-gray-100 rounded animate-pulse w-20" /> : (
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${diag?.resumo.integracao_ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                    <span className={`text-sm font-bold ${diag?.resumo.integracao_ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                      {diag?.resumo.integracao_ok ? 'Conectada' : 'Desconectada'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button onClick={() => refetchDiag()} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <RefreshCw size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* KPIs agentes */}
+          {!diagLoading && diag && (
+            <div className="grid grid-cols-4 gap-3">
               {[
-                { label: 'Aderência', value: '88%', color: 'text-blue-600' },
-                { label: 'Naturalidade', value: '4.2/5', color: 'text-emerald-600' },
-                { label: 'Gatilhos', value: '2/4', color: 'text-amber-600' },
-                { label: 'Nota geral', value: 'A-', color: 'text-purple-600' },
-              ].map((s, i) => (
-                <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
-                  <p className={`text-lg font-mono font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-gray-500">{s.label}</p>
+                { label: 'Total de agentes', value: diag.resumo.total_agentes, color: 'text-gray-900' },
+                { label: 'Com Telnyx', value: diag.resumo.com_telnyx, color: 'text-emerald-600' },
+                { label: 'Sem Telnyx', value: diag.resumo.sem_telnyx, color: diag.resumo.sem_telnyx > 0 ? 'text-red-500' : 'text-gray-400' },
+                { label: 'Certificados', value: diag.resumo.certificados, color: 'text-blue-600' },
+              ].map((k, i) => (
+                <div key={i} className="bg-white border border-gray-200 rounded-2xl px-4 py-3 text-center">
+                  <p className={`text-2xl font-bold font-mono ${k.color}`}>{k.value}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{k.label}</p>
                 </div>
               ))}
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs text-blue-700 font-semibold mb-0.5">Sugestão de melhoria</p>
-              <p className="text-xs text-blue-600">Usar gatilho de urgência mais cedo, antes do lead mencionar preço.</p>
+          )}
+
+          {/* Tabela de agentes */}
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Status por agente</h3>
+              <p className="text-xs text-gray-400">Atualizado: {diag ? new Date(diag.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
             </div>
+            {diagLoading ? (
+              <div className="p-6 space-y-3">
+                {[1,2,3].map(i => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}
+              </div>
+            ) : !diag?.agentes || diag.agentes.length === 0 ? (
+              <div className="text-center py-12">
+                <Cpu size={24} className="text-gray-200 mx-auto mb-2" />
+                <p className="text-xs text-gray-400">Nenhum agente cadastrado.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {diag.agentes.map((ag, i) => (
+                  <div key={i} className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{ag.nome}</p>
+                      {ag.telnyx_assistant_id && (
+                        <p className="text-xs font-mono text-gray-400 truncate">{ag.telnyx_assistant_id}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ag.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {ag.status}
+                      </span>
+                      <div className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${ag.telnyx_ok ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-600'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${ag.telnyx_ok ? 'bg-blue-400' : 'bg-red-400'}`} />
+                        {ag.telnyx_ok ? 'Telnyx OK' : 'Sem Telnyx'}
+                      </div>
+                      {ag.score_certificacao != null && (
+                        <span className={`text-xs font-mono font-bold ${scoreCor(ag.score_certificacao)}`}>{ag.score_certificacao}pts</span>
+                      )}
+                      {ag.certificado && (
+                        <CheckCircle size={14} className="text-emerald-500" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Aviso sem Telnyx */}
+          {!diagLoading && diag && diag.resumo.sem_telnyx > 0 && (
+            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
+              <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-amber-800">
+                  {diag.resumo.sem_telnyx} agente{diag.resumo.sem_telnyx > 1 ? 's' : ''} sem Telnyx configurado
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  Agentes sem <code className="bg-amber-100 px-1 rounded">telnyx_assistant_id</code> não conseguem fazer ligações. Vá em <strong>Agentes → Editar → Integração Telnyx</strong> para configurar.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
