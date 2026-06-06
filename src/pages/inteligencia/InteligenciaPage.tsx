@@ -2893,19 +2893,6 @@ function TabAjusteFino() {
     ? Math.max(...scores) - Math.min(...scores)
     : null
 
-  // ── Taxa de conversão por estado (sotaque regional) ───────────────────────
-  const porEstado: Record<string, { total: number; sucesso: number }> = {}
-  ligsRaw.forEach((l: any) => {
-    const estado = l.contatos?.estado
-    if (!estado) return
-    if (!porEstado[estado]) porEstado[estado] = { total: 0, sucesso: 0 }
-    porEstado[estado].total++
-    if (l.resultado === 'agendou' || l.resultado === 'transferida') porEstado[estado].sucesso++
-  })
-  const regioes = Object.entries(porEstado)
-    .map(([estado, d]) => ({ estado, taxa: d.total > 0 ? Math.round((d.sucesso / d.total) * 100) : 0, total: d.total }))
-    .sort((a, b) => b.taxa - a.taxa)
-
   const GATILHOS = [
     { value: 'urgencia', label: 'Urgência' },
     { value: 'proposta', label: 'Proposta de valor' },
