@@ -1700,26 +1700,59 @@ function TabBanco() {
   const [salvando, setSalvando] = useState(false)
   const [erroSalvar, setErroSalvar] = useState('')
   const [deletando, setDeletando] = useState<string | null>(null)
+  // Resultado de extração URL — múltiplos argumentos
+  const [extraidos, setExtraidos] = useState<{descricao:string,categoria:string,selecionado:boolean}[]>([])
+  const [fonteExtraida, setFonteExtraida] = useState('')
+  const [validadeExtraida, setValidadeExtraida] = useState('')
+  const [salvandoExtraidos, setSalvandoExtraidos] = useState(false)
 
-  // Extrai inteligência de uma URL de notícia via backend
   async function handleExtrairUrl() {
     if (!urlNoticia.trim()) { setErroSalvar('Cole a URL da notícia'); return }
     setExtraindo(true)
     setErroSalvar('')
+    setExtraidos([])
     try {
       const r = await api.post('https://app.etztech.com/api/v1/inteligencia/banco/extrair-url', { url: urlNoticia })
       const ext = r.data
-      setNovoArg(p => ({
-        ...p,
-        descricao: ext.descricao || p.descricao,
-        categoria: ext.categoria || p.categoria,
-        fonte: ext.fonte || new URL(urlNoticia).hostname.replace('www.', ''),
-      }))
-      setModo('manual') // vai para manual para revisar antes de salvar
+      // Novo formato: array de argumentos
+      if (ext.argumentos && ext.argumentos.length > 0) {
+        setExtraidos(ext.argumentos.map((a: any) => ({ ...a, selecionado: true })))
+        setFonteExtraida(ext.fonte || new URL(urlNoticia).hostname.replace('www.', ''))
+      } else if (ext.descricao) {
+        // fallback formato antigo
+        setExtraidos([{ descricao: ext.descricao, categoria: ext.categoria || '', selecionado: true }])
+        setFonteExtraida(ext.fonte || '')
+      }
     } catch (e: any) {
       setErroSalvar(e?.response?.data?.error || 'Não foi possível ler a URL')
     } finally {
       setExtraindo(false)
+    }
+  }
+
+  async function handleSalvarExtraidos() {
+    const selecionados = extraidos.filter(a => a.selecionado)
+    if (selecionados.length === 0) { setErroSalvar('Selecione pelo menos um argumento'); return }
+    setSalvandoExtraidos(true)
+    setErroSalvar('')
+    try {
+      await Promise.all(selecionados.map(a =>
+        api.post('https://app.etztech.com/api/v1/inteligencia/banco', {
+          categoria: a.categoria,
+          descricao: a.descricao,
+          fonte: fonteExtraida,
+          validade: validadeExtraida || '',
+        })
+      ))
+      setExtraidos([])
+      setUrlNoticia('')
+      setFonteExtraida('')
+      setValidadeExtraida('')
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-banco'] })
+    } catch (e: any) {
+      setErroSalvar(e?.response?.data?.error || 'Erro ao salvar')
+    } finally {
+      setSalvandoExtraidos(false)
     }
   }
 
@@ -1839,13 +1872,13 @@ function TabBanco() {
             <div className="flex items-start gap-1.5 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">
               <span className="text-brand-500 text-sm mt-0.5">🤖</span>
               <p className="text-[11px] text-brand-700 leading-relaxed">
-                <span className="font-semibold">Extração automática:</span> cole a URL de qualquer notícia, artigo ou relatório. A IA lê o conteúdo e extrai o argumento mais relevante para as ligações.
+                <span className="font-semibold">Extração automática:</span> cole a URL de qualquer notícia, artigo ou relatório. A IA lê o conteúdo e extrai todos os argumentos relevantes para as ligações.
               </p>
             </div>
             <div className="flex gap-2">
               <input
                 value={urlNoticia}
-                onChange={e => setUrlNoticia(e.target.value)}
+                onChange={e => { setUrlNoticia(e.target.value); setExtraidos([]) }}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400"
                 placeholder="https://g1.globo.com/economia/noticia/..."
                 type="url"
@@ -1858,6 +1891,55 @@ function TabBanco() {
                 {extraindo ? <><Loader2 size={13} className="animate-spin" />Lendo...</> : <><Brain size={13} />Extrair</>}
               </button>
             </div>
+
+            {/* Resultados da extração */}
+            {extraidos.length > 0 && (
+              <div className="border border-emerald-200 rounded-xl p-3 space-y-3 bg-emerald-50/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle size={13} className="text-emerald-600" />
+                    <p className="text-xs font-semibold text-emerald-700">{extraidos.length} argumentos extraídos de <span className="text-emerald-800">{fonteExtraida}</span></p>
+                  </div>
+                  <p className="text-[10px] text-gray-400">Desmarque os que não quer salvar</p>
+                </div>
+                <div className="space-y-2">
+                  {extraidos.map((a, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setExtraidos(prev => prev.map((x, j) => j === i ? { ...x, selecionado: !x.selecionado } : x))}
+                      className={`flex gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${a.selecionado ? 'bg-white border-emerald-200' : 'bg-gray-50 border-gray-100 opacity-50'}`}
+                    >
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${a.selecionado ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}>
+                        {a.selecionado && <CheckCircle size={10} className="text-white" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-800 leading-relaxed">{a.descricao}</p>
+                        <span className="mt-1 inline-block bg-brand-50 text-brand-700 text-[10px] px-1.5 py-0.5 rounded font-medium">{a.categoria}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={validadeExtraida}
+                    onChange={e => setValidadeExtraida(e.target.value)}
+                    className="w-28 border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-200"
+                    placeholder="Validade (dias)"
+                    type="number" min="1"
+                  />
+                  <button
+                    onClick={handleSalvarExtraidos}
+                    disabled={salvandoExtraidos || extraidos.filter(a => a.selecionado).length === 0}
+                    className="flex-1 bg-brand-600 text-white rounded-lg py-1.5 text-sm font-semibold hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {salvandoExtraidos
+                      ? <><Loader2 size={13} className="animate-spin" />Salvando...</>
+                      : <><Zap size={13} />Salvar {extraidos.filter(a => a.selecionado).length} argumento{extraidos.filter(a => a.selecionado).length !== 1 ? 's' : ''}</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
             {erroSalvar && <p className="text-xs text-red-500">{erroSalvar}</p>}
           </div>
         )}
