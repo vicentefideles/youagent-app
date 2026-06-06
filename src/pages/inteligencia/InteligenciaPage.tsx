@@ -3103,68 +3103,75 @@ function TabAjusteFino() {
           </button>
         </div>
         <p className="text-[11px] text-gray-400 mb-4">
-          Configure o tom de abordagem por região brasileira. Cada agente herda essas preferências no setup — sotaque e cadência impactam diretamente o rapport e a taxa de conversão.
+          O agente detecta automaticamente a região do contato e adapta o tom durante a ligação. Conforme as ligações acontecem, o sistema mostra qual tom converte mais em cada região — você ajusta aqui e o agente obedece nas próximas chamadas.
         </p>
 
         <div className="space-y-3">
-          {REGIOES_BR.map(r => (
-            <div key={r.regiao} className="border border-gray-100 rounded-xl p-3">
-              <div className="flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-bold text-gray-900">{r.regiao}</span>
-                    <div className="flex gap-1 flex-wrap">
-                      {r.estados.map(e => (
-                        <span key={e} className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">{e}</span>
-                      ))}
+          {REGIOES_BR.map(r => {
+            const ligsRegiao = ligsRaw.filter((l: any) => r.estados.includes(l.contatos?.estado ?? ''))
+            const totalReg = ligsRegiao.length
+            const sucessoReg = ligsRegiao.filter((l: any) => l.resultado === 'agendou' || l.resultado === 'transferida').length
+            const taxa = totalReg > 0 ? Math.round((sucessoReg / totalReg) * 100) : null
+            const cor = taxa !== null ? (taxa >= 60 ? 'bg-emerald-500' : taxa >= 35 ? 'bg-amber-500' : 'bg-red-400') : 'bg-gray-200'
+            const corTxt = taxa !== null ? (taxa >= 60 ? 'text-emerald-600' : taxa >= 35 ? 'text-amber-600' : 'text-red-600') : 'text-gray-400'
+            const corBorder = taxa !== null ? (taxa >= 60 ? 'border-emerald-100' : taxa >= 35 ? 'border-amber-100' : 'border-red-100') : 'border-gray-100'
+
+            return (
+              <div key={r.regiao} className={`border rounded-xl p-3 ${corBorder}`}>
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-bold text-gray-900">{r.regiao}</span>
+                      <div className="flex gap-1 flex-wrap">
+                        {r.estados.map(e => (
+                          <span key={e} className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">{e}</span>
+                        ))}
+                      </div>
                     </div>
+                    <p className="text-[11px] text-gray-500 mb-2">{r.descricao}</p>
+
+                    {/* Performance real ou estado de aprendizado */}
+                    {taxa !== null ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] text-gray-500 font-medium">Conversão com tom <span className="text-brand-600 font-bold">"{tonsPorRegiao[r.regiao]}"</span></span>
+                          <span className={`text-[11px] font-bold ${corTxt}`}>{taxa}% · {totalReg} lig.</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${cor} transition-all`} style={{ width: `${taxa}%` }} />
+                        </div>
+                        {taxa < 35 && (
+                          <p className="text-[10px] text-amber-600 mt-1">⚠ Taxa baixa — considere mudar o tom para esta região</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-pulse" />
+                        <p className="text-[10px] text-gray-400">Aguardando ligações nesta região — performance aparece automaticamente</p>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[11px] text-gray-500">{r.descricao}</p>
-                </div>
-                <div className="flex-shrink-0 w-44">
-                  <select
-                    value={tonsPorRegiao[r.regiao] ?? 'Padrão'}
-                    onChange={e => setTonsPorRegiao(prev => ({ ...prev, [r.regiao]: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-200 bg-white text-gray-800"
-                  >
-                    {TONS.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                  <p className="text-[10px] text-gray-400 mt-1 text-center">tom de abordagem</p>
+
+                  <div className="flex-shrink-0 w-44">
+                    <select
+                      value={tonsPorRegiao[r.regiao] ?? 'Padrão'}
+                      onChange={e => setTonsPorRegiao(prev => ({ ...prev, [r.regiao]: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-200 bg-white text-gray-800"
+                    >
+                      {TONS.map(t => <option key={t}>{t}</option>)}
+                    </select>
+                    <p className="text-[10px] text-gray-400 mt-1 text-center">tom configurado</p>
+                  </div>
                 </div>
               </div>
-
-              {/* Barra de performance real se houver dados */}
-              {(() => {
-                const estadosRegiao = r.estados
-                const ligsRegiao = ligsRaw.filter((l: any) => estadosRegiao.includes(l.contatos?.estado ?? ''))
-                const totalReg = ligsRegiao.length
-                const sucessoReg = ligsRegiao.filter((l: any) => l.resultado === 'agendou' || l.resultado === 'transferida').length
-                const taxa = totalReg > 0 ? Math.round((sucessoReg / totalReg) * 100) : null
-                if (taxa === null) return (
-                  <p className="text-[10px] text-gray-300 mt-2">Sem ligações nesta região ainda — performance será exibida automaticamente</p>
-                )
-                const cor = taxa >= 60 ? 'bg-emerald-500' : taxa >= 35 ? 'bg-amber-500' : 'bg-red-400'
-                const corTxt = taxa >= 60 ? 'text-emerald-600' : taxa >= 35 ? 'text-amber-600' : 'text-red-600'
-                return (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-gray-400">Performance atual</span>
-                      <span className={`text-[10px] font-bold ${corTxt}`}>{taxa}% · {totalReg} lig.</span>
-                    </div>
-                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${cor} transition-all`} style={{ width: `${taxa}%` }} />
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="mt-3 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 flex items-start gap-2">
-          <AlertCircle size={13} className="text-brand-600 flex-shrink-0 mt-0.5" />
+          <Zap size={13} className="text-brand-600 flex-shrink-0 mt-0.5" />
           <p className="text-[11px] text-brand-700">
-            As preferências de tom por região serão aplicadas no setup do agente. Cada nova ligação para um contato daquela região usará automaticamente o tom configurado aqui.
+            O agente identifica o estado do contato e adapta o tom automaticamente em cada ligação — sem intervenção manual. Os dados de conversão por tom aparecem aqui conforme as ligações acontecem.
           </p>
         </div>
       </div>
