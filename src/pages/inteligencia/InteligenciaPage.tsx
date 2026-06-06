@@ -2063,7 +2063,7 @@ function TabBanco() {
   )
 }
 
-function TabMetricas() {
+function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
   const { data: ligacoesRaw = [] } = useQuery({
     queryKey: ['metricas-ligacoes-count'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
@@ -2238,7 +2238,12 @@ function TabMetricas() {
             <h3 className="text-sm font-semibold text-gray-900">Eficácia dos gatilhos de transferência</h3>
             <p className="text-xs text-gray-400 mt-0.5">Calibração automática — conectado à discadora</p>
           </div>
-          {temDados && <button className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-brand-700 transition-colors">Configurar gatilhos</button>}
+          <button
+            onClick={() => onNavigate?.('padroes')}
+            className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+          >
+            Configurar gatilhos
+          </button>
         </div>
         {temDados ? (
           <>
@@ -3901,7 +3906,7 @@ export default function InteligenciaPage() {
     campanhas: <TabCampanhas />,
     conhecimento: <TabConhecimento />,
     banco: <TabBanco />,
-    metricas: <TabMetricas />,
+    metricas: <TabMetricas onNavigate={setActiveTab} />,
     ajustefino: <TabAjusteFino />,
     evolucao: <TabEvolucao />,
     cross: <TabCross />,
