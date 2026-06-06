@@ -3234,6 +3234,10 @@ function TabEvolucao() {
     queryKey: ['evolucao-qualidade'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/qualidade').then(r => r.data as any[]).catch(() => []),
   })
+  const { data: historico = [] } = useQuery({
+    queryKey: ['evolucao-historico'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/qualidade/historico').then(r => r.data as any[]).catch(() => []),
+  })
 
   const fmt = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })
 
@@ -3241,10 +3245,42 @@ function TabEvolucao() {
   const primeiroAgente = (agentes as any[]).sort((a, b) => new Date(a.criado_em ?? a.created_at ?? 0).getTime() - new Date(b.criado_em ?? b.created_at ?? 0).getTime())[0]
   const primeiraLig = (ligsRaw as any[]).sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime())[0]
   const crossAprovados = (crossAll as any[]).filter((c: any) => c.status === 'aprovado')
-  const ultimoCross = crossAprovados.sort((a, b) => new Date(b.aprovado_em ?? b.criado_em).getTime() - new Date(a.aprovado_em ?? a.criado_em).getTime())[0]
-  const primeiroCross = crossAprovados.sort((a, b) => new Date(a.aprovado_em ?? a.criado_em).getTime() - new Date(b.aprovado_em ?? b.criado_em).getTime())[0]
+  const ultimoCross = [...crossAprovados].sort((a, b) => new Date(b.aprovado_em ?? b.criado_em).getTime() - new Date(a.aprovado_em ?? a.criado_em).getTime())[0]
+  const primeiroCross = [...crossAprovados].sort((a, b) => new Date(a.aprovado_em ?? a.criado_em).getTime() - new Date(b.aprovado_em ?? b.criado_em).getTime())[0]
   const scores = (qualidade as any[]).map((q: any) => q.score_total ?? 0).filter((s: number) => s > 0)
   const scoreAtual = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+
+  // ── Taxa de aprendizado (cross aprovados: este mês vs mês anterior) ─────────
+  const agora = new Date()
+  const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1).getTime()
+  const inicioMesAnterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1).getTime()
+  const crossEsteMes = crossAprovados.filter((c: any) => new Date(c.aprovado_em ?? c.criado_em).getTime() >= inicioMes).length
+  const crossMesAnterior = crossAprovados.filter((c: any) => {
+    const t = new Date(c.aprovado_em ?? c.criado_em).getTime()
+    return t >= inicioMesAnterior && t < inicioMes
+  }).length
+  const tendencia = crossMesAnterior === 0
+    ? (crossEsteMes > 0 ? 'acelerando' : 'neutro')
+    : crossEsteMes > crossMesAnterior ? 'acelerando' : crossEsteMes < crossMesAnterior ? 'desacelerando' : 'estável'
+
+  // ── Alerta de ciclo parado ────────────────────────────────────────────────
+  const diasSemAprovacao = ultimoCross
+    ? Math.floor((Date.now() - new Date(ultimoCross.aprovado_em ?? ultimoCross.criado_em).getTime()) / 86400000)
+    : null
+  const alertaCicloParado = diasSemAprovacao !== null && diasSemAprovacao >= 7
+
+  // ── Gráfico SVG de score ──────────────────────────────────────────────────
+  const W = 420; const H = 80; const PAD = 8
+  const historicoArr = historico as any[]
+  const pontos = historicoArr.map((h: any) => h.score_medio as number)
+  const minS = pontos.length > 0 ? Math.min(...pontos) : 0
+  const maxS = pontos.length > 0 ? Math.max(...pontos, minS + 1) : 100
+  const toX = (i: number) => PAD + (i / Math.max(pontos.length - 1, 1)) * (W - PAD * 2)
+  const toY = (v: number) => H - PAD - ((v - minS) / (maxS - minS)) * (H - PAD * 2)
+  const path = pontos.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+  const areaPath = pontos.length > 1
+    ? `${path} L${toX(pontos.length - 1).toFixed(1)},${H} L${toX(0).toFixed(1)},${H} Z`
+    : ''
 
   // Linha do tempo com marcos reais
   const marcos: { icon: React.ReactNode; titulo: string; data: string; desc: string; ativo: boolean }[] = []
@@ -3311,6 +3347,97 @@ function TabEvolucao() {
               <p className="text-[11px] text-gray-500 mt-0.5">{k.label}</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ── Alerta ciclo parado ──────────────────────────────────────────── */}
+      {alertaCicloParado && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+          <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-semibold text-amber-800">
+              Ciclo de aprendizado parado há {diasSemAprovacao} dia{diasSemAprovacao !== 1 ? 's' : ''}
+            </p>
+            <p className="text-[11px] text-amber-700 mt-0.5">
+              Nenhum argumento novo aprovado desde {fmt(ultimoCross!.aprovado_em ?? ultimoCross!.criado_em)}. Revise os pendentes na aba <strong>IC</strong> para manter o sistema evoluindo.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Gráfico de score + taxa de aprendizado ───────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Gráfico evolução do score */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Evolução do score médio</h3>
+            {scoreAtual !== null && (
+              <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">{scoreAtual}% atual</span>
+            )}
+          </div>
+          {pontos.length < 2 ? (
+            <div className="flex flex-col items-center justify-center h-20 text-gray-400">
+              <p className="text-xs">Dados insuficientes para o gráfico.</p>
+              <p className="text-[11px] mt-0.5">Clique em "Calcular — Hoje" na aba Qualidade para gerar snapshots.</p>
+            </div>
+          ) : (
+            <div>
+              <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 80 }}>
+                <defs>
+                  <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {areaPath && <path d={areaPath} fill="url(#scoreGrad)" />}
+                <path d={path} fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                {pontos.map((v, i) => (
+                  <circle key={i} cx={toX(i)} cy={toY(v)} r="3" fill="#7c3aed" />
+                ))}
+              </svg>
+              <div className="flex justify-between mt-1">
+                <span className="text-[10px] text-gray-400">{fmt(historicoArr[0]?.calculado_em)}</span>
+                <span className="text-[10px] text-gray-400">{fmt(historicoArr[historicoArr.length - 1]?.calculado_em)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Taxa de aprendizado */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Taxa de aprendizado</h3>
+          <div className="flex items-end gap-6 mb-3">
+            <div>
+              <p className="text-2xl font-bold text-brand-600">{crossEsteMes}</p>
+              <p className="text-[11px] text-gray-500">aprovados este mês</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-400">{crossMesAnterior}</p>
+              <p className="text-[11px] text-gray-500">mês anterior</p>
+            </div>
+            <div className="ml-auto">
+              {tendencia === 'acelerando' && <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><TrendingUp size={11} /> Acelerando</span>}
+              {tendencia === 'desacelerando' && <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full"><TrendingUp size={11} className="rotate-180" /> Desacelerando</span>}
+              {tendencia === 'estável' && <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Estável</span>}
+              {tendencia === 'neutro' && <span className="text-xs font-semibold text-gray-400 bg-gray-50 px-2 py-1 rounded-full">Sem dados</span>}
+            </div>
+          </div>
+          <div className="flex gap-2 h-10 items-end">
+            {[crossMesAnterior, crossEsteMes].map((v, i) => {
+              const max = Math.max(crossMesAnterior, crossEsteMes, 1)
+              const pct = Math.max((v / max) * 100, v > 0 ? 10 : 0)
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <div className={`w-full rounded-t-md ${i === 1 ? 'bg-brand-500' : 'bg-gray-200'}`} style={{ height: `${pct}%` }} />
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex gap-2 mt-1">
+            <p className="flex-1 text-center text-[10px] text-gray-400">Mês ant.</p>
+            <p className="flex-1 text-center text-[10px] text-gray-400">Este mês</p>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-2 text-center">Total: {crossAprovados.length} argumento{crossAprovados.length !== 1 ? 's' : ''} aprovado{crossAprovados.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
