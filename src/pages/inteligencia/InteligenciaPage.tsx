@@ -7,6 +7,7 @@ import {
   Target, TestTube2, Globe, Cpu, CheckCircle,
   Upload, Trash2, RotateCcw, Zap,
   AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star, X,
+  MessageSquare, Send,
 } from 'lucide-react'
 import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi, agentesApi } from '@/services/api'
 
@@ -4286,6 +4287,10 @@ interface SimResultado {
   gatilhos_total: number
   duracao_segundos: number
   resultado: 'aprovado' | 'reprovado' | 'inconclusivo'
+  score_minimo?: number
+  turno_critico?: number | null
+  sugestao_melhoria?: string
+  feedback_detalhado?: Record<string, string>
   analise: {
     gatilho_principal?: string
     proxima_acao?: string
@@ -4294,6 +4299,27 @@ interface SimResultado {
     pontos_fortes?: string[]
     pontos_melhoria?: string[]
   }
+}
+
+interface RelatorioData {
+  agente: string
+  total: number
+  score_geral: number | null
+  score_minimo: number
+  pronto: boolean
+  todos_testados: boolean
+  certificado_em: string | null
+  cenarios: { id: string; score: number | null; resultado: string; testado: boolean }[]
+  pontos_fortes: string[]
+  pontos_melhoria: string[]
+  sugestoes: { cenario: string; sugestao: string }[]
+}
+
+interface CertTodosResultado {
+  resultados: { cenario: string; score: number; resultado: string; sugestao?: string; analise?: SimResultado['analise'] }[]
+  score_geral: number
+  todos_aprovados: boolean
+  score_minimo: number
 }
 
 const CERT_SCENARIOS = [
@@ -4312,292 +4338,597 @@ function fmtDuracao(seg: number) {
 
 function TabSimulador() {
   const queryClient = useQueryClient()
+  const [modo, setModo] = useState<'automatico' | 'interativo' | 'relatorio'>('automatico')
 
-  // Agentes reais
+  // Dados base
   const { data: agentes = [] } = useQuery({
     queryKey: ['agentes-lista'],
-    queryFn: () => agentesApi.list().then(r => r.data as { id: string; nome: string }[]),
+    queryFn: () => agentesApi.list().then(r => r.data as { id: string; nome: string; status?: string }[]),
   })
-
-  // Histórico de simulações
-  const { data: historico = [], isFetching: loadingHist } = useQuery({
+  const { data: historico = [] } = useQuery({
     queryKey: ['inteligencia-simulador'],
-    queryFn: () => inteligenciaSimuladorApi.list().then(r => r.data as SimResultado[]),
+    queryFn: () => inteligenciaSimuladorApi.list().then(r => r.data as (SimResultado & { criado_em: string })[]),
+  })
+  const { data: simConfig, refetch: refetchConfig } = useQuery({
+    queryKey: ['simulador-config'],
+    queryFn: () => inteligenciaSimuladorApi.getConfig().then(r => r.data as { score_minimo: number }),
   })
 
-  const [agenteId, setAgenteId] = useState('')
-  const [cenario, setCenario] = useState('preco')
-  const [loading, setLoading] = useState(false)
+  // ── Estado geral ──────────────────────────────────────────────
+  const [agenteId, setAgenteId]   = useState('')
+  const [cenario, setCenario]     = useState('preco')
+  const [scoreMin, setScoreMin]   = useState(75)
+  const [loading, setLoading]     = useState(false)
   const [certLoading, setCertLoading] = useState<Record<string, boolean>>({})
+  const [certTodosLoading, setCertTodosLoading] = useState(false)
   const [resultado, setResultado] = useState<SimResultado | null>(null)
   const [visibleLines, setVisibleLines] = useState(0)
-  const [certResultados, setCertResultados] = useState<Record<string, SimResultado>>({})
+  const [certResultados, setCertResultados] = useState<Record<string, { score: number; resultado: string; sugestao?: string }>>({})
+  const [certTodosResultado, setCertTodosResultado] = useState<CertTodosResultado | null>(null)
 
-  // Anima o transcript linha a linha após receber resultado
+  // ── Estado modo interativo ────────────────────────────────────
+  const [chatHistorico, setChatHistorico] = useState<{ who: string; text: string }[]>([])
+  const [chatInput, setChatInput]         = useState('')
+  const [chatLoading, setChatLoading]     = useState(false)
+  const [chatAnalise, setChatAnalise]     = useState<{ gatilho?: string; sentimento?: string; fase?: string; probabilidade?: number } | null>(null)
+
+  // ── Relatório ─────────────────────────────────────────────────
+  const [relatorioAgenteId, setRelatorioAgenteId] = useState('')
+  const { data: relatorio, isFetching: loadingRel, refetch: refetchRelatorio } = useQuery({
+    queryKey: ['simulador-relatorio', relatorioAgenteId],
+    queryFn: () => relatorioAgenteId
+      ? inteligenciaSimuladorApi.relatorio(relatorioAgenteId).then(r => r.data as RelatorioData)
+      : Promise.resolve(null),
+    enabled: !!relatorioAgenteId,
+  })
+
+  // Sincroniza score_minimo com config carregada
+  useEffect(() => {
+    if (simConfig?.score_minimo) setScoreMin(simConfig.score_minimo)
+  }, [simConfig])
+
+  // Anima transcript
   useEffect(() => {
     if (!resultado) return
     setVisibleLines(0)
     const total = resultado.transcript.length
     let i = 0
-    const timer = setInterval(() => {
-      i++
-      setVisibleLines(i)
-      if (i >= total) clearInterval(timer)
-    }, 380)
+    const timer = setInterval(() => { i++; setVisibleLines(i); if (i >= total) clearInterval(timer) }, 350)
     return () => clearInterval(timer)
   }, [resultado])
 
-  async function rodarSimulacao(cenarioId: string, para: 'principal' | string = 'principal') {
-    if (para === 'principal') setLoading(true)
-    else setCertLoading(p => ({ ...p, [cenarioId]: true }))
-
-    try {
-      const res = await inteligenciaSimuladorApi.create({ agente_id: agenteId || null, cenario: cenarioId })
-      const data = res.data as SimResultado
-      if (para === 'principal') {
-        setResultado(data)
-      } else {
-        setCertResultados(p => ({ ...p, [cenarioId]: data }))
-      }
-      queryClient.invalidateQueries({ queryKey: ['inteligencia-simulador'] })
-    } catch (e) {
-      console.error(e)
-    } finally {
-      if (para === 'principal') setLoading(false)
-      else setCertLoading(p => ({ ...p, [cenarioId]: false }))
-    }
-  }
-
+  // ── Helpers ───────────────────────────────────────────────────
   const sentimentoCor = (s?: string) =>
     s === 'positivo' ? 'text-emerald-600' : s === 'negativo' ? 'text-red-600' : 'text-gray-600'
 
   const resultadoBadge = (r: string) =>
-    r === 'aprovado'
-      ? 'bg-emerald-100 text-emerald-700'
-      : r === 'reprovado'
-      ? 'bg-red-100 text-red-700'
-      : 'bg-amber-100 text-amber-700'
+    r === 'aprovado' ? 'bg-emerald-100 text-emerald-700'
+    : r === 'reprovado' ? 'bg-red-100 text-red-700'
+    : r === 'pendente' ? 'bg-gray-100 text-gray-500'
+    : 'bg-amber-100 text-amber-700'
+
+  async function salvarScoreMin(val: number) {
+    setScoreMin(val)
+    await inteligenciaSimuladorApi.setConfig({ score_minimo: val }).catch(() => {})
+    refetchConfig()
+  }
+
+  // ── Rodar simulação individual ────────────────────────────────
+  async function rodarSimulacao(cenarioId: string, destino: 'principal' | string = 'principal') {
+    if (destino === 'principal') setLoading(true)
+    else setCertLoading(p => ({ ...p, [cenarioId]: true }))
+    try {
+      const res = await inteligenciaSimuladorApi.create({ agente_id: agenteId || null, cenario: cenarioId })
+      const data = res.data as SimResultado
+      if (destino === 'principal') setResultado(data)
+      else setCertResultados(p => ({ ...p, [cenarioId]: { score: data.score, resultado: data.resultado, sugestao: data.sugestao_melhoria } }))
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-simulador'] })
+    } catch (e) { console.error(e) }
+    finally {
+      if (destino === 'principal') setLoading(false)
+      else setCertLoading(p => ({ ...p, [cenarioId]: false }))
+    }
+  }
+
+  // ── Certificar todos de uma vez ───────────────────────────────
+  async function certificarTodos() {
+    setCertTodosLoading(true)
+    setCertResultados({})
+    setCertTodosResultado(null)
+    try {
+      const res = await inteligenciaSimuladorApi.certificarTodos({ agente_id: agenteId || null })
+      const data = res.data as CertTodosResultado
+      setCertTodosResultado(data)
+      const mapa: Record<string, { score: number; resultado: string; sugestao?: string }> = {}
+      data.resultados.forEach(r => { mapa[r.cenario] = { score: r.score, resultado: r.resultado, sugestao: r.sugestao } })
+      setCertResultados(mapa)
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-simulador'] })
+    } catch (e) { console.error(e) }
+    finally { setCertTodosLoading(false) }
+  }
+
+  // ── Modo interativo — enviar mensagem ─────────────────────────
+  async function enviarMensagem() {
+    if (!chatInput.trim() || chatLoading) return
+    const msg = chatInput.trim()
+    setChatInput('')
+    const novoHist = [...chatHistorico, { who: 'Lead', text: msg }]
+    setChatHistorico(novoHist)
+    setChatLoading(true)
+    try {
+      const res = await inteligenciaSimuladorApi.interativo({
+        agente_id: agenteId || null,
+        historico: chatHistorico,
+        mensagem_lead: msg,
+      })
+      const data = res.data as { resposta: string; analise: { gatilho?: string; sentimento?: string; fase?: string; probabilidade?: number } }
+      setChatHistorico(h => [...h, { who: 'Agente', text: data.resposta }])
+      setChatAnalise(data.analise)
+    } catch (e) { console.error(e) }
+    finally { setChatLoading(false) }
+  }
 
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white flex items-center justify-between"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#3d4a1a)' }}
-      >
+      {/* Header */}
+      <div className="rounded-xl p-5 text-white flex items-center justify-between" style={{ background: 'linear-gradient(135deg,#1a1f35,#3d4a1a)' }}>
         <div>
           <h2 className="text-lg font-semibold">Simulador de Ligações</h2>
-          <p className="text-sm text-white/70 mt-0.5">Teste cenários de objeção com o agente real antes de ir para produção</p>
+          <p className="text-sm text-white/70 mt-0.5">Treine e certifique o agente antes das primeiras ligações reais</p>
         </div>
         <div className="text-right text-xs text-white/50">
           <p>{historico.length} simulações realizadas</p>
         </div>
       </div>
 
-      {/* Configuração */}
+      {/* Score mínimo + seletor de agente */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Configuração da simulação</h3>
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          <select
-            value={agenteId}
-            onChange={e => setAgenteId(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-          >
-            <option value="">Qualquer agente</option>
-            {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-          </select>
-          <select
-            value={cenario}
-            onChange={e => setCenario(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 col-span-2"
-          >
-            {CERT_SCENARIOS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-700 block mb-1.5">Agente a treinar</label>
+            <select value={agenteId} onChange={e => setAgenteId(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+              <option value="">Qualquer agente</option>
+              {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}{a.status === 'em_treinamento' ? ' 🔵' : ''}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-700 block mb-1.5">
+              Score mínimo para aprovação — <span className="text-blue-600 font-bold">{scoreMin}/100</span>
+            </label>
+            <input type="range" min={50} max={95} step={5} value={scoreMin}
+              onChange={e => setScoreMin(Number(e.target.value))}
+              onMouseUp={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
+              onTouchEnd={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
+              className="w-full accent-blue-600" />
+            <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+              <span>50</span><span>70</span><span>80</span><span>95</span>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => rodarSimulacao(cenario)}
-          disabled={loading}
-          className="w-full py-2 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-        >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-          {loading ? 'Simulando com IA...' : 'Rodar simulação'}
-        </button>
       </div>
 
-      {/* Resultado da simulação */}
-      {resultado && (
+      {/* Tabs de modo */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {([
+          { id: 'automatico', label: 'Simulação automática', icon: <Play size={13}/> },
+          { id: 'interativo', label: 'Modo interativo', icon: <MessageSquare size={13}/> },
+          { id: 'relatorio',  label: 'Relatório de prontidão', icon: <BarChart2 size={13}/> },
+        ] as const).map(t => (
+          <button key={t.id} onClick={() => setModo(t.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${modo === t.id ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── MODO AUTOMÁTICO ── */}
+      {modo === 'automatico' && (
         <>
-          {/* KPIs */}
+          {/* Configuração + botões */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">Resultado da simulação</h3>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(resultado.resultado)}`}>
-                {resultado.resultado.toUpperCase()}
-              </span>
+            <div className="flex gap-3 mb-3">
+              <select value={cenario} onChange={e => setCenario(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+                {CERT_SCENARIOS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
             </div>
-            <div className="grid grid-cols-4 gap-3 mb-3">
-              {[
-                { label: 'Score',     value: String(resultado.score ?? '—') },
-                { label: 'Objeções',  value: `${resultado.objecoes_aprovadas}/${resultado.objecoes_total}` },
-                { label: 'Gatilhos',  value: `${resultado.gatilhos_detectados}/${resultado.gatilhos_total}` },
-                { label: 'Duração',   value: fmtDuracao(resultado.duracao_segundos) },
-              ].map((k, i) => (
-                <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
-                  <p className="text-lg font-mono font-bold text-gray-800">{k.value}</p>
-                  <p className="text-xs text-gray-500">{k.label}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => rodarSimulacao(cenario)} disabled={loading}
+                className="py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
+                {loading ? <Loader2 size={14} className="animate-spin"/> : <Play size={14}/>}
+                {loading ? 'Simulando...' : 'Rodar cenário'}
+              </button>
+              <button onClick={certificarTodos} disabled={certTodosLoading}
+                className="py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
+                {certTodosLoading ? <Loader2 size={14} className="animate-spin"/> : <CheckCircle size={14}/>}
+                {certTodosLoading ? 'Certificando...' : 'Certificar agente (5 cenários)'}
+              </button>
             </div>
-
-            {/* Score bar */}
-            <div className="mb-3">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Desempenho do agente</span>
-                <span className="font-mono font-bold">{resultado.score ?? 0}/100</span>
-              </div>
-              <Bar pct={resultado.score ?? 0} color={resultado.score >= 80 ? 'bg-emerald-500' : resultado.score >= 60 ? 'bg-amber-400' : 'bg-red-400'} />
-            </div>
+            {certTodosLoading && (
+              <p className="text-xs text-gray-400 text-center mt-2">Rodando os 5 cenários em paralelo com IA — pode levar ~20s...</p>
+            )}
           </div>
 
-          {/* Painel transcript + análise */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <h3 className="text-sm font-semibold text-gray-900">Transcrição simulada</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-400 mb-2 font-semibold">CONVERSA</p>
-                <div className="bg-gray-950 rounded-lg p-3 space-y-2 font-mono text-xs max-h-52 overflow-y-auto">
-                  {resultado.transcript.slice(0, visibleLines).map((t, i) => (
-                    <div key={i}>
-                      <span className={`font-bold ${t.who === 'Agente' ? 'text-blue-400' : 'text-emerald-400'}`}>{t.who}: </span>
-                      <span className="text-gray-300">{t.text}</span>
-                    </div>
-                  ))}
-                  {visibleLines < resultado.transcript.length && (
-                    <span className="text-gray-600 animate-pulse">▊</span>
-                  )}
+          {/* Resultado individual */}
+          {resultado && (
+            <>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Resultado — {CERT_SCENARIOS.find(c => c.id === resultado.cenario)?.label}</h3>
+                  <div className="flex items-center gap-2">
+                    {resultado.score_minimo && <span className="text-xs text-gray-400">mín. {resultado.score_minimo}</span>}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(resultado.resultado)}`}>
+                      {resultado.resultado.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-2 font-semibold">ANÁLISE IA</p>
-                <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-3 mb-3">
                   {[
-                    { label: 'Gatilho principal',  value: resultado.analise?.gatilho_principal  || '—', color: 'text-amber-600' },
-                    { label: 'Próxima ação',        value: resultado.analise?.proxima_acao       || '—', color: 'text-blue-600' },
-                    { label: 'Sentimento',          value: resultado.analise?.sentimento         || '—', color: sentimentoCor(resultado.analise?.sentimento) },
-                    { label: 'Prob. agendamento',   value: `${resultado.analise?.probabilidade_agendamento ?? '—'}%`, color: 'text-emerald-600' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-1.5">
-                      <span className="text-xs text-gray-500">{item.label}</span>
-                      <span className={`text-xs font-mono font-semibold ${item.color}`}>{item.value}</span>
+                    { label: 'Score',    value: String(resultado.score ?? '—') },
+                    { label: 'Objeções', value: `${resultado.objecoes_aprovadas}/${resultado.objecoes_total}` },
+                    { label: 'Gatilhos', value: `${resultado.gatilhos_detectados}/${resultado.gatilhos_total}` },
+                    { label: 'Duração',  value: fmtDuracao(resultado.duracao_segundos) },
+                  ].map((k, i) => (
+                    <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
+                      <p className="text-lg font-mono font-bold text-gray-800">{k.value}</p>
+                      <p className="text-xs text-gray-500">{k.label}</p>
                     </div>
                   ))}
                 </div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Desempenho</span>
+                  <span className="font-mono font-bold">{resultado.score ?? 0}/100</span>
+                </div>
+                <Bar pct={resultado.score ?? 0} color={resultado.score >= 80 ? 'bg-emerald-500' : resultado.score >= 60 ? 'bg-amber-400' : 'bg-red-400'} />
 
-                {resultado.analise?.pontos_fortes && resultado.analise.pontos_fortes.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs font-semibold text-emerald-700 mb-1">Pontos fortes</p>
-                    <ul className="space-y-0.5">
-                      {resultado.analise.pontos_fortes.map((p, i) => (
-                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500">✓</span>{p}</li>
-                      ))}
-                    </ul>
+                {/* Sugestão acionável */}
+                {resultado.sugestao_melhoria && (
+                  <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                    <p className="text-xs font-semibold text-blue-700 mb-0.5">Sugestão para melhorar o script</p>
+                    <p className="text-xs text-blue-800">{resultado.sugestao_melhoria}</p>
                   </div>
                 )}
-                {resultado.analise?.pontos_melhoria && resultado.analise.pontos_melhoria.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs font-semibold text-amber-700 mb-1">Melhorias</p>
-                    <ul className="space-y-0.5">
-                      {resultado.analise.pontos_melhoria.map((p, i) => (
-                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500">→</span>{p}</li>
-                      ))}
-                    </ul>
+
+                {/* Turno crítico */}
+                {resultado.turno_critico && (
+                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <p className="text-xs text-amber-700">⚠ Ponto crítico no turno {resultado.turno_critico} — o agente perdeu a condução da conversa aqui.</p>
                   </div>
                 )}
               </div>
+
+              {/* Transcript + análise */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2 font-semibold">TRANSCRIÇÃO SIMULADA</p>
+                    <div className="bg-gray-950 rounded-lg p-3 space-y-2 font-mono text-xs max-h-56 overflow-y-auto">
+                      {resultado.transcript.slice(0, visibleLines).map((t, i) => (
+                        <div key={i} className={resultado.turno_critico && Math.ceil((i+1)/2) === resultado.turno_critico ? 'border-l-2 border-amber-400 pl-2' : ''}>
+                          <span className={`font-bold ${t.who === 'Agente' ? 'text-blue-400' : 'text-emerald-400'}`}>{t.who}: </span>
+                          <span className="text-gray-300">{t.text}</span>
+                        </div>
+                      ))}
+                      {visibleLines < resultado.transcript.length && <span className="text-gray-600 animate-pulse">▊</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2 font-semibold">ANÁLISE IA</p>
+                    <div className="space-y-1.5 mb-3">
+                      {[
+                        { label: 'Gatilho principal', value: resultado.analise?.gatilho_principal || '—', color: 'text-amber-600' },
+                        { label: 'Próxima ação',      value: resultado.analise?.proxima_acao      || '—', color: 'text-blue-600' },
+                        { label: 'Sentimento',        value: resultado.analise?.sentimento        || '—', color: sentimentoCor(resultado.analise?.sentimento) },
+                        { label: 'Prob. agendamento', value: `${resultado.analise?.probabilidade_agendamento ?? '—'}%`, color: 'text-emerald-600' },
+                      ].map((item, i) => (
+                        <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-1.5">
+                          <span className="text-xs text-gray-500">{item.label}</span>
+                          <span className={`text-xs font-mono font-semibold ${item.color}`}>{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {resultado.analise?.pontos_fortes && resultado.analise.pontos_fortes.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs font-semibold text-emerald-700 mb-1">Pontos fortes</p>
+                        {resultado.analise.pontos_fortes.map((p, i) => (
+                          <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500">✓</span>{p}</p>
+                        ))}
+                      </div>
+                    )}
+                    {resultado.analise?.pontos_melhoria && resultado.analise.pontos_melhoria.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-amber-700 mb-1">Pontos de melhoria</p>
+                        {resultado.analise.pontos_melhoria.map((p, i) => (
+                          <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500">→</span>{p}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Certificações */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-gray-900">Certificações obrigatórias</h3>
+              <span className="text-xs text-gray-400">Score mínimo: {scoreMin}/100</span>
             </div>
+            <p className="text-xs text-gray-500 mb-3">O agente precisa atingir o score mínimo em todos os 5 cenários antes de ser liberado para ligações reais.</p>
+
+            {certTodosResultado && (
+              <div className={`mb-3 rounded-lg px-3 py-2 border ${certTodosResultado.todos_aprovados ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-semibold ${certTodosResultado.todos_aprovados ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {certTodosResultado.todos_aprovados ? '✓ Agente certificado para produção!' : '✗ Certificação não concluída'}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-gray-700">Score geral: {certTodosResultado.score_geral}/100</span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {CERT_SCENARIOS.map((c) => {
+                const cert = certResultados[c.id]
+                const isLoading = certLoading[c.id]
+                const aprovado = cert && cert.resultado === 'aprovado'
+                const reprovado = cert && cert.resultado === 'reprovado'
+                return (
+                  <div key={c.id} className={`border rounded-lg px-3 py-2 ${aprovado ? 'border-emerald-200 bg-emerald-50' : reprovado ? 'border-red-100 bg-red-50' : 'border-gray-100'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-700 flex-1">{c.label}</span>
+                      {cert ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-gray-700">{cert.score}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded font-semibold ${resultadoBadge(cert.resultado)}`}>
+                            {cert.resultado.toUpperCase()}
+                          </span>
+                          <button onClick={() => rodarSimulacao(c.id, c.id)} disabled={isLoading}
+                            className="text-xs text-gray-400 hover:text-gray-600" title="Repetir">↺</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => rodarSimulacao(c.id, c.id)} disabled={isLoading}
+                          className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 flex items-center gap-1">
+                          {isLoading ? <Loader2 size={10} className="animate-spin"/> : null}
+                          {isLoading ? 'Testando...' : 'Testar'}
+                        </button>
+                      )}
+                    </div>
+                    {cert?.sugestao && reprovado && (
+                      <p className="text-xs text-red-700 mt-1 italic">→ {cert.sugestao}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {Object.keys(certResultados).length < CERT_SCENARIOS.length && (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                <p className="text-xs text-amber-700">⚠ Agente não pode ir para produção com certificações pendentes.</p>
+              </div>
+            )}
           </div>
+
+          {/* Histórico */}
+          {historico.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico de simulações</h3>
+              <div className="space-y-2">
+                {historico.slice(0, 8).map((h, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                    <div>
+                      <span className="font-medium text-gray-700">{CERT_SCENARIOS.find(c => c.id === h.cenario)?.label || h.cenario || '—'}</span>
+                      <span className="text-gray-400 ml-2">{h.agente_nome || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-gray-600">{h.score ?? '—'}</span>
+                      <span className={`px-2 py-0.5 rounded font-semibold ${resultadoBadge(h.resultado || 'inconclusivo')}`}>
+                        {(h.resultado || 'inconclusivo').toUpperCase()}
+                      </span>
+                      <span className="text-gray-400">{new Date(h.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 
-      {/* Certificações obrigatórias */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold text-gray-900">Certificações obrigatórias</h3>
-          <span className="text-xs text-gray-400">Teste todos os cenários antes de ir para produção</span>
-        </div>
-        <p className="text-xs text-gray-500 mb-3">O agente deve ser aprovado em todos os cenários abaixo. Cada teste usa IA real para simular a situação.</p>
-        <div className="space-y-2">
-          {CERT_SCENARIOS.map((c) => {
-            const cert = certResultados[c.id]
-            const loadingCert = certLoading[c.id]
-            return (
-              <div key={c.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 ${cert?.resultado === 'aprovado' ? 'border-emerald-200 bg-emerald-50' : cert?.resultado === 'reprovado' ? 'border-red-100 bg-red-50' : 'border-gray-100'}`}>
-                <span className="text-xs text-gray-700 flex-1">{c.label}</span>
-                {cert ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-gray-700">{cert.score}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-semibold ${resultadoBadge(cert.resultado)}`}>
-                      {cert.resultado.toUpperCase()}
-                    </span>
-                    <button
-                      onClick={() => rodarSimulacao(c.id, c.id)}
-                      disabled={loadingCert}
-                      className="text-xs text-gray-400 hover:text-gray-600 ml-1"
-                      title="Repetir teste"
-                    >
-                      ↺
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => rodarSimulacao(c.id, c.id)}
-                    disabled={loadingCert}
-                    className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 flex items-center gap-1"
-                  >
-                    {loadingCert ? <Loader2 size={10} className="animate-spin" /> : null}
-                    {loadingCert ? 'Testando...' : 'Testar'}
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
-        {Object.keys(certResultados).length < CERT_SCENARIOS.length && (
-          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-2">
-            <p className="text-xs text-amber-700">⚠ Agente não pode entrar em produção com certificações pendentes. Conclua todos os testes antes do deploy.</p>
-          </div>
-        )}
-        {Object.keys(certResultados).length === CERT_SCENARIOS.length && Object.values(certResultados).every(r => r.resultado === 'aprovado') && (
-          <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-2">
-            <p className="text-xs text-emerald-700 font-semibold">✓ Todos os cenários aprovados — agente certificado para produção.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Histórico */}
-      {historico.length > 0 && (
+      {/* ── MODO INTERATIVO ── */}
+      {modo === 'interativo' && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico de simulações</h3>
-          {loadingHist && <div className="text-xs text-gray-400">Carregando...</div>}
-          <div className="space-y-2">
-            {historico.slice(0, 8).map((h, i) => (
-              <div key={i} className="flex items-center justify-between text-xs border-b border-gray-100 pb-2 last:border-0 last:pb-0">
-                <div>
-                  <span className="font-medium text-gray-700">{CERT_SCENARIOS.find(c => c.id === h.cenario)?.label || h.cenario}</span>
-                  <span className="text-gray-400 ml-2">{h.agente_nome || '—'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-gray-600">{h.score ?? '—'}</span>
-                  <span className={`px-2 py-0.5 rounded font-semibold ${resultadoBadge(h.resultado || 'inconclusivo')}`}>
-                    {(h.resultado || 'inconclusivo').toUpperCase()}
-                  </span>
-                  <span className="text-gray-400">{new Date((h as any).criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Modo interativo — você é o lead</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Digite como se fosse o cliente. O agente responde com a IA real configurada para ele.</p>
+            </div>
+            <button onClick={() => { setChatHistorico([]); setChatAnalise(null) }}
+              className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-2 py-1">
+              Reiniciar
+            </button>
+          </div>
+
+          {/* Chat */}
+          <div className="bg-gray-950 rounded-xl p-3 min-h-48 max-h-80 overflow-y-auto space-y-2 mb-3 font-mono text-xs">
+            {chatHistorico.length === 0 && (
+              <p className="text-gray-600 text-center py-8">Digite sua primeira mensagem como lead para iniciar a simulação...</p>
+            )}
+            {chatHistorico.map((m, i) => (
+              <div key={i} className={`flex ${m.who === 'Lead' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-lg px-3 py-2 ${m.who === 'Lead' ? 'bg-blue-900 text-blue-100' : 'bg-gray-800 text-gray-200'}`}>
+                  <span className={`text-xs font-bold block mb-0.5 ${m.who === 'Lead' ? 'text-blue-300' : 'text-emerald-400'}`}>{m.who}</span>
+                  {m.text}
                 </div>
               </div>
             ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-800 rounded-lg px-3 py-2">
+                  <span className="text-emerald-400 text-xs font-bold block mb-0.5">Agente</span>
+                  <span className="text-gray-500 animate-pulse">digitando...</span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Análise em tempo real */}
+          {chatAnalise && (
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {[
+                { label: 'Gatilho', value: chatAnalise.gatilho || '—', color: 'text-amber-600' },
+                { label: 'Sentimento', value: chatAnalise.sentimento || '—', color: sentimentoCor(chatAnalise.sentimento) },
+                { label: 'Fase', value: chatAnalise.fase || '—', color: 'text-purple-600' },
+                { label: 'Prob.', value: `${chatAnalise.probabilidade ?? '—'}%`, color: 'text-emerald-600' },
+              ].map((item, i) => (
+                <div key={i} className="bg-gray-50 rounded-lg px-2 py-1.5 text-center">
+                  <p className={`text-xs font-mono font-bold ${item.color}`}>{item.value}</p>
+                  <p className="text-xs text-gray-400">{item.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && enviarMensagem()}
+              placeholder="Digite como o lead... (Enter para enviar)"
+              disabled={chatLoading}
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-60"
+            />
+            <button onClick={enviarMensagem} disabled={chatLoading || !chatInput.trim()}
+              className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1">
+              {chatLoading ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── RELATÓRIO DE PRONTIDÃO ── */}
+      {modo === 'relatorio' && (
+        <div className="space-y-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Selecione o agente para ver o relatório</h3>
+            <div className="flex gap-2">
+              <select value={relatorioAgenteId} onChange={e => setRelatorioAgenteId(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="">Selecione um agente...</option>
+                {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+              </select>
+              <button onClick={() => refetchRelatorio()} disabled={!relatorioAgenteId || loadingRel}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                {loadingRel ? <Loader2 size={14} className="animate-spin"/> : '↺'}
+              </button>
+            </div>
+          </div>
+
+          {loadingRel && (
+            <div className="flex items-center justify-center py-12 gap-2 text-gray-400 text-sm">
+              <Loader2 size={18} className="animate-spin"/> Gerando relatório...
+            </div>
+          )}
+
+          {relatorio && !loadingRel && (
+            <>
+              {/* Status geral */}
+              <div className={`rounded-xl p-5 text-white ${relatorio.pronto ? 'bg-emerald-600' : 'bg-gray-700'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide opacity-70 mb-1">Status do agente</p>
+                    <p className="text-xl font-bold">{relatorio.pronto ? '✓ Pronto para produção' : '⏳ Em treinamento'}</p>
+                    <p className="text-sm opacity-70 mt-1">
+                      {relatorio.pronto
+                        ? `Certificado em ${new Date(relatorio.certificado_em!).toLocaleDateString('pt-BR')}`
+                        : relatorio.todos_testados
+                        ? 'Todos os cenários testados, mas score abaixo do mínimo em algum'
+                        : `${relatorio.cenarios.filter(c => c.testado).length}/5 cenários testados`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold font-mono">{relatorio.score_geral ?? '—'}</p>
+                    <p className="text-xs opacity-70">Score geral / mín. {relatorio.score_minimo}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cenários */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Cenários obrigatórios</h3>
+                <div className="space-y-2">
+                  {relatorio.cenarios.map(c => {
+                    const label = CERT_SCENARIOS.find(s => s.id === c.id)?.label || c.id
+                    return (
+                      <div key={c.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 ${!c.testado ? 'border-gray-100' : c.resultado === 'aprovado' ? 'border-emerald-200 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
+                        <span className="text-xs text-gray-700 flex-1">{label}</span>
+                        {c.testado ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-gray-700">{c.score ?? '—'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded font-semibold ${resultadoBadge(c.resultado)}`}>
+                              {c.resultado.toUpperCase()}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Não testado</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Pontos fortes e de melhoria */}
+              <div className="grid grid-cols-2 gap-4">
+                {relatorio.pontos_fortes.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-emerald-700 mb-2">Pontos fortes</h3>
+                    <ul className="space-y-1">
+                      {relatorio.pontos_fortes.map((p, i) => (
+                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500 flex-shrink-0">✓</span>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {relatorio.pontos_melhoria.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-amber-700 mb-2">Pontos de melhoria</h3>
+                    <ul className="space-y-1">
+                      {relatorio.pontos_melhoria.map((p, i) => (
+                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500 flex-shrink-0">→</span>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Sugestões acionáveis */}
+              {relatorio.sugestoes.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Sugestões acionáveis para o script</h3>
+                  <div className="space-y-2">
+                    {relatorio.sugestoes.map((s, i) => (
+                      <div key={i} className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                        <p className="text-xs font-semibold text-blue-700 mb-0.5">{CERT_SCENARIOS.find(c => c.id === s.cenario)?.label || s.cenario}</p>
+                        <p className="text-xs text-blue-800">{s.sugestao}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {relatorio.total === 0 && (
+                <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
+                  <p className="text-gray-400 text-sm">Nenhuma simulação realizada para este agente ainda.</p>
+                  <p className="text-gray-400 text-xs mt-1">Use a aba "Simulação automática" para rodar os cenários.</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

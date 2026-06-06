@@ -235,9 +235,13 @@ export const inteligenciaQualidadeApi = {
   save:   (data: unknown) => api.post('/inteligencia/qualidade', data),
 }
 export const inteligenciaSimuladorApi = {
-  list:    ()             => api.get('/inteligencia/simulador'),
-  create:  (data: unknown) => api.post('/inteligencia/simulador', data),
-  ativar:  (id: string)   => api.patch(`/inteligencia/simulador/${id}/ativar`, {}),
+  list:            ()                    => api.get('/inteligencia/simulador'),
+  create:          (data: unknown)       => api.post('/inteligencia/simulador/rodar', data),
+  certificarTodos: (data: unknown)       => api.post('/inteligencia/simulador/certificar-todos', data),
+  interativo:      (data: unknown)       => api.post('/inteligencia/simulador/interativo', data),
+  relatorio:       (agenteId: string)    => api.get(`/inteligencia/simulador/relatorio/${agenteId}`),
+  getConfig:       ()                    => api.get('/inteligencia/simulador/config'),
+  setConfig:       (data: unknown)       => api.post('/inteligencia/simulador/config', data),
 }
 
 // Emails
