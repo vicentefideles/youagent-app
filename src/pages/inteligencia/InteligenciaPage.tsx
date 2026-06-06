@@ -3978,6 +3978,25 @@ interface PadraoArg {
 }
 
 function TabPadroes() {
+  const [autoAprovacao, setAutoAprovacao] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('etz_auto_aprovacao') ?? 'false') } catch { return false }
+  })
+  const [threshold, setThreshold] = useState<number>(() => {
+    try { return Number(localStorage.getItem('etz_auto_aprovacao_threshold') ?? '2') } catch { return 2 }
+  })
+  const [salvandoAuto, setSalvandoAuto] = useState(false)
+  const [salvoAuto, setSalvoAuto] = useState(false)
+
+  function toggleAutoAprovacao(val: boolean) {
+    setAutoAprovacao(val)
+    localStorage.setItem('etz_auto_aprovacao', JSON.stringify(val))
+  }
+  function salvarThreshold() {
+    setSalvandoAuto(true)
+    localStorage.setItem('etz_auto_aprovacao_threshold', String(threshold))
+    setTimeout(() => { setSalvandoAuto(false); setSalvoAuto(true); setTimeout(() => setSalvoAuto(false), 2500) }, 400)
+  }
+
   const { data: padroes = [], isFetching, refetch } = useQuery({
     queryKey: ['padroes-cross'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross')
@@ -4067,6 +4086,73 @@ function TabPadroes() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Auto-aprovação ────────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${autoAprovacao ? 'bg-emerald-50' : 'bg-gray-100'}`}>
+              <Zap size={16} className={autoAprovacao ? 'text-emerald-600' : 'text-gray-400'} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-900">Auto-aprovação de padrões</p>
+                {autoAprovacao
+                  ? <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">ATIVO</span>
+                  : <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-semibold">DESATIVADO</span>
+                }
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {autoAprovacao
+                  ? `Padrões com eficácia ≥ ${threshold}x são aprovados automaticamente e ficam prontos para Sincronizar com CI.`
+                  : 'Quando ativo, padrões com alta eficácia são aprovados automaticamente — sem precisar revisar um por um.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Toggle switch */}
+          <button
+            onClick={() => toggleAutoAprovacao(!autoAprovacao)}
+            className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${autoAprovacao ? 'bg-emerald-500' : 'bg-gray-200'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${autoAprovacao ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        {/* Configuração do threshold — só aparece quando ativo */}
+        {autoAprovacao && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs font-medium text-gray-700 mb-3">Eficácia mínima para auto-aprovação</p>
+            <div className="flex items-center gap-4">
+              <div className="flex gap-2">
+                {[1.5, 2, 2.5, 3].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setThreshold(v)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold border transition-colors ${threshold === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'}`}
+                  >
+                    {v}x
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-400 flex-1">
+                {threshold === 1.5 && 'Padrões com 50%+ de melhoria — mais sugestões, menor certeza.'}
+                {threshold === 2   && 'Padrões que dobram a conversão — equilíbrio recomendado.'}
+                {threshold === 2.5 && 'Padrões muito sólidos — menos aprovações, maior confiança.'}
+                {threshold === 3   && 'Apenas padrões excepcionais — aprovação muito conservadora.'}
+              </p>
+              <button
+                onClick={salvarThreshold}
+                disabled={salvandoAuto}
+                className="flex items-center gap-1.5 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors font-semibold disabled:opacity-50"
+              >
+                {salvandoAuto ? <Loader2 size={11} className="animate-spin" /> : salvoAuto ? <CheckCircle size={11} /> : null}
+                {salvoAuto ? 'Salvo!' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Alerta crítico dinâmico (só aparece se há padrão com eficacia >= 2) ── */}
