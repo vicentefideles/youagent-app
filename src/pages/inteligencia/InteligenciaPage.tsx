@@ -5,7 +5,7 @@ import {
   FlaskConical, Shield, Users, Clock, BookOpen, Database,
   BarChart2, Sliders, TrendingUp, Share2, GitBranch, Play,
   Target, TestTube2, Globe, Cpu, CheckCircle,
-  ChevronRight, Upload, Trash2, RotateCcw, Zap,
+  Upload, Trash2, RotateCcw, Zap,
   AlertCircle, ArrowRight, RefreshCw, Download, Megaphone, Brain, Sparkles, Loader2, Star, X,
 } from 'lucide-react'
 import { inteligenciaSimuladorApi, inteligenciaApi, claudeApi, api, qualidadeCalcularApi, campanhasApi } from '@/services/api'
@@ -3218,73 +3218,179 @@ function TabAjusteFino() {
 }
 
 function TabEvolucao() {
+  const { data: agentes = [] } = useQuery({
+    queryKey: ['evolucao-agentes'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/agentes').then(r => r.data as any[]).catch(() => []),
+  })
+  const { data: ligsRaw = [] } = useQuery({
+    queryKey: ['evolucao-ligacoes'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
+  })
+  const { data: crossAll = [] } = useQuery({
+    queryKey: ['evolucao-cross'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross').then(r => r.data as any[]).catch(() => []),
+  })
+  const { data: qualidade = [] } = useQuery({
+    queryKey: ['evolucao-qualidade'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/qualidade').then(r => r.data as any[]).catch(() => []),
+  })
+
+  const fmt = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })
+
+  // Marcos reais derivados dos dados
+  const primeiroAgente = (agentes as any[]).sort((a, b) => new Date(a.criado_em ?? a.created_at ?? 0).getTime() - new Date(b.criado_em ?? b.created_at ?? 0).getTime())[0]
+  const primeiraLig = (ligsRaw as any[]).sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime())[0]
+  const crossAprovados = (crossAll as any[]).filter((c: any) => c.status === 'aprovado')
+  const ultimoCross = crossAprovados.sort((a, b) => new Date(b.aprovado_em ?? b.criado_em).getTime() - new Date(a.aprovado_em ?? a.criado_em).getTime())[0]
+  const primeiroCross = crossAprovados.sort((a, b) => new Date(a.aprovado_em ?? a.criado_em).getTime() - new Date(b.aprovado_em ?? b.criado_em).getTime())[0]
+  const scores = (qualidade as any[]).map((q: any) => q.score_total ?? 0).filter((s: number) => s > 0)
+  const scoreAtual = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+
+  // Linha do tempo com marcos reais
+  const marcos: { icon: React.ReactNode; titulo: string; data: string; desc: string; ativo: boolean }[] = []
+
+  if (ultimoCross) marcos.push({
+    icon: <Brain size={12} />,
+    titulo: 'Última evolução de inteligência',
+    data: fmt(ultimoCross.aprovado_em ?? ultimoCross.criado_em),
+    desc: `Argumento "${(ultimoCross.frase || ultimoCross.argumento || '').slice(0, 60)}…" aprovado`,
+    ativo: true,
+  })
+  if (primeiroCross) marcos.push({
+    icon: <Zap size={12} />,
+    titulo: 'Primeiro aprendizado cross aprovado',
+    data: fmt(primeiroCross.aprovado_em ?? primeiroCross.criado_em),
+    desc: `Gatilho: ${primeiroCross.gatilho ?? '—'} · total aprovados: ${crossAprovados.length}`,
+    ativo: false,
+  })
+  if (primeiraLig) marcos.push({
+    icon: <Zap size={12} />,
+    titulo: 'Primeira ligação realizada',
+    data: fmt(primeiraLig.criado_em),
+    desc: `${ligsRaw.length} ligações no total`,
+    ativo: false,
+  })
+  if (primeiroAgente) marcos.push({
+    icon: <CheckCircle size={12} />,
+    titulo: 'Setup inicial',
+    data: fmt(primeiroAgente.criado_em ?? primeiroAgente.created_at ?? new Date().toISOString()),
+    desc: `${agentes.length} agente${agentes.length !== 1 ? 's' : ''} configurado${agentes.length !== 1 ? 's' : ''}`,
+    ativo: false,
+  })
+
+  const semDados = marcos.length === 0
+
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#134e4a)' }}
-      >
-        <h2 className="text-lg font-semibold">Evolução do Sistema</h2>
-        <p className="text-sm text-white/60 mt-0.5">Histórico de versões e ciclo de evolução automático</p>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Linha do tempo</h3>
-          <div className="relative">
-            <div className="absolute left-3 top-0 bottom-0 w-0.5 border-l-2 border-dashed border-gray-200" />
-            {[
-              { version: 'v2.4', active: true, date: 'Hoje', desc: '+2 gatilhos / +1 sotaque / Score +4 pts' },
-              { version: 'v2.3', active: false, date: '15 Mai', desc: 'Motor cross-cliente ativado' },
-              { version: 'v2.1', active: false, date: '02 Abr', desc: 'ICP dinâmico por campanha' },
-              { version: 'v1.0', active: false, date: 'Mar 2026', desc: 'Setup inicial — 3 agentes' },
-            ].map((v, i) => (
-              <div key={i} className="flex gap-3 mb-4 relative pl-8">
-                <div className={`absolute left-0.5 top-1 w-5 h-5 rounded-full flex items-center justify-center ${v.active ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-                  <span className="text-xs font-bold">{i + 1}</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold ${v.active ? 'text-blue-600' : 'text-gray-700'}`}>{v.version}</span>
-                    {v.active && <span className="bg-blue-50 text-blue-600 text-xs px-1.5 py-0.5 rounded font-semibold">ATIVA</span>}
-                    <span className="text-xs text-gray-400">{v.date}</span>
-                  </div>
-                  <p className="text-xs text-gray-500">{v.desc}</p>
-                </div>
-              </div>
-            ))}
+
+      {/* Header branco premium */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+            <TrendingUp size={20} className="text-brand-600" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-base font-semibold text-gray-900">Evolução do Sistema</h2>
+              <span className="bg-brand-50 text-brand-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">APRENDIZADO CONTÍNUO</span>
+            </div>
+            <p className="text-xs text-gray-500">Marcos reais de evolução — cada ligação retroalimenta o sistema e eleva a inteligência dos agentes.</p>
           </div>
         </div>
 
+        {/* KPIs reais */}
+        <div className="grid grid-cols-4 gap-3 mt-4">
+          {[
+            { label: 'Ligações realizadas', value: ligsRaw.length > 0 ? ligsRaw.length.toLocaleString('pt-BR') : '—', color: 'text-brand-600' },
+            { label: 'Cross aprovados', value: crossAprovados.length > 0 ? String(crossAprovados.length) : '—', color: 'text-emerald-600' },
+            { label: 'Agentes ativos', value: agentes.length > 0 ? String(agentes.length) : '—', color: 'text-purple-600' },
+            { label: 'Score médio atual', value: scoreAtual !== null ? `${scoreAtual}%` : '—', color: 'text-amber-600' },
+          ].map((k, i) => (
+            <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">{k.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+
+        {/* Linha do tempo real */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Marcos de evolução</h3>
+          {semDados ? (
+            <div className="text-center py-8 text-gray-400">
+              <TrendingUp size={28} className="mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Marcos aparecerão conforme o sistema evolui.</p>
+              <p className="text-[11px] mt-1">Crie agentes e inicie ligações para começar.</p>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-3 top-0 bottom-0 w-0.5 border-l-2 border-dashed border-gray-200" />
+              {marcos.map((m, i) => (
+                <div key={i} className="flex gap-3 mb-5 relative pl-8">
+                  <div className={`absolute left-0.5 top-1 w-5 h-5 rounded-full flex items-center justify-center ${m.ativo ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {m.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-bold ${m.ativo ? 'text-brand-600' : 'text-gray-700'}`}>{m.titulo}</span>
+                      {m.ativo && <span className="bg-brand-50 text-brand-600 text-[10px] px-1.5 py-0.5 rounded font-semibold">ATUAL</span>}
+                      <span className="text-[11px] text-gray-400">{m.data}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{m.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-4">
+          {/* Ciclo de evolução */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Ciclo de evolução automático</h3>
-            <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Como o sistema evolui</h3>
+            <div className="space-y-2.5">
               {[
-                '1. Ligações executadas e gravadas',
-                '2. Análise de gatilhos e padrões (IA)',
-                '3. Validação cruzada com histórico',
-                '4. Aprovação pelo gerente (cross-cliente)',
-                '5. Deploy automático na próxima janela',
+                { n: '1', txt: 'Ligações executadas e gravadas pelo agente', ok: ligsRaw.length > 0 },
+                { n: '2', txt: 'Análise de gatilhos e padrões pela IA', ok: ligsRaw.length > 0 },
+                { n: '3', txt: 'Validação cruzada com histórico de conversões', ok: crossAll.length > 0 },
+                { n: '4', txt: 'Aprovação pelo gerente (aba IC)', ok: crossAprovados.length > 0 },
+                { n: '5', txt: 'Sincronizar com CI → agentes atualizados', ok: false },
               ].map((s, i) => (
-                <div key={i} className="flex gap-2 text-xs text-gray-600">
-                  <ChevronRight size={12} className="text-blue-500 mt-0.5 shrink-0" />
-                  {s}
+                <div key={i} className="flex items-start gap-2">
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${s.ok ? 'bg-emerald-100' : 'bg-gray-100'}`}>
+                    {s.ok
+                      ? <CheckCircle size={10} className="text-emerald-600" />
+                      : <span className="text-[9px] text-gray-500 font-bold">{s.n}</span>}
+                  </div>
+                  <p className={`text-xs ${s.ok ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>{s.txt}</p>
                 </div>
               ))}
             </div>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <p className="text-xs text-blue-600 font-semibold mb-1">Próximo deploy</p>
-            <p className="text-3xl font-mono font-bold text-blue-700 mb-2">3d 04h 12m</p>
-            <p className="text-xs text-blue-600 font-semibold mb-1">v2.5 — Melhorias previstas:</p>
-            <ul className="space-y-1">
-              {['+3 novos gatilhos de setor saúde', 'Sotaque Nordeste ativado', 'A/B automático para abertura de ligação'].map((b, i) => (
-                <li key={i} className="text-xs text-blue-600 flex gap-1.5">
-                  <CheckCircle size={12} className="mt-0.5 shrink-0" /> {b}
-                </li>
-              ))}
-            </ul>
-          </div>
+
+          {/* Última evolução de inteligência */}
+          {ultimoCross ? (
+            <div className="bg-brand-50 border border-brand-100 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Brain size={14} className="text-brand-600" />
+                <p className="text-xs text-brand-700 font-semibold">Última evolução de inteligência</p>
+              </div>
+              <p className="text-[11px] text-brand-600 mb-1">{fmt(ultimoCross.aprovado_em ?? ultimoCross.criado_em)}</p>
+              <p className="text-xs text-brand-800 font-medium leading-relaxed line-clamp-2">
+                "{(ultimoCross.frase || ultimoCross.argumento || '—').slice(0, 100)}"
+              </p>
+              <p className="text-[10px] text-brand-500 mt-1.5">Gatilho: {ultimoCross.gatilho ?? '—'} · {crossAprovados.length} aprovados no total</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+              <Brain size={20} className="mx-auto mb-2 text-gray-300" />
+              <p className="text-xs text-gray-500">Nenhum aprendizado aprovado ainda.</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Approve argumentos na aba IC para ver a evolução aqui.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
