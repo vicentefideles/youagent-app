@@ -4509,39 +4509,70 @@ function TabSimulador() {
 
       {/* ── Configuração: agente + score mínimo ── */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Configuração</p>
         <div className="grid grid-cols-2 gap-6">
+          {/* Seletor de agente */}
           <div>
-            <label className="text-xs font-semibold text-gray-700 block mb-2">Agente a treinar</label>
-            <div className="relative">
-              <select value={agenteId} onChange={e => setAgenteId(e.target.value)}
-                className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-gray-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer pr-8">
-                <option value="">Todos os agentes</option>
-                {agentes.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.nome}{a.status === 'em_treinamento' ? ' — em treinamento' : ''}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 8L1 3h10L6 8z"/></svg>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Agente a treinar</label>
+            <div className="space-y-1.5">
+              {/* Opção "Todos" */}
+              <button onClick={() => setAgenteId('')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                  agenteId === '' ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                }`}>
+                <div className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-500"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${agenteId === '' ? 'text-blue-700' : 'text-gray-700'}`}>Todos os agentes</p>
+                  <p className="text-xs text-gray-400">Simula sem vínculo</p>
+                </div>
+                {agenteId === '' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+              </button>
+              {/* Agentes cadastrados */}
+              {agentes.map(a => (
+                <button key={a.id} onClick={() => setAgenteId(a.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                    agenteId === a.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                  }`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
+                    a.status === 'em_treinamento' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'
+                  }`}>
+                    {a.nome.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${agenteId === a.id ? 'text-blue-700' : 'text-gray-700'}`}>{a.nome}</p>
+                    <p className="text-xs text-gray-400">{a.status === 'em_treinamento' ? 'Em treinamento' : 'Ativo'}</p>
+                  </div>
+                  {agenteId === a.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Score mínimo */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Score mínimo para aprovação</label>
+            <div className="border border-gray-100 bg-gray-50 rounded-xl p-4">
+              <div className="flex items-end justify-between mb-3">
+                <div>
+                  <p className="text-3xl font-bold font-mono text-gray-900">{scoreMin}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">de 100 pontos</p>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${
+                  scoreMin >= 85 ? 'bg-red-50 text-red-600' : scoreMin >= 70 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                }`}>
+                  {scoreMin >= 85 ? 'Exigente' : scoreMin >= 70 ? 'Recomendado' : 'Básico'}
+                </span>
+              </div>
+              <input type="range" min={50} max={95} step={5} value={scoreMin}
+                onChange={e => setScoreMin(Number(e.target.value))}
+                onMouseUp={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
+                onTouchEnd={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
+                className="w-full h-1.5 accent-blue-600 cursor-pointer" />
+              <div className="flex justify-between text-xs text-gray-300 mt-2">
+                <span>50</span><span>75</span><span>95</span>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">Agentes em treinamento precisam ser certificados antes de ligar.</p>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-700">Score mínimo para aprovação</label>
-              <span className="text-sm font-bold text-blue-600 font-mono bg-blue-50 px-2 py-0.5 rounded-lg">{scoreMin}/100</span>
-            </div>
-            <input type="range" min={50} max={95} step={5} value={scoreMin}
-              onChange={e => setScoreMin(Number(e.target.value))}
-              onMouseUp={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
-              onTouchEnd={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
-              className="w-full h-2 accent-blue-600 cursor-pointer" />
-            <div className="flex justify-between text-xs text-gray-300 mt-1">
-              <span>50 — básico</span><span>75 — recomendado</span><span>95 — exigente</span>
-            </div>
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed">O agente precisa atingir este score em todos os 5 cenários para ser liberado para ligações reais.</p>
           </div>
         </div>
       </div>
