@@ -2966,7 +2966,7 @@ function TabAjusteFino() {
             { icon: <CheckCircle size={14} className="text-brand-600" />, titulo: 'Selecione', desc: 'Ligações que agendaram — você sabe quais foram genuinamente boas' },
             { icon: <Zap size={14} className="text-amber-500" />, titulo: 'Identifique', desc: 'O gatilho que funcionou: urgência, proposta, concorrente, decisor...' },
             { icon: <Brain size={14} className="text-purple-600" />, titulo: 'Registre', desc: 'O padrão vai para revisão no IC e é aprovado antes de propagar' },
-            { icon: <TrendingUp size={14} className="text-emerald-600" />, titulo: 'O agente aprende', desc: 'Aprovado pelo gerente, o padrão é absorvido e passa a guiar as próximas ligações' },
+            { icon: <TrendingUp size={14} className="text-emerald-600" />, titulo: 'O agente aprende', desc: 'Na próxima sincronização, o argumento entra no prompt do agente automaticamente' },
           ].map((b, i) => (
             <div key={i} className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">{b.icon}<span className="text-xs font-semibold text-gray-800">{b.titulo}</span></div>
