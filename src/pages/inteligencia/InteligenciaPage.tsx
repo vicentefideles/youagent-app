@@ -4469,55 +4469,113 @@ function TabSimulador() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="rounded-xl p-5 text-white flex items-center justify-between" style={{ background: 'linear-gradient(135deg,#1a1f35,#3d4a1a)' }}>
-        <div>
-          <h2 className="text-lg font-semibold">Simulador de Ligações</h2>
-          <p className="text-sm text-white/70 mt-0.5">Treine e certifique o agente antes das primeiras ligações reais</p>
-        </div>
-        <div className="text-right text-xs text-white/50">
-          <p>{historico.length} simulações realizadas</p>
+    <div className="space-y-5">
+      {/* ── Header rico ── */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg,#0f1729 0%,#1e3a1e 100%)' }}>
+        <div className="px-6 pt-6 pb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  <Play size={16} className="text-white" />
+                </div>
+                <h2 className="text-lg font-bold text-white">Simulador de Ligações</h2>
+              </div>
+              <p className="text-sm text-white/60 leading-relaxed max-w-xl">
+                Ambiente seguro para treinar e certificar seu agente de IA <span className="text-white/90 font-medium">antes das primeiras ligações reais</span>. O agente só vai para produção depois de ser aprovado nos 5 cenários obrigatórios.
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-2xl font-bold font-mono text-white">{historico.length}</p>
+              <p className="text-xs text-white/40">simulações realizadas</p>
+            </div>
+          </div>
+          {/* Como funciona */}
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { step: '1', title: 'Treine com IA', desc: 'Rode os 5 cenários de objeção reais e veja onde o agente acerta ou falha' },
+              { step: '2', title: 'Receba feedback', desc: 'A IA aponta o turno exato onde errou e sugere como corrigir o script' },
+              { step: '3', title: 'Certifique e ative', desc: 'Com score acima do mínimo em todos os cenários, o agente vai para produção' },
+            ].map(s => (
+              <div key={s.step} className="bg-white/5 rounded-xl px-3 py-2.5 flex gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-white/20 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{s.step}</span>
+                <div>
+                  <p className="text-xs font-semibold text-white/90">{s.title}</p>
+                  <p className="text-xs text-white/40 mt-0.5 leading-relaxed">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Score mínimo + seletor de agente */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="grid grid-cols-2 gap-4">
+      {/* ── Configuração: agente + score mínimo ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Configuração</p>
+        <div className="grid grid-cols-2 gap-6">
           <div>
-            <label className="text-xs font-semibold text-gray-700 block mb-1.5">Agente a treinar</label>
-            <select value={agenteId} onChange={e => setAgenteId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
-              <option value="">Qualquer agente</option>
-              {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}{a.status === 'em_treinamento' ? ' 🔵' : ''}</option>)}
-            </select>
+            <label className="text-xs font-semibold text-gray-700 block mb-2">Agente a treinar</label>
+            <div className="relative">
+              <select value={agenteId} onChange={e => setAgenteId(e.target.value)}
+                className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-gray-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer pr-8">
+                <option value="">Todos os agentes</option>
+                {agentes.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.nome}{a.status === 'em_treinamento' ? ' — em treinamento' : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 8L1 3h10L6 8z"/></svg>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">Agentes em treinamento precisam ser certificados antes de ligar.</p>
           </div>
           <div>
-            <label className="text-xs font-semibold text-gray-700 block mb-1.5">
-              Score mínimo para aprovação — <span className="text-blue-600 font-bold">{scoreMin}/100</span>
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-gray-700">Score mínimo para aprovação</label>
+              <span className="text-sm font-bold text-blue-600 font-mono bg-blue-50 px-2 py-0.5 rounded-lg">{scoreMin}/100</span>
+            </div>
             <input type="range" min={50} max={95} step={5} value={scoreMin}
               onChange={e => setScoreMin(Number(e.target.value))}
               onMouseUp={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
               onTouchEnd={e => salvarScoreMin(Number((e.target as HTMLInputElement).value))}
-              className="w-full accent-blue-600" />
-            <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-              <span>50</span><span>70</span><span>80</span><span>95</span>
+              className="w-full h-2 accent-blue-600 cursor-pointer" />
+            <div className="flex justify-between text-xs text-gray-300 mt-1">
+              <span>50 — básico</span><span>75 — recomendado</span><span>95 — exigente</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs de modo */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+      {/* ── Tabs de modo ── */}
+      <div className="grid grid-cols-3 gap-2">
         {([
-          { id: 'automatico', label: 'Simulação automática', icon: <Play size={13}/> },
-          { id: 'interativo', label: 'Modo interativo', icon: <MessageSquare size={13}/> },
-          { id: 'relatorio',  label: 'Relatório de prontidão', icon: <BarChart2 size={13}/> },
+          { id: 'automatico', label: 'Simulação automática', sub: 'IA roda o cenário completo', icon: <Play size={16}/>, color: 'blue' },
+          { id: 'interativo', label: 'Modo interativo', sub: 'Você digita como o lead', icon: <MessageSquare size={16}/>, color: 'purple' },
+          { id: 'relatorio',  label: 'Relatório de prontidão', sub: 'Score geral e diagnóstico', icon: <BarChart2 size={16}/>, color: 'emerald' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setModo(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${modo === t.id ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-            {t.icon}{t.label}
+            className={`flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all ${
+              modo === t.id
+                ? t.color === 'blue'    ? 'border-blue-500 bg-blue-50'
+                : t.color === 'purple'  ? 'border-purple-500 bg-purple-50'
+                : 'border-emerald-500 bg-emerald-50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+              modo === t.id
+                ? t.color === 'blue'   ? 'bg-blue-600 text-white'
+                : t.color === 'purple' ? 'bg-purple-600 text-white'
+                : 'bg-emerald-600 text-white'
+                : 'bg-gray-100 text-gray-500'
+            }`}>
+              {t.icon}
+            </div>
+            <div>
+              <p className={`text-sm font-semibold ${modo === t.id ? 'text-gray-900' : 'text-gray-700'}`}>{t.label}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{t.sub}</p>
+            </div>
           </button>
         ))}
       </div>
@@ -4525,85 +4583,99 @@ function TabSimulador() {
       {/* ── MODO AUTOMÁTICO ── */}
       {modo === 'automatico' && (
         <>
-          {/* Configuração + botões */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex gap-3 mb-3">
-              <select value={cenario} onChange={e => setCenario(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                {CERT_SCENARIOS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+          {/* Seletor de cenário + ações */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Escolha o cenário</p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {CERT_SCENARIOS.map(c => (
+                <button key={c.id} onClick={() => setCenario(c.id)}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold text-left border-2 transition-all ${
+                    cenario === c.id
+                      ? 'border-blue-500 bg-blue-50 text-blue-800'
+                      : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200'
+                  }`}>
+                  {c.label}
+                </button>
+              ))}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => rodarSimulacao(cenario)} disabled={loading}
-                className="py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
-                {loading ? <Loader2 size={14} className="animate-spin"/> : <Play size={14}/>}
-                {loading ? 'Simulando...' : 'Rodar cenário'}
+                className="py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 transition-colors shadow-sm">
+                {loading ? <Loader2 size={15} className="animate-spin"/> : <Play size={15}/>}
+                {loading ? 'Simulando com IA...' : 'Rodar este cenário'}
               </button>
               <button onClick={certificarTodos} disabled={certTodosLoading}
-                className="py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
-                {certTodosLoading ? <Loader2 size={14} className="animate-spin"/> : <CheckCircle size={14}/>}
-                {certTodosLoading ? 'Certificando...' : 'Certificar agente (5 cenários)'}
+                className="py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm">
+                {certTodosLoading ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle size={15}/>}
+                {certTodosLoading ? 'Certificando todos...' : 'Certificar agente — 5 cenários'}
               </button>
             </div>
             {certTodosLoading && (
-              <p className="text-xs text-gray-400 text-center mt-2">Rodando os 5 cenários em paralelo com IA — pode levar ~20s...</p>
+              <div className="mt-3 flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                <Loader2 size={13} className="animate-spin text-emerald-600 shrink-0"/>
+                <p className="text-xs text-emerald-700">Rodando os 5 cenários em paralelo com IA — aguarde ~20 segundos...</p>
+              </div>
             )}
           </div>
 
           {/* Resultado individual */}
           {resultado && (
             <>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Resultado — {CERT_SCENARIOS.find(c => c.id === resultado.cenario)?.label}</h3>
-                  <div className="flex items-center gap-2">
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                {/* Header do resultado */}
+                <div className={`px-5 py-3 flex items-center justify-between ${resultado.resultado === 'aprovado' ? 'bg-emerald-50 border-b border-emerald-100' : resultado.resultado === 'reprovado' ? 'bg-red-50 border-b border-red-100' : 'bg-gray-50 border-b border-gray-100'}`}>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Resultado da simulação</p>
+                    <h3 className="text-sm font-semibold text-gray-900">{CERT_SCENARIOS.find(c => c.id === resultado.cenario)?.label}</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
                     {resultado.score_minimo && <span className="text-xs text-gray-400">mín. {resultado.score_minimo}</span>}
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(resultado.resultado)}`}>
+                    <span className={`text-sm font-bold px-3 py-1 rounded-full ${resultadoBadge(resultado.resultado)}`}>
                       {resultado.resultado.toUpperCase()}
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-4 gap-3 mb-3">
-                  {[
-                    { label: 'Score',    value: String(resultado.score ?? '—') },
-                    { label: 'Objeções', value: `${resultado.objecoes_aprovadas}/${resultado.objecoes_total}` },
-                    { label: 'Gatilhos', value: `${resultado.gatilhos_detectados}/${resultado.gatilhos_total}` },
-                    { label: 'Duração',  value: fmtDuracao(resultado.duracao_segundos) },
-                  ].map((k, i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
-                      <p className="text-lg font-mono font-bold text-gray-800">{k.value}</p>
-                      <p className="text-xs text-gray-500">{k.label}</p>
+                <div className="p-5">
+                  <div className="grid grid-cols-4 gap-3 mb-4">
+                    {[
+                      { label: 'Score',    value: String(resultado.score ?? '—'), highlight: true },
+                      { label: 'Objeções', value: `${resultado.objecoes_aprovadas}/${resultado.objecoes_total}`, highlight: false },
+                      { label: 'Gatilhos', value: `${resultado.gatilhos_detectados}/${resultado.gatilhos_total}`, highlight: false },
+                      { label: 'Duração',  value: fmtDuracao(resultado.duracao_segundos), highlight: false },
+                    ].map((k, i) => (
+                      <div key={i} className={`rounded-xl p-3 text-center ${k.highlight ? 'bg-gray-900' : 'bg-gray-50'}`}>
+                        <p className={`text-xl font-mono font-bold ${k.highlight ? 'text-white' : 'text-gray-800'}`}>{k.value}</p>
+                        <p className={`text-xs mt-0.5 ${k.highlight ? 'text-gray-400' : 'text-gray-500'}`}>{k.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                    <span className="font-medium">Desempenho geral</span>
+                    <span className="font-mono font-bold text-gray-700">{resultado.score ?? 0}/100</span>
+                  </div>
+                  <Bar pct={resultado.score ?? 0} color={resultado.score >= 80 ? 'bg-emerald-500' : resultado.score >= 60 ? 'bg-amber-400' : 'bg-red-400'} />
+
+                  {resultado.sugestao_melhoria && (
+                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                      <p className="text-xs font-semibold text-blue-700 mb-1">Sugestão de melhoria do script</p>
+                      <p className="text-xs text-blue-800 leading-relaxed">{resultado.sugestao_melhoria}</p>
                     </div>
-                  ))}
+                  )}
+                  {resultado.turno_critico && (
+                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                      <span className="text-amber-500 shrink-0">⚠</span>
+                      <p className="text-xs text-amber-700">Ponto crítico no turno {resultado.turno_critico} — o agente perdeu a condução da conversa aqui.</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>Desempenho</span>
-                  <span className="font-mono font-bold">{resultado.score ?? 0}/100</span>
-                </div>
-                <Bar pct={resultado.score ?? 0} color={resultado.score >= 80 ? 'bg-emerald-500' : resultado.score >= 60 ? 'bg-amber-400' : 'bg-red-400'} />
-
-                {/* Sugestão acionável */}
-                {resultado.sugestao_melhoria && (
-                  <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                    <p className="text-xs font-semibold text-blue-700 mb-0.5">Sugestão para melhorar o script</p>
-                    <p className="text-xs text-blue-800">{resultado.sugestao_melhoria}</p>
-                  </div>
-                )}
-
-                {/* Turno crítico */}
-                {resultado.turno_critico && (
-                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    <p className="text-xs text-amber-700">⚠ Ponto crítico no turno {resultado.turno_critico} — o agente perdeu a condução da conversa aqui.</p>
-                  </div>
-                )}
               </div>
 
               {/* Transcript + análise */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <p className="text-xs text-gray-400 mb-2 font-semibold">TRANSCRIÇÃO SIMULADA</p>
-                    <div className="bg-gray-950 rounded-lg p-3 space-y-2 font-mono text-xs max-h-56 overflow-y-auto">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Transcrição simulada</p>
+                    <div className="bg-gray-950 rounded-xl p-3 space-y-2 font-mono text-xs max-h-56 overflow-y-auto">
                       {resultado.transcript.slice(0, visibleLines).map((t, i) => (
                         <div key={i} className={resultado.turno_critico && Math.ceil((i+1)/2) === resultado.turno_critico ? 'border-l-2 border-amber-400 pl-2' : ''}>
                           <span className={`font-bold ${t.who === 'Agente' ? 'text-blue-400' : 'text-emerald-400'}`}>{t.who}: </span>
@@ -4614,7 +4686,7 @@ function TabSimulador() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-2 font-semibold">ANÁLISE IA</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Análise IA</p>
                     <div className="space-y-1.5 mb-3">
                       {[
                         { label: 'Gatilho principal', value: resultado.analise?.gatilho_principal || '—', color: 'text-amber-600' },
@@ -4622,7 +4694,7 @@ function TabSimulador() {
                         { label: 'Sentimento',        value: resultado.analise?.sentimento        || '—', color: sentimentoCor(resultado.analise?.sentimento) },
                         { label: 'Prob. agendamento', value: `${resultado.analise?.probabilidade_agendamento ?? '—'}%`, color: 'text-emerald-600' },
                       ].map((item, i) => (
-                        <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-1.5">
+                        <div key={i} className="flex justify-between bg-gray-50 rounded-xl px-3 py-2">
                           <span className="text-xs text-gray-500">{item.label}</span>
                           <span className={`text-xs font-mono font-semibold ${item.color}`}>{item.value}</span>
                         </div>
@@ -4630,17 +4702,17 @@ function TabSimulador() {
                     </div>
                     {resultado.analise?.pontos_fortes && resultado.analise.pontos_fortes.length > 0 && (
                       <div className="mb-2">
-                        <p className="text-xs font-semibold text-emerald-700 mb-1">Pontos fortes</p>
+                        <p className="text-xs font-semibold text-emerald-700 mb-1.5">Pontos fortes</p>
                         {resultado.analise.pontos_fortes.map((p, i) => (
-                          <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500">✓</span>{p}</p>
+                          <p key={i} className="text-xs text-gray-600 flex gap-1.5 mb-1"><span className="text-emerald-500 shrink-0">✓</span>{p}</p>
                         ))}
                       </div>
                     )}
                     {resultado.analise?.pontos_melhoria && resultado.analise.pontos_melhoria.length > 0 && (
                       <div>
-                        <p className="text-xs font-semibold text-amber-700 mb-1">Pontos de melhoria</p>
+                        <p className="text-xs font-semibold text-amber-700 mb-1.5">Pontos de melhoria</p>
                         {resultado.analise.pontos_melhoria.map((p, i) => (
-                          <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500">→</span>{p}</p>
+                          <p key={i} className="text-xs text-gray-600 flex gap-1.5 mb-1"><span className="text-amber-500 shrink-0">→</span>{p}</p>
                         ))}
                       </div>
                     )}
@@ -4651,53 +4723,58 @@ function TabSimulador() {
           )}
 
           {/* Certificações */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-semibold text-gray-900">Certificações obrigatórias</h3>
-              <span className="text-xs text-gray-400">Score mínimo: {scoreMin}/100</span>
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Certificações obrigatórias</h3>
+                <p className="text-xs text-gray-400 mt-0.5">O agente é liberado para produção somente após aprovar os 5 cenários abaixo.</p>
+              </div>
+              <span className="text-xs text-gray-500 bg-gray-100 rounded-lg px-2 py-1 font-mono shrink-0">mín. {scoreMin}/100</span>
             </div>
-            <p className="text-xs text-gray-500 mb-3">O agente precisa atingir o score mínimo em todos os 5 cenários antes de ser liberado para ligações reais.</p>
 
             {certTodosResultado && (
-              <div className={`mb-3 rounded-lg px-3 py-2 border ${certTodosResultado.todos_aprovados ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                <div className="flex items-center justify-between">
-                  <span className={`text-xs font-semibold ${certTodosResultado.todos_aprovados ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {certTodosResultado.todos_aprovados ? '✓ Agente certificado para produção!' : '✗ Certificação não concluída'}
-                  </span>
-                  <span className="text-xs font-mono font-bold text-gray-700">Score geral: {certTodosResultado.score_geral}/100</span>
-                </div>
+              <div className={`mt-3 mb-4 rounded-xl px-4 py-3 border flex items-center justify-between ${certTodosResultado.todos_aprovados ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                <span className={`text-sm font-semibold ${certTodosResultado.todos_aprovados ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {certTodosResultado.todos_aprovados ? '✓ Agente certificado para produção!' : '✗ Certificação não concluída — revise os cenários reprovados'}
+                </span>
+                <span className="text-sm font-mono font-bold text-gray-700">{certTodosResultado.score_geral}/100</span>
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 mt-3">
               {CERT_SCENARIOS.map((c) => {
                 const cert = certResultados[c.id]
                 const isLoading = certLoading[c.id]
                 const aprovado = cert && cert.resultado === 'aprovado'
                 const reprovado = cert && cert.resultado === 'reprovado'
                 return (
-                  <div key={c.id} className={`border rounded-lg px-3 py-2 ${aprovado ? 'border-emerald-200 bg-emerald-50' : reprovado ? 'border-red-100 bg-red-50' : 'border-gray-100'}`}>
+                  <div key={c.id} className={`border-2 rounded-xl px-4 py-3 transition-colors ${aprovado ? 'border-emerald-200 bg-emerald-50' : reprovado ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-gray-50'}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-700 flex-1">{c.label}</span>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${aprovado ? 'bg-emerald-500 text-white' : reprovado ? 'bg-red-400 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                          {aprovado ? '✓' : reprovado ? '✗' : '?'}
+                        </div>
+                        <span className="text-xs font-medium text-gray-700">{c.label}</span>
+                      </div>
                       {cert ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-gray-700">{cert.score}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded font-semibold ${resultadoBadge(cert.resultado)}`}>
+                          <span className="text-xs font-mono font-bold text-gray-700">{cert.score}/100</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(cert.resultado)}`}>
                             {cert.resultado.toUpperCase()}
                           </span>
                           <button onClick={() => rodarSimulacao(c.id, c.id)} disabled={isLoading}
-                            className="text-xs text-gray-400 hover:text-gray-600" title="Repetir">↺</button>
+                            className="text-xs text-gray-400 hover:text-gray-600 px-1" title="Repetir">↺</button>
                         </div>
                       ) : (
                         <button onClick={() => rodarSimulacao(c.id, c.id)} disabled={isLoading}
-                          className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 disabled:opacity-60 flex items-center gap-1">
+                          className="bg-white text-gray-700 text-xs px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-60 flex items-center gap-1.5 font-medium shadow-sm">
                           {isLoading ? <Loader2 size={10} className="animate-spin"/> : null}
-                          {isLoading ? 'Testando...' : 'Testar'}
+                          {isLoading ? 'Testando...' : 'Testar cenário'}
                         </button>
                       )}
                     </div>
                     {cert?.sugestao && reprovado && (
-                      <p className="text-xs text-red-700 mt-1 italic">→ {cert.sugestao}</p>
+                      <p className="text-xs text-red-700 mt-2 italic pl-9">→ {cert.sugestao}</p>
                     )}
                   </div>
                 )
@@ -4705,26 +4782,27 @@ function TabSimulador() {
             </div>
 
             {Object.keys(certResultados).length < CERT_SCENARIOS.length && (
-              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                <p className="text-xs text-amber-700">⚠ Agente não pode ir para produção com certificações pendentes.</p>
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                <span className="text-amber-500 shrink-0">⚠</span>
+                <p className="text-xs text-amber-700">O agente não pode ir para produção com certificações pendentes. Teste todos os 5 cenários.</p>
               </div>
             )}
           </div>
 
           {/* Histórico */}
           {historico.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico de simulações</h3>
-              <div className="space-y-2">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Histórico de simulações</p>
+              <div className="space-y-1.5">
                 {historico.slice(0, 8).map((h, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                  <div key={i} className="flex items-center justify-between text-xs bg-gray-50 rounded-xl px-3 py-2">
                     <div>
                       <span className="font-medium text-gray-700">{CERT_SCENARIOS.find(c => c.id === h.cenario)?.label || h.cenario || '—'}</span>
                       <span className="text-gray-400 ml-2">{h.agente_nome || '—'}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-gray-600">{h.score ?? '—'}</span>
-                      <span className={`px-2 py-0.5 rounded font-semibold ${resultadoBadge(h.resultado || 'inconclusivo')}`}>
+                      <span className={`px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(h.resultado || 'inconclusivo')}`}>
                         {(h.resultado || 'inconclusivo').toUpperCase()}
                       </span>
                       <span className="text-gray-400">{new Date(h.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
@@ -4739,73 +4817,75 @@ function TabSimulador() {
 
       {/* ── MODO INTERATIVO ── */}
       {modo === 'interativo' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">Modo interativo — você é o lead</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Digite como se fosse o cliente. O agente responde com a IA real configurada para ele.</p>
+              <p className="text-xs text-gray-400 mt-0.5">Digite como se fosse o cliente. O agente responde com a IA real configurada para ele.</p>
             </div>
             <button onClick={() => { setChatHistorico([]); setChatAnalise(null) }}
-              className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-2 py-1">
+              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl px-3 py-1.5 hover:bg-gray-50 transition-colors">
               Reiniciar
             </button>
           </div>
 
-          {/* Chat */}
-          <div className="bg-gray-950 rounded-xl p-3 min-h-48 max-h-80 overflow-y-auto space-y-2 mb-3 font-mono text-xs">
-            {chatHistorico.length === 0 && (
-              <p className="text-gray-600 text-center py-8">Digite sua primeira mensagem como lead para iniciar a simulação...</p>
-            )}
-            {chatHistorico.map((m, i) => (
-              <div key={i} className={`flex ${m.who === 'Lead' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg px-3 py-2 ${m.who === 'Lead' ? 'bg-blue-900 text-blue-100' : 'bg-gray-800 text-gray-200'}`}>
-                  <span className={`text-xs font-bold block mb-0.5 ${m.who === 'Lead' ? 'text-blue-300' : 'text-emerald-400'}`}>{m.who}</span>
-                  {m.text}
-                </div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-800 rounded-lg px-3 py-2">
-                  <span className="text-emerald-400 text-xs font-bold block mb-0.5">Agente</span>
-                  <span className="text-gray-500 animate-pulse">digitando...</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Análise em tempo real */}
-          {chatAnalise && (
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {[
-                { label: 'Gatilho', value: chatAnalise.gatilho || '—', color: 'text-amber-600' },
-                { label: 'Sentimento', value: chatAnalise.sentimento || '—', color: sentimentoCor(chatAnalise.sentimento) },
-                { label: 'Fase', value: chatAnalise.fase || '—', color: 'text-purple-600' },
-                { label: 'Prob.', value: `${chatAnalise.probabilidade ?? '—'}%`, color: 'text-emerald-600' },
-              ].map((item, i) => (
-                <div key={i} className="bg-gray-50 rounded-lg px-2 py-1.5 text-center">
-                  <p className={`text-xs font-mono font-bold ${item.color}`}>{item.value}</p>
-                  <p className="text-xs text-gray-400">{item.label}</p>
+          <div className="p-5">
+            {/* Chat */}
+            <div className="bg-gray-950 rounded-2xl p-4 min-h-48 max-h-80 overflow-y-auto space-y-3 mb-4 font-mono text-xs">
+              {chatHistorico.length === 0 && (
+                <p className="text-gray-600 text-center py-10">Digite sua primeira mensagem como lead para iniciar a simulação...</p>
+              )}
+              {chatHistorico.map((m, i) => (
+                <div key={i} className={`flex ${m.who === 'Lead' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-xl px-3 py-2 ${m.who === 'Lead' ? 'bg-blue-900 text-blue-100' : 'bg-gray-800 text-gray-200'}`}>
+                    <span className={`text-xs font-bold block mb-0.5 ${m.who === 'Lead' ? 'text-blue-300' : 'text-emerald-400'}`}>{m.who}</span>
+                    {m.text}
+                  </div>
                 </div>
               ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-800 rounded-xl px-3 py-2">
+                    <span className="text-emerald-400 text-xs font-bold block mb-0.5">Agente</span>
+                    <span className="text-gray-500 animate-pulse">digitando...</span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Input */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && enviarMensagem()}
-              placeholder="Digite como o lead... (Enter para enviar)"
-              disabled={chatLoading}
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-60"
-            />
-            <button onClick={enviarMensagem} disabled={chatLoading || !chatInput.trim()}
-              className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1">
-              {chatLoading ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}
-            </button>
+            {/* Análise em tempo real */}
+            {chatAnalise && (
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {[
+                  { label: 'Gatilho', value: chatAnalise.gatilho || '—', color: 'text-amber-600' },
+                  { label: 'Sentimento', value: chatAnalise.sentimento || '—', color: sentimentoCor(chatAnalise.sentimento) },
+                  { label: 'Fase', value: chatAnalise.fase || '—', color: 'text-purple-600' },
+                  { label: 'Prob.', value: `${chatAnalise.probabilidade ?? '—'}%`, color: 'text-emerald-600' },
+                ].map((item, i) => (
+                  <div key={i} className="bg-gray-50 rounded-xl px-2 py-2 text-center">
+                    <p className={`text-xs font-mono font-bold ${item.color}`}>{item.value}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && enviarMensagem()}
+                placeholder="Digite como o lead... (Enter para enviar)"
+                disabled={chatLoading}
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 disabled:opacity-60 bg-gray-50"
+              />
+              <button onClick={enviarMensagem} disabled={chatLoading || !chatInput.trim()}
+                className="bg-blue-600 text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1 shadow-sm">
+                {chatLoading ? <Loader2 size={15} className="animate-spin"/> : <Send size={15}/>}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -4813,16 +4893,21 @@ function TabSimulador() {
       {/* ── RELATÓRIO DE PRONTIDÃO ── */}
       {modo === 'relatorio' && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Selecione o agente para ver o relatório</h3>
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Selecione o agente</p>
             <div className="flex gap-2">
-              <select value={relatorioAgenteId} onChange={e => setRelatorioAgenteId(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                <option value="">Selecione um agente...</option>
-                {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-              </select>
+              <div className="relative flex-1">
+                <select value={relatorioAgenteId} onChange={e => setRelatorioAgenteId(e.target.value)}
+                  className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-gray-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer pr-8">
+                  <option value="">Selecione um agente...</option>
+                  {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 8L1 3h10L6 8z"/></svg>
+                </div>
+              </div>
               <button onClick={() => refetchRelatorio()} disabled={!relatorioAgenteId || loadingRel}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors">
                 {loadingRel ? <Loader2 size={14} className="animate-spin"/> : '↺'}
               </button>
             </div>
@@ -4837,12 +4922,12 @@ function TabSimulador() {
           {relatorio && !loadingRel && (
             <>
               {/* Status geral */}
-              <div className={`rounded-xl p-5 text-white ${relatorio.pronto ? 'bg-emerald-600' : 'bg-gray-700'}`}>
+              <div className={`rounded-2xl p-6 text-white ${relatorio.pronto ? 'bg-emerald-600' : 'bg-gray-800'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-wide opacity-70 mb-1">Status do agente</p>
+                    <p className="text-xs uppercase tracking-widest opacity-60 mb-2">Status do agente</p>
                     <p className="text-xl font-bold">{relatorio.pronto ? '✓ Pronto para produção' : '⏳ Em treinamento'}</p>
-                    <p className="text-sm opacity-70 mt-1">
+                    <p className="text-sm opacity-60 mt-1.5 leading-relaxed">
                       {relatorio.pronto
                         ? `Certificado em ${new Date(relatorio.certificado_em!).toLocaleDateString('pt-BR')}`
                         : relatorio.todos_testados
@@ -4851,25 +4936,29 @@ function TabSimulador() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-3xl font-bold font-mono">{relatorio.score_geral ?? '—'}</p>
-                    <p className="text-xs opacity-70">Score geral / mín. {relatorio.score_minimo}</p>
+                    <p className="text-4xl font-bold font-mono">{relatorio.score_geral ?? '—'}</p>
+                    <p className="text-xs opacity-50 mt-1">score geral / mín. {relatorio.score_minimo}</p>
                   </div>
                 </div>
               </div>
 
               {/* Cenários */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Cenários obrigatórios</h3>
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Cenários obrigatórios</p>
                 <div className="space-y-2">
                   {relatorio.cenarios.map(c => {
                     const label = CERT_SCENARIOS.find(s => s.id === c.id)?.label || c.id
+                    const ok = c.testado && c.resultado === 'aprovado'
                     return (
-                      <div key={c.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 ${!c.testado ? 'border-gray-100' : c.resultado === 'aprovado' ? 'border-emerald-200 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
-                        <span className="text-xs text-gray-700 flex-1">{label}</span>
+                      <div key={c.id} className={`flex items-center gap-3 border-2 rounded-xl px-4 py-2.5 ${!c.testado ? 'border-gray-100 bg-gray-50' : ok ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${!c.testado ? 'bg-gray-200 text-gray-400' : ok ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'}`}>
+                          {!c.testado ? '?' : ok ? '✓' : '✗'}
+                        </div>
+                        <span className="text-xs font-medium text-gray-700 flex-1">{label}</span>
                         {c.testado ? (
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-bold text-gray-700">{c.score ?? '—'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded font-semibold ${resultadoBadge(c.resultado)}`}>
+                            <span className="text-xs font-mono font-bold text-gray-700">{c.score ?? '—'}/100</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${resultadoBadge(c.resultado)}`}>
                               {c.resultado.toUpperCase()}
                             </span>
                           </div>
@@ -4885,21 +4974,21 @@ function TabSimulador() {
               {/* Pontos fortes e de melhoria */}
               <div className="grid grid-cols-2 gap-4">
                 {relatorio.pontos_fortes.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <h3 className="text-sm font-semibold text-emerald-700 mb-2">Pontos fortes</h3>
-                    <ul className="space-y-1">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-3">Pontos fortes</p>
+                    <ul className="space-y-2">
                       {relatorio.pontos_fortes.map((p, i) => (
-                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500 flex-shrink-0">✓</span>{p}</li>
+                        <li key={i} className="text-xs text-gray-600 flex gap-2"><span className="text-emerald-500 shrink-0 mt-0.5">✓</span>{p}</li>
                       ))}
                     </ul>
                   </div>
                 )}
                 {relatorio.pontos_melhoria.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <h3 className="text-sm font-semibold text-amber-700 mb-2">Pontos de melhoria</h3>
-                    <ul className="space-y-1">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-3">Pontos de melhoria</p>
+                    <ul className="space-y-2">
                       {relatorio.pontos_melhoria.map((p, i) => (
-                        <li key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500 flex-shrink-0">→</span>{p}</li>
+                        <li key={i} className="text-xs text-gray-600 flex gap-2"><span className="text-amber-500 shrink-0 mt-0.5">→</span>{p}</li>
                       ))}
                     </ul>
                   </div>
@@ -4908,13 +4997,13 @@ function TabSimulador() {
 
               {/* Sugestões acionáveis */}
               {relatorio.sugestoes.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Sugestões acionáveis para o script</h3>
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Sugestões para o script</p>
                   <div className="space-y-2">
                     {relatorio.sugestoes.map((s, i) => (
-                      <div key={i} className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                        <p className="text-xs font-semibold text-blue-700 mb-0.5">{CERT_SCENARIOS.find(c => c.id === s.cenario)?.label || s.cenario}</p>
-                        <p className="text-xs text-blue-800">{s.sugestao}</p>
+                      <div key={i} className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                        <p className="text-xs font-semibold text-blue-700 mb-1">{CERT_SCENARIOS.find(c => c.id === s.cenario)?.label || s.cenario}</p>
+                        <p className="text-xs text-blue-800 leading-relaxed">{s.sugestao}</p>
                       </div>
                     ))}
                   </div>
@@ -4922,7 +5011,7 @@ function TabSimulador() {
               )}
 
               {relatorio.total === 0 && (
-                <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
+                <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center">
                   <p className="text-gray-400 text-sm">Nenhuma simulação realizada para este agente ainda.</p>
                   <p className="text-gray-400 text-xs mt-1">Use a aba "Simulação automática" para rodar os cenários.</p>
                 </div>
