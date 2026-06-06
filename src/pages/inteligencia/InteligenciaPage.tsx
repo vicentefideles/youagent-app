@@ -4443,6 +4443,10 @@ function TabSimulador() {
       data.resultados.forEach(r => { mapa[r.cenario] = { score: r.score, resultado: r.resultado, sugestao: r.sugestao } })
       setCertResultados(mapa)
       queryClient.invalidateQueries({ queryKey: ['inteligencia-simulador'] })
+      // Se aprovado, invalida cache de agentes — discadora e campanhas refletem imediatamente
+      if (data.todos_aprovados) {
+        queryClient.invalidateQueries({ queryKey: ['agentes'] })
+      }
     } catch (e) { console.error(e) }
     finally { setCertTodosLoading(false) }
   }
@@ -4762,11 +4766,18 @@ function TabSimulador() {
             </div>
 
             {certTodosResultado && (
-              <div className={`mt-3 mb-4 rounded-xl px-4 py-3 border flex items-center justify-between ${certTodosResultado.todos_aprovados ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                <span className={`text-sm font-semibold ${certTodosResultado.todos_aprovados ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {certTodosResultado.todos_aprovados ? '✓ Agente certificado para produção!' : '✗ Certificação não concluída — revise os cenários reprovados'}
-                </span>
-                <span className="text-sm font-mono font-bold text-gray-700">{certTodosResultado.score_geral}/100</span>
+              <div className={`mt-3 mb-4 rounded-xl px-4 py-4 border ${certTodosResultado.todos_aprovados ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-sm font-bold ${certTodosResultado.todos_aprovados ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {certTodosResultado.todos_aprovados ? '✓ Agente certificado e ativado!' : '✗ Certificação não concluída'}
+                  </span>
+                  <span className="text-sm font-mono font-bold text-gray-700">{certTodosResultado.score_geral}/100</span>
+                </div>
+                <p className={`text-xs ${certTodosResultado.todos_aprovados ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {certTodosResultado.todos_aprovados
+                    ? 'Status atualizado para ativo — o agente já aparece na Discadora e pode ser adicionado a campanhas.'
+                    : 'Revise os cenários reprovados e rode novamente até atingir o score mínimo em todos.'}
+                </p>
               </div>
             )}
 
