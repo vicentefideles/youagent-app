@@ -3524,124 +3524,313 @@ function TabEvolucao() {
   )
 }
 
-interface CrossPendente {
+interface CrossArg {
   id: string
   gatilho: string
   frase: string
+  argumento: string
   status: string
   criado_em: string
+  aprovado_em: string | null
+  segmento: string | null
+  cliente_id: string
 }
 
 function TabCross() {
-  const [votes, setVotes] = useState<Record<number, 'approved' | 'rejected' | null>>({})
-
-  // Dados da API
-  const { data: crossData = [] } = useQuery({
-    queryKey: ['inteligencia-cross'],
-    queryFn: () => inteligenciaApi.getCross().then(res => (res.data as CrossPendente[]) || []).catch(() => [] as CrossPendente[]),
-  })
-
-  // Use API data; fallback to empty (no hardcoded items in production view)
-  const pendentesApi = crossData
-
-  // Gerar cross com Claude
+  const qc = useQueryClient()
+  const [aprovando, setAprovando] = useState<string | null>(null)
+  const [rejeitando, setRejeitando] = useState<string | null>(null)
   const [novoGatilho, setNovoGatilho] = useState('')
   const [novosExemplos, setNovosExemplos] = useState('')
   const [gerandoCross, setGerandoCross] = useState(false)
   const [crossGerado, setCrossGerado] = useState<string | null>(null)
   const [crossErro, setCrossErro] = useState<string | null>(null)
 
+  const { data: crossAll = [], refetch: refetchCross } = useQuery({
+    queryKey: ['cross-all'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross').then(r => r.data as CrossArg[]).catch(() => [] as CrossArg[]),
+  })
+  const { data: ligsRaw = [] } = useQuery({
+    queryKey: ['cross-ligacoes'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
+  })
+
+  const pendentes = crossAll.filter(c => c.status === 'pendente')
+  const aprovados = crossAll.filter(c => c.status === 'aprovado')
+  const totalLigs = (ligsRaw as any[]).length
+  const ligsConvertidas = (ligsRaw as any[]).filter((l: any) => l.resultado === 'agendou' || l.resultado === 'transferida')
+
+  // KPIs
+  const agora = new Date()
+  const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1)
+  const aprovadosEsteMes = aprovados.filter(c => new Date(c.aprovado_em ?? c.criado_em) >= inicioMes).length
+
+  // Agrupamento por gatilho dos aprovados
+  const porGatilho: Record<string, CrossArg[]> = {}
+  aprovados.forEach(c => {
+    const g = c.gatilho ?? 'outros'
+    if (!porGatilho[g]) porGatilho[g] = []
+    porGatilho[g].push(c)
+  })
+
+  // ROI estimado por argumento: ligações convertidas após aprovação
+  function ligsAposAprovacao(c: CrossArg) {
+    if (!c.aprovado_em) return 0
+    const dt = new Date(c.aprovado_em)
+    return ligsConvertidas.filter((l: any) => new Date(l.criado_em) >= dt).length
+  }
+
+  async function aprovar(id: string) {
+    setAprovando(id)
+    try {
+      await api.post(`https://app.etztech.com/api/v1/inteligencia/cross/${id}/aprovar`)
+      await refetchCross()
+      qc.invalidateQueries({ queryKey: ['inteligencia-cross'] })
+      qc.invalidateQueries({ queryKey: ['evolucao-cross'] })
+    } catch { /* silencioso */ } finally { setAprovando(null) }
+  }
+
+  async function rejeitar(id: string) {
+    setRejeitando(id)
+    try {
+      await api.delete(`https://app.etztech.com/api/v1/inteligencia/cross/${id}`)
+      await refetchCross()
+      qc.invalidateQueries({ queryKey: ['inteligencia-cross'] })
+    } catch { /* silencioso */ } finally { setRejeitando(null) }
+  }
+
   async function handleGerarCross() {
     if (!novoGatilho.trim()) return
-    setGerandoCross(true)
-    setCrossGerado(null)
-    setCrossErro(null)
+    setGerandoCross(true); setCrossGerado(null); setCrossErro(null)
     try {
-      const res = await claudeApi.gerarCross({
-        gatilho: novoGatilho.trim(),
-        exemplos: novosExemplos.split('\n').map(s => s.trim()).filter(Boolean),
-      })
+      const res = await claudeApi.gerarCross({ gatilho: novoGatilho.trim(), exemplos: novosExemplos.split('\n').map(s => s.trim()).filter(Boolean) })
       const d = res.data as { frase?: string; resultado?: string; content?: string }
       setCrossGerado(d.frase ?? d.resultado ?? d.content ?? JSON.stringify(d))
-    } catch {
-      setCrossErro('Erro ao gerar com Claude. Tente novamente.')
-    } finally {
-      setGerandoCross(false)
-    }
+    } catch { setCrossErro('Erro ao gerar com Claude. Tente novamente.') }
+    finally { setGerandoCross(false) }
   }
+
+  const fmtDt = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const fmtHora = (d: string) => new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#064e3b,#065f46)' }}
-      >
-        <h2 className="text-lg font-semibold mb-1">Aprendizado Cross-Cliente</h2>
-        <p className="text-sm text-white/70">Argumentos validados em um estado são propagados para toda a rede. Aprovação obrigatória do gerente antes de ir para produção.</p>
-        <div className="flex gap-6 mt-3">
+
+      {/* ── Header branco premium ──────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <Brain size={20} className="text-emerald-600" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-base font-semibold text-gray-900">Aprendizado Cross-Cliente</h2>
+              <span className="bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">REDE COLABORATIVA</span>
+            </div>
+            <p className="text-xs text-gray-500">O que funciona em qualquer segmento vira aprendizado para o seu agente. O sistema detecta automaticamente — você aprova e o agente evolui.</p>
+          </div>
+        </div>
+
+        {/* KPIs reais */}
+        <div className="grid grid-cols-4 gap-3 mt-4">
           {[
-            { label: 'Aprovados este mês', val: '11' },
-            { label: 'Em produção', val: '8' },
-            { label: 'Impacto médio', val: '+10pp' },
+            { label: 'Pendentes de aprovação', value: String(pendentes.length), color: pendentes.length > 0 ? 'text-amber-600' : 'text-gray-400', bg: pendentes.length > 0 ? 'bg-amber-50' : 'bg-gray-50' },
+            { label: 'Aprovados no total', value: String(aprovados.length), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Aprovados este mês', value: String(aprovadosEsteMes), color: 'text-brand-600', bg: 'bg-brand-50' },
+            { label: 'Ligações analisadas', value: totalLigs > 0 ? totalLigs.toLocaleString('pt-BR') : '—', color: 'text-purple-600', bg: 'bg-purple-50' },
           ].map((k, i) => (
-            <div key={i}>
-              <p className="text-xs text-white/50">{k.label}</p>
-              <p className="text-lg font-mono font-bold text-emerald-300">{k.val}</p>
+            <div key={i} className={`${k.bg} rounded-lg p-3 text-center`}>
+              <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">{k.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <KpiCard label="Insights gerados" value="14" accent="green" />
-        <KpiCard label="Impacto médio" value="+10pp" accent="blue" />
-        <KpiCard label="Setores ativos" value="6" accent="purple" />
+      {/* ── Alerta pendentes ───────────────────────────────────────────────── */}
+      {pendentes.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <AlertCircle size={15} className="text-amber-600 flex-shrink-0" />
+          <p className="text-xs text-amber-800 font-medium">
+            {pendentes.length} argumento{pendentes.length !== 1 ? 's' : ''} aguardando sua aprovação — revise e aprove para o agente evoluir.
+          </p>
+        </div>
+      )}
+
+      {/* ── Grid: pendentes + como funciona ───────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+
+        {/* Pendentes de aprovação */}
+        <div id="cross-pending-list" className="bg-white border-l-4 border-l-amber-400 border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Pendentes de aprovação</h3>
+            <span id="cross-pending-count" className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{pendentes.length} pendentes</span>
+          </div>
+
+          {pendentes.length === 0 ? (
+            <div className="text-center py-6 text-gray-400">
+              <CheckCircle size={24} className="mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Nenhum argumento pendente.</p>
+              <p className="text-[11px] mt-0.5">Clique em "Detectar padrões" na aba IC para gerar novos.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendentes.map(a => {
+                const texto = a.frase || a.argumento || '—'
+                return (
+                  <div key={a.id} className="border border-gray-200 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">{a.gatilho ?? '—'}</span>
+                      <span className="text-[10px] text-gray-400">{fmtDt(a.criado_em)} {fmtHora(a.criado_em)}</span>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-100 rounded-lg p-2.5 mb-2.5">
+                      <p className="text-[10px] text-gray-400 font-semibold mb-1">ARGUMENTO DETECTADO:</p>
+                      <p className="text-xs text-gray-700 leading-relaxed">{texto.slice(0, 200)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => aprovar(a.id)}
+                        disabled={aprovando === a.id}
+                        className="flex-1 bg-emerald-600 text-white text-xs py-1.5 rounded-lg hover:bg-emerald-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        {aprovando === a.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                        Aprovar e propagar
+                      </button>
+                      <button
+                        onClick={() => rejeitar(a.id)}
+                        disabled={rejeitando === a.id}
+                        className="flex-1 bg-white border border-red-200 text-red-600 text-xs py-1.5 rounded-lg hover:bg-red-50 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        {rejeitando === a.id ? <Loader2 size={11} className="animate-spin" /> : null}
+                        Recusar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Como funciona na prática */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Como funciona na prática</h3>
+          <div className="space-y-3">
+            {[
+              { n: '1', cor: 'bg-brand-100 text-brand-700', txt: 'Todos os agentes geram dados de cada ligação — setor do contato, objeção levantada, argumento usado e se agendou ou não' },
+              { n: '2', cor: 'bg-emerald-100 text-emerald-700', txt: 'O sistema organiza por perfil de contato — indústria, varejo, tecnologia, saúde e mais — e identifica os argumentos que mais convertem em cada um' },
+              { n: '3', cor: 'bg-purple-100 text-purple-700', txt: 'O agente aprende que referências de outros segmentos podem converter mais do que referências do próprio setor — e usa isso estrategicamente' },
+              { n: '4', cor: 'bg-amber-100 text-amber-700', txt: 'Se sua campanha tem diferentes segmentos na mesma lista, o agente muda de abordagem e referência automaticamente para cada empresa' },
+              { n: '✓', cor: 'bg-gray-100 text-gray-600', txt: 'Nenhuma informação confidencial é compartilhada — apenas padrões estatísticos anônimos de comportamento e conversão' },
+            ].map((s, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold ${s.cor}`}>{s.n}</div>
+                <p className="text-xs text-gray-600 leading-relaxed">{s.txt}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div id="cross-pending-list" className="bg-white border-l-4 border-l-purple-500 border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Argumentos pendentes de aprovação</h3>
-          <span id="cross-pending-count" className="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{pendentesApi.filter((_, i) => !votes[i]).length} pendentes</span>
+      {/* ── Argumentos aprovados com pipeline visual ───────────────────────── */}
+      {aprovados.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Argumentos aplicados — impacto no CI</h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">{aprovados.length} argumento{aprovados.length !== 1 ? 's' : ''} ativo{aprovados.length !== 1 ? 's' : ''} · conectados automaticamente ao motor de IA</p>
+            </div>
+          </div>
+
+          {/* Agrupado por gatilho */}
+          {Object.entries(porGatilho).map(([gatilho, args]) => (
+            <div key={gatilho} className="mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="bg-brand-50 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">{gatilho}</span>
+                <span className="text-[10px] text-gray-400">{args.length} argumento{args.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              <div className="space-y-3">
+                {args.map(c => {
+                  const texto = c.frase || c.argumento || '—'
+                  const ligsImpact = ligsAposAprovacao(c)
+                  return (
+                    <div key={c.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50/50">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-xs text-gray-800 font-medium leading-relaxed flex-1">"{texto.slice(0, 120)}{texto.length > 120 ? '…' : ''}"</p>
+                        {ligsImpact > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex-shrink-0">+{ligsImpact} conv.</span>
+                        )}
+                      </div>
+
+                      {/* Pipeline visual */}
+                      <div className="grid grid-cols-4 gap-1 mt-3">
+                        {[
+                          { label: 'DETECTADO', sub: 'Auto-detectado', data: fmtDt(c.criado_em), done: true },
+                          { label: 'APROVADO', sub: `${fmtDt(c.aprovado_em ?? c.criado_em)} ${fmtHora(c.aprovado_em ?? c.criado_em)}`, data: 'pelo gerente', done: true },
+                          { label: 'PROPAGADO', sub: 'Sincronizar com CI', data: '', done: false },
+                          { label: 'RESULTADO', sub: ligsImpact > 0 ? `${ligsImpact} conv. após` : 'Aguardando', data: '', done: ligsImpact > 0 },
+                        ].map((etapa, ei) => (
+                          <div key={ei} className="text-center">
+                            <div className={`w-6 h-6 rounded-full mx-auto flex items-center justify-center mb-1 ${etapa.done ? 'bg-emerald-100' : 'bg-gray-100'}`}>
+                              {etapa.done
+                                ? <CheckCircle size={12} className="text-emerald-600" />
+                                : <span className="text-[9px] text-gray-400 font-bold">{ei + 1}</span>}
+                            </div>
+                            <p className={`text-[9px] font-bold ${etapa.done ? 'text-emerald-700' : 'text-gray-400'}`}>{etapa.label}</p>
+                            <p className="text-[9px] text-gray-400 leading-tight">{etapa.sub}</p>
+                            {etapa.data && <p className="text-[9px] text-gray-400">{etapa.data}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-        {pendentesApi.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-4">Nenhum argumento pendente de aprovação.</p>
-        )}
-        <div className="space-y-4">
-          {pendentesApi.map((a, i) => (
-            <div key={a.id ?? i} className={`border rounded-xl p-4 transition-colors ${votes[i] === 'approved' ? 'border-emerald-200 bg-emerald-50' : votes[i] === 'rejected' ? 'border-red-100 bg-red-50 opacity-60' : 'border-gray-200'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{a.gatilho}</span>
-                <span className="text-xs text-gray-400">{new Date(a.criado_em).toLocaleDateString('pt-BR')}</span>
-                <span className="ml-auto">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${a.status === 'aprovado' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>{a.status}</span>
-                </span>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
-                <p className="text-xs text-gray-500 font-semibold mb-1">FRASE VALIDADA:</p>
-                <p className="text-xs text-gray-700 italic">"{a.frase}"</p>
-              </div>
-              {!votes[i] ? (
-                <div className="flex gap-2">
-                  <button onClick={() => setVotes(p => ({ ...p, [i]: 'approved' }))} className="flex-1 bg-emerald-600 text-white text-xs py-1.5 rounded-lg hover:bg-emerald-700 transition-colors font-semibold">✓ Aprovar e propagar</button>
-                  <button onClick={() => setVotes(p => ({ ...p, [i]: 'rejected' }))} className="flex-1 bg-white border border-red-200 text-red-600 text-xs py-1.5 rounded-lg hover:bg-red-50 transition-colors font-semibold">✗ Recusar</button>
+      )}
+
+      {/* ── Insights ativos por perfil de contato ─────────────────────────── */}
+      {aprovados.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Insights ativos por gatilho</h3>
+          <p className="text-[11px] text-gray-400 mb-3">Aprendizados aprovados aplicados automaticamente pelo motor de IA a cada ligação</p>
+          <div className="space-y-2">
+            {aprovados.slice(0, 6).map(c => {
+              const ligsImpact = ligsAposAprovacao(c)
+              const texto = c.frase || c.argumento || '—'
+              return (
+                <div key={c.id} className="flex items-start gap-3 border border-gray-100 rounded-lg px-3 py-2.5">
+                  <CheckCircle size={13} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="bg-gray-100 text-gray-600 text-[10px] px-1.5 py-0.5 rounded font-semibold">{c.gatilho ?? '—'}</span>
+                      <span className="text-[10px] text-gray-400">Toda a plataforma · {fmtDt(c.aprovado_em ?? c.criado_em)}</span>
+                    </div>
+                    <p className="text-xs text-gray-700 leading-relaxed truncate">{texto}</p>
+                  </div>
+                  {ligsImpact > 0 && (
+                    <span className="text-xs font-bold text-emerald-600 flex-shrink-0">+{ligsImpact} conv.</span>
+                  )}
                 </div>
-              ) : (
-                <p className="text-xs font-semibold text-center py-1">{votes[i] === 'approved' ? '✓ Aprovado — entrará na próxima janela de deploy' : '✗ Recusado — em quarentena'}</p>
-              )}
-            </div>
-          ))}
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Seção: Gerar argumento com Claude */}
+      {/* ── Gerar argumento com Claude ─────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles size={15} className="text-purple-500" />
           <h3 className="text-sm font-semibold text-gray-900">Gerar argumento com Claude</h3>
+          <span className="text-[10px] text-gray-400 ml-auto">O argumento gerado vai para revisão como pendente</span>
         </div>
-        <div className="space-y-2 mb-3">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
-            <label className="text-xs text-gray-500 font-medium">Gatilho (ex: urgência, preço)</label>
+            <label className="text-xs text-gray-500 font-medium">Gatilho</label>
             <input
               value={novoGatilho}
               onChange={e => setNovoGatilho(e.target.value)}
@@ -3654,7 +3843,7 @@ function TabCross() {
             <textarea
               value={novosExemplos}
               onChange={e => setNovosExemplos(e.target.value)}
-              rows={3}
+              rows={2}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1 outline-none focus:ring-2 focus:ring-purple-200 resize-none"
               placeholder={"Temos apenas 3 vagas para junho.\nO investimento se paga em 4 meses."}
             />
@@ -3666,38 +3855,15 @@ function TabCross() {
           className="flex items-center gap-1.5 bg-purple-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Sparkles size={12} />
-          {gerandoCross ? 'Gerando...' : '✨ Gerar com Claude'}
+          {gerandoCross ? <><Loader2 size={11} className="animate-spin" /> Gerando…</> : '✨ Gerar com Claude'}
         </button>
         {crossGerado && (
           <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-purple-700 mb-1">Argumento gerado:</p>
+            <p className="text-[10px] font-semibold text-purple-700 mb-1">Argumento gerado — salvo como pendente:</p>
             <p className="text-xs text-purple-800 italic">"{crossGerado}"</p>
           </div>
         )}
-        {crossErro && (
-          <p className="mt-2 text-xs text-red-500">{crossErro}</p>
-        )}
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Argumentos já aplicados</h3>
-        <div className="space-y-2">
-          {[
-            { tag: 'Concorrente', impacto: '+8pp', desc: 'Menção estratégica ao [Concorrente X] — aplicado em SP/MG', data: '15/05' },
-            { tag: 'Tom consultivo', impacto: '+6pp', desc: 'Abertura com pergunta aberta de diagnóstico', data: '08/05' },
-            { tag: 'Urgência sazonal', impacto: '+11pp', desc: 'Vagas limitadas para início de trimestre', data: '01/05' },
-          ].map((a, i) => (
-            <div key={i} className="flex items-center gap-3 border border-gray-100 rounded-lg px-3 py-2">
-              <CheckCircle size={14} className="text-emerald-500 shrink-0" />
-              <div className="flex-1">
-                <span className="bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded font-semibold mr-2">{a.tag}</span>
-                <span className="text-xs text-gray-600">{a.desc}</span>
-              </div>
-              <span className="text-xs font-mono font-bold text-emerald-600">{a.impacto}</span>
-              <span className="text-xs text-gray-400">{a.data}</span>
-            </div>
-          ))}
-        </div>
+        {crossErro && <p className="mt-2 text-xs text-red-500">{crossErro}</p>}
       </div>
     </div>
   )
