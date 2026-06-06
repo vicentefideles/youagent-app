@@ -1692,10 +1692,36 @@ function TabBanco() {
   const total: number = bancoData?.total ?? 0
   const expirando7d: number = bancoData?.expirando7d ?? 0
 
+  // Modos de entrada: manual ou URL
+  const [modo, setModo] = useState<'manual' | 'url'>('manual')
   const [novoArg, setNovoArg] = useState({ categoria: '', descricao: '', validade: '', fonte: '' })
+  const [urlNoticia, setUrlNoticia] = useState('')
+  const [extraindo, setExtraindo] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [erroSalvar, setErroSalvar] = useState('')
   const [deletando, setDeletando] = useState<string | null>(null)
+
+  // Extrai inteligência de uma URL de notícia via backend
+  async function handleExtrairUrl() {
+    if (!urlNoticia.trim()) { setErroSalvar('Cole a URL da notícia'); return }
+    setExtraindo(true)
+    setErroSalvar('')
+    try {
+      const r = await api.post('https://app.etztech.com/api/v1/inteligencia/banco/extrair-url', { url: urlNoticia })
+      const ext = r.data
+      setNovoArg(p => ({
+        ...p,
+        descricao: ext.descricao || p.descricao,
+        categoria: ext.categoria || p.categoria,
+        fonte: ext.fonte || new URL(urlNoticia).hostname.replace('www.', ''),
+      }))
+      setModo('manual') // vai para manual para revisar antes de salvar
+    } catch (e: any) {
+      setErroSalvar(e?.response?.data?.error || 'Não foi possível ler a URL')
+    } finally {
+      setExtraindo(false)
+    }
+  }
 
   async function handleAdicionar() {
     if (!novoArg.categoria || !novoArg.descricao.trim()) {
@@ -1707,6 +1733,7 @@ function TabBanco() {
     try {
       await api.post('https://app.etztech.com/api/v1/inteligencia/banco', novoArg)
       setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
+      setUrlNoticia('')
       queryClient.invalidateQueries({ queryKey: ['inteligencia-banco'] })
     } catch (e: any) {
       setErroSalvar(e?.response?.data?.error || 'Erro ao salvar')
@@ -1724,7 +1751,6 @@ function TabBanco() {
     finally { setDeletando(null) }
   }
 
-  // Formata expiração
   function formatExpira(expira_em: string | null) {
     if (!expira_em) return null
     const diff = Math.ceil((new Date(expira_em).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -1735,26 +1761,110 @@ function TabBanco() {
 
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#1a1f35,#1a3a1f)' }}
-      >
-        <h2 className="text-lg font-semibold">Banco de Argumentos</h2>
-        <p className="text-sm text-white/60 mt-0.5">Inteligência de mercado injetada automaticamente nas ligações — sem necessidade de sincronização</p>
-      </div>
-
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2">
-        <Zap size={14} className="text-emerald-600 mt-0.5 shrink-0" />
-        <p className="text-xs text-emerald-700">
-          <strong>Automático:</strong> cada argumento adicionado aqui é injetado no motor IA imediatamente — a próxima ligação já usa. Quando o contexto da conversa for compatível, o agente cita como dado de mercado.
+      {/* Header */}
+      <div className="rounded-xl p-5 text-white" style={{ background: 'linear-gradient(135deg,#1a1f35,#1a3a1f)' }}>
+        <div className="flex items-center gap-2 mb-1">
+          <Database size={18} className="text-white/80" />
+          <h2 className="text-lg font-semibold">Banco de Argumentos</h2>
+        </div>
+        <p className="text-sm text-white/60">
+          Inteligência de mercado injetada automaticamente em cada ligação — sem sincronização manual
         </p>
+        <div className="flex gap-4 mt-3">
+          <div className="text-center">
+            <p className="text-xl font-bold">{isLoading ? '—' : total}</p>
+            <p className="text-[11px] text-white/50">argumentos ativos</p>
+          </div>
+          {expirando7d > 0 && (
+            <div className="text-center">
+              <p className="text-xl font-bold text-amber-300">{expirando7d}</p>
+              <p className="text-[11px] text-white/50">expirando em 7d</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Formulário */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Adicionar inteligência de mercado</h3>
+      {/* Card explicativo */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+            <Zap size={12} className="text-emerald-600" />
+          </div>
+          <p className="text-sm font-semibold text-gray-900">Como o Banco de Argumentos funciona</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { icon: '📰', titulo: 'Notícias e tendências', desc: 'Cole a URL de uma notícia relevante — a IA lê, extrai o insight e salva automaticamente' },
+            { icon: '⚡', titulo: 'Injeção automática', desc: 'Cada argumento entra na próxima ligação sem clicar em nada — o agente já usa' },
+            { icon: '🎯', titulo: 'Contextual e preciso', desc: 'O agente cita o dado somente quando o contexto da conversa for compatível' },
+            { icon: '⏰', titulo: 'Validade inteligente', desc: 'Configure expiração para dados temporários — notícias de 30 dias, sazonalidade, etc.' },
+          ].map((c, i) => (
+            <div key={i} className="flex gap-2">
+              <span className="text-base mt-0.5">{c.icon}</span>
+              <div>
+                <p className="text-xs font-semibold text-gray-800">{c.titulo}</p>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{c.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Formulário com abas Manual / URL */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Adicionar inteligência de mercado</h3>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+            <button
+              onClick={() => setModo('manual')}
+              className={`px-3 py-1.5 font-medium transition-colors ${modo === 'manual' ? 'bg-brand-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            >
+              ✏️ Manual
+            </button>
+            <button
+              onClick={() => setModo('url')}
+              className={`px-3 py-1.5 font-medium transition-colors ${modo === 'url' ? 'bg-brand-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            >
+              🔗 URL de notícia
+            </button>
+          </div>
+        </div>
+
+        {/* Modo URL */}
+        {modo === 'url' && (
+          <div className="space-y-3">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+              <p className="text-xs text-blue-700">Cole a URL de qualquer notícia, artigo ou relatório de mercado. A IA lê o conteúdo e extrai automaticamente o argumento mais relevante para as ligações.</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={urlNoticia}
+                onChange={e => setUrlNoticia(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="https://g1.globo.com/economia/noticia/..."
+                type="url"
+              />
+              <button
+                onClick={handleExtrairUrl}
+                disabled={extraindo}
+                className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0"
+              >
+                {extraindo ? <><Loader2 size={13} className="animate-spin" />Lendo...</> : <><Brain size={13} />Extrair</>}
+              </button>
+            </div>
+            {erroSalvar && <p className="text-xs text-red-500">{erroSalvar}</p>}
+          </div>
+        )}
+
+        {/* Modo Manual (também exibido após extração de URL para revisão) */}
+        {modo === 'manual' && (
           <div className="space-y-2">
+            {novoArg.descricao && novoArg.fonte && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                <CheckCircle size={13} className="text-emerald-600 shrink-0" />
+                <p className="text-xs text-emerald-700">Conteúdo extraído da URL. Revise e ajuste antes de salvar.</p>
+              </div>
+            )}
             <select
               value={novoArg.categoria}
               onChange={e => setNovoArg(p => ({ ...p, categoria: e.target.value }))}
@@ -1774,7 +1884,7 @@ function TabBanco() {
               value={novoArg.descricao}
               onChange={e => setNovoArg(p => ({ ...p, descricao: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none"
-              placeholder="Descreva o argumento ou insight de mercado que o agente deve usar..."
+              placeholder="Descreva o argumento ou insight de mercado que o agente deve usar em ligações..."
             />
             <div className="flex gap-2">
               <input
@@ -1789,72 +1899,59 @@ function TabBanco() {
                 value={novoArg.fonte}
                 onChange={e => setNovoArg(p => ({ ...p, fonte: e.target.value }))}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Fonte (ex: IBGE, G1)"
+                placeholder="Fonte (ex: IBGE, G1, Interno)"
               />
             </div>
             {erroSalvar && <p className="text-xs text-red-500">{erroSalvar}</p>}
+            <button
+              className="w-full bg-brand-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              onClick={handleAdicionar}
+              disabled={salvando}
+            >
+              {salvando ? <><Loader2 size={14} className="animate-spin" />Salvando...</> : <><Zap size={14} />Adicionar ao banco</>}
+            </button>
           </div>
-          <button
-            className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            onClick={handleAdicionar}
-            disabled={salvando}
-          >
-            {salvando ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : 'Adicionar ao banco'}
-          </button>
-        </div>
-
-        {/* KPIs reais */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <KpiCard label="Argumentos ativos" value={isLoading ? '—' : String(total)} accent="blue" />
-            <KpiCard label="Expirando em 7 dias" value={isLoading ? '—' : String(expirando7d)} accent={expirando7d > 0 ? 'amber' : 'green'} />
-          </div>
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-            <p className="text-xs font-semibold text-blue-800 mb-1">Como o agente usa</p>
-            <ul className="text-xs text-blue-700 space-y-1">
-              <li>• Cita dados de mercado quando cliente hesita em decidir</li>
-              <li>• Usa casos e referências para gerar urgência natural</li>
-              <li>• Menciona tendências para posicionar a solução como atual</li>
-              <li>• Rebate concorrentes com dados factuais, sem atacar</li>
-            </ul>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-3">
-            <p className="text-xs text-gray-500 text-center">
-              {total === 0
-                ? 'Sem argumentos ainda. Adicione o primeiro insight de mercado.'
-                : `${total} argumento${total > 1 ? 's' : ''} disponível${total > 1 ? 'is' : ''} para as ligações`}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Lista real */}
+      {/* Lista */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Inteligências cadastradas</h3>
-        {isLoading && <p className="text-xs text-gray-400 text-center py-4">Carregando...</p>}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Inteligências cadastradas</h3>
+          {total > 0 && (
+            <span className="text-xs text-gray-400">{total} ativo{total > 1 ? 's' : ''}</span>
+          )}
+        </div>
+        {isLoading && <p className="text-xs text-gray-400 text-center py-6">Carregando...</p>}
         {!isLoading && argumentos.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-4">Nenhum argumento cadastrado ainda. Adicione notícias, tendências ou dados de mercado que o agente pode usar nas ligações.</p>
+          <div className="text-center py-6">
+            <Database size={28} className="text-gray-200 mx-auto mb-2" />
+            <p className="text-xs text-gray-400">Nenhum argumento ainda.</p>
+            <p className="text-xs text-gray-400 mt-0.5">Cole uma URL de notícia ou escreva um insight manualmente.</p>
+          </div>
         )}
         <div className="space-y-2">
           {argumentos.map((item: any) => {
             const expInfo = formatExpira(item.expira_em)
             return (
-              <div key={item.id} className="border border-gray-100 rounded-lg p-3">
+              <div key={item.id} className="border border-gray-100 rounded-lg p-3 hover:border-gray-200 transition-colors">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="text-xs font-medium text-gray-800 flex-1 leading-relaxed">{item.descricao}</p>
                   <button
                     onClick={() => handleDeletar(item.id)}
                     disabled={deletando === item.id}
-                    className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                    className="text-gray-300 hover:text-red-400 transition-colors shrink-0 mt-0.5"
                   >
                     {deletando === item.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                   </button>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{item.categoria}</span>
-                  {item.fonte && <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">📰 {item.fonte}</span>}
-                  {expInfo && <span className={`text-xs px-1.5 py-0.5 rounded ${expInfo.color}`}>{expInfo.label}</span>}
-                  {!item.expira_em && <span className="bg-gray-50 text-gray-400 text-xs px-1.5 py-0.5 rounded">Sem validade</span>}
+                <div className="flex gap-1.5 flex-wrap">
+                  <span className="bg-brand-50 text-brand-700 text-[10px] px-1.5 py-0.5 rounded font-medium">{item.categoria}</span>
+                  {item.fonte && <span className="bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded">📰 {item.fonte}</span>}
+                  {expInfo
+                    ? <span className={`text-[10px] px-1.5 py-0.5 rounded ${expInfo.color}`}>{expInfo.label}</span>
+                    : <span className="bg-gray-50 text-gray-400 text-[10px] px-1.5 py-0.5 rounded">Sem validade</span>
+                  }
                 </div>
               </div>
             )
