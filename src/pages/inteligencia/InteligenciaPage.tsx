@@ -2368,7 +2368,7 @@ function TabMetricas() {
             </div>
           ) : (
             <div className="space-y-3">
-              {TOP_ARGS.map((a, i) => (
+              {TOP_ARGS.map((_a, i) => (
                 <div key={i} className="flex items-center gap-2 opacity-35">
                   <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
