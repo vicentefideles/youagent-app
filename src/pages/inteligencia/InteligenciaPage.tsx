@@ -3965,80 +3965,202 @@ function TabCross() {
   )
 }
 
+interface PadraoArg {
+  id: string
+  gatilho: string
+  frase: string
+  argumento: string
+  eficacia: number
+  status: string
+  criado_em: string
+  aprovado_em: string | null
+  origem: string
+}
+
 function TabPadroes() {
-  const patterns = [
-    {
-      pct: '+58%',
-      label: 'Cliente pergunta preço depois de "sem interesse"',
-      badge: 'Ativo',
-      color: 'bg-emerald-500',
-      ocorrencias: 312,
-      desc: 'Quando o lead diz "sem interesse" mas faz uma pergunta de preço na sequência, a probabilidade de agendamento sobe 58%. O agente deve tratar como sinal positivo e não encerrar a ligação.',
-      nota: 'Incorporado: abertura de espaço para negociação após objeção inicial.',
-    },
-    {
-      pct: '2.1x',
-      label: '3ª tentativa com contexto prévio converte 2.1x mais',
-      badge: 'Ativo',
-      color: 'bg-blue-500',
-      ocorrencias: 187,
-      desc: 'Referenciar o histórico da conversa anterior ("Da última vez que falei com o senhor, mencionou que...") na terceira tentativa duplica a taxa de agendamento vs. ligação genérica.',
-      nota: 'Incorporado: script de rechamada personalizado por histórico.',
-    },
-    {
-      pct: '+36%',
-      label: 'Oferecer dois horários específicos aumenta aceite',
-      badge: 'Em validação',
-      color: 'bg-amber-400',
-      ocorrencias: 94,
-      desc: 'Propor dois horários concretos ("Terça às 10h ou Quarta às 14h?") em vez de perguntar abertamente quando o lead prefere aumenta a taxa de aceite em 36%. Reduz fricção de decisão.',
-      nota: 'Em validação: aguardando 100+ ocorrências para confirmar significância estatística.',
-    },
-  ]
+  const { data: padroes = [], isFetching, refetch } = useQuery({
+    queryKey: ['padroes-cross'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross')
+      .then(r => (r.data as PadraoArg[]).sort((a, b) => (b.eficacia || 0) - (a.eficacia || 0)))
+      .catch(() => [] as PadraoArg[]),
+  })
+  const { data: ligsRaw = [] } = useQuery({
+    queryKey: ['padroes-ligs'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
+  })
+
+  const agora = new Date()
+  const inicioSemana = new Date(agora); inicioSemana.setDate(agora.getDate() - 7); inicioSemana.setHours(0,0,0,0)
+
+  const aprovados  = padroes.filter(p => p.status === 'aprovado')
+  const pendentes  = padroes.filter(p => p.status === 'pendente')
+  const novosSemana = padroes.filter(p => new Date(p.criado_em) >= inicioSemana).length
+  const totalLigs  = (ligsRaw as any[]).length
+
+  const eficaciaMedia = aprovados.length > 0
+    ? Math.round(aprovados.reduce((s, p) => s + (p.eficacia || 0), 0) / aprovados.length)
+    : 0
+
+  // Padrão crítico: maior eficacia entre os aprovados
+  const topPadrao = aprovados[0]
+  const temAlertaCritico = topPadrao && (topPadrao.eficacia || 0) >= 2
+
+  const fmtDt = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+
+  const badgeStatus = (p: PadraoArg) => {
+    if (p.status === 'aprovado') return { label: 'Ativo', cls: 'bg-emerald-50 text-emerald-700' }
+    return { label: 'Aguardando aprovação', cls: 'bg-amber-50 text-amber-700' }
+  }
+
+  const impactoCor = (ef: number) => {
+    if (ef >= 2) return 'bg-emerald-500'
+    if (ef >= 1) return 'bg-blue-500'
+    if (ef > 0)  return 'bg-amber-400'
+    return 'bg-gray-300'
+  }
+
+  const impactoLabel = (ef: number) => {
+    if (ef >= 2)  return `${ef.toFixed(1)}x`
+    if (ef > 0)   return `+${Math.round(ef * 100)}%`
+    return '—'
+  }
+
   return (
     <div className="space-y-4">
-      <div
-        className="rounded-xl p-5 text-white"
-        style={{ background: 'linear-gradient(135deg,#4a1d96,#6b21a8)' }}
-      >
-        <h2 className="text-lg font-semibold">Detecção de Padrões</h2>
-        <p className="text-sm text-white/70 mt-0.5">Motor de IA identifica correlações que humanos não percebem em 1.842 ligações</p>
-      </div>
 
-      <div className="bg-amber-50 border-t-4 border-t-amber-400 border border-amber-200 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle size={18} className="text-amber-500 mt-0.5 shrink-0" />
-          <div>
-            <h3 className="text-sm font-semibold text-amber-800 mb-1">Análise de Fase — Objeções detectadas cedo</h3>
-            <p className="text-xs text-amber-700">Padrão crítico: <strong>68% das objeções de preço</strong> surgem antes do lead entender o produto. Agentes que aguardam a qualificação antes de responder ao preço convertem <strong>2.3x mais</strong>. Ajuste de timing recomendado para campanhas industriais.</p>
-            <button className="mt-2 bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors font-semibold">Aplicar ajuste de timing</button>
+      {/* ── Header branco premium ─────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
+            <GitBranch size={20} className="text-purple-600" />
           </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-base font-semibold text-gray-900">Detecção de Padrões</h2>
+              <span className="bg-purple-50 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">MOTOR DE IA</span>
+            </div>
+            <p className="text-xs text-gray-500">
+              O sistema analisa todas as ligações e identifica correlações que humanos não percebem — o que foi dito, em qual fase, com qual resultado. Os padrões com maior impacto viram argumentos aprovados no CI.
+            </p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 flex-shrink-0"
+          >
+            <RefreshCw size={11} className={isFetching ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+        </div>
+
+        {/* KPIs reais */}
+        <div className="grid grid-cols-4 gap-3 mt-4">
+          {[
+            { label: 'Padrões detectados', value: padroes.length > 0 ? String(padroes.length) : '—', color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: 'Novos esta semana',  value: novosSemana > 0 ? String(novosSemana) : '—',     color: 'text-brand-600',  bg: 'bg-brand-50' },
+            { label: 'Eficácia média',     value: eficaciaMedia > 0 ? `+${eficaciaMedia}%` : '—',  color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Ligações analisadas', value: totalLigs > 0 ? totalLigs.toLocaleString('pt-BR') : '—', color: 'text-amber-600', bg: 'bg-amber-50' },
+          ].map((k, i) => (
+            <div key={i} className={`${k.bg} rounded-lg p-3 text-center`}>
+              <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">{k.label}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <KpiCard label="Padrões detectados" value="47" accent="purple" />
-        <KpiCard label="Novos esta semana" value="3" accent="blue" />
-        <KpiCard label="Impacto médio" value="+18%" accent="green" />
-        <KpiCard label="Ligações analisadas" value="1.842" accent="amber" />
+      {/* ── Alerta crítico dinâmico (só aparece se há padrão com eficacia >= 2) ── */}
+      {temAlertaCritico && topPadrao && (
+        <div className="bg-amber-50 border-l-4 border-l-amber-400 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-amber-800 mb-0.5">Padrão de alto impacto detectado — {impactoLabel(topPadrao.eficacia)} de melhoria</p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Gatilho <strong>{topPadrao.gatilho}</strong>: "{(topPadrao.frase || topPadrao.argumento || '').slice(0, 120)}"
+                {topPadrao.status === 'pendente'
+                  ? ' — ainda não aprovado. Vá na aba Cross para aprovar e propagar para os agentes.'
+                  : ' — já incorporado ao CI dos seus agentes.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Lista de padrões reais ─────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Padrões descobertos — por impacto</h3>
+          <div className="flex gap-2">
+            <span className="text-[10px] text-gray-400">{aprovados.length} ativos · {pendentes.length} aguardando aprovação</span>
+          </div>
+        </div>
+
+        {padroes.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            <GitBranch size={28} className="mx-auto mb-2 opacity-25" />
+            <p className="text-xs font-medium">Nenhum padrão detectado ainda.</p>
+            <p className="text-[11px] mt-1 text-gray-400">O sistema detecta padrões automaticamente todo dia às 00:00.<br/>Use o botão "Detectar padrões" na aba Cross para forçar uma análise agora.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {padroes.map((p) => {
+              const { label: badgeLabel, cls: badgeCls } = badgeStatus(p)
+              const texto = p.frase || p.argumento || '—'
+              const ef = p.eficacia || 0
+              return (
+                <div key={p.id} className="border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {ef > 0 && (
+                      <span className={`text-white text-[10px] px-2 py-0.5 rounded-full font-bold ${impactoCor(ef)}`}>
+                        {impactoLabel(ef)}
+                      </span>
+                    )}
+                    <p className="text-xs text-gray-800 font-semibold flex-1 min-w-0">
+                      Gatilho: <span className="text-purple-700">{p.gatilho ?? '—'}</span>
+                    </p>
+                    <span className="text-[10px] text-gray-400 font-mono">detectado {fmtDt(p.criado_em)}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${badgeCls}`}>{badgeLabel}</span>
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 mb-2">
+                    <p className="text-xs text-gray-700 leading-relaxed">"{texto.slice(0, 200)}{texto.length > 200 ? '…' : ''}"</p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      {p.status === 'aprovado'
+                        ? <><CheckCircle size={11} className="text-emerald-500" /><p className="text-[10px] text-emerald-700 font-medium">Incorporado ao CI · aprovado em {fmtDt(p.aprovado_em ?? p.criado_em)}</p></>
+                        : <><AlertCircle size={11} className="text-amber-500" /><p className="text-[10px] text-amber-700 font-medium">Pendente de aprovação — vá na aba Cross</p></>
+                      }
+                    </div>
+                    {p.origem === 'rede_global' && (
+                      <span className="text-[10px] text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                        <Share2 size={9} /> Da rede ETZ
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
+      {/* ── Como os padrões viram inteligência ───────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Padrões descobertos com maior impacto</h3>
-        <div className="space-y-4">
-          {patterns.map((p, i) => (
-            <div key={i} className="border border-gray-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-white text-xs px-2 py-0.5 rounded-full font-bold ${p.color}`}>{p.pct}</span>
-                <p className="text-xs text-gray-800 font-semibold flex-1">{p.label}</p>
-                <span className="text-xs text-gray-400 font-mono">{p.ocorrencias} ocorrências</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${p.badge === 'Ativo' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{p.badge}</span>
-              </div>
-              <p className="text-xs text-gray-600 mb-2">{p.desc}</p>
-              <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2 py-1.5">
-                <CheckCircle size={11} className="text-blue-500 shrink-0" />
-                <p className="text-xs text-gray-500">{p.nota}</p>
-              </div>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Como os padrões viram inteligência</h3>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { n: '1', cor: 'bg-purple-100 text-purple-700', title: 'Detecção', desc: 'Sistema analisa transcrições e identifica o que converteu — argumento, fase, gatilho, tom.' },
+            { n: '2', cor: 'bg-amber-100 text-amber-700',   title: 'Validação', desc: 'Padrão fica em "aguardando" até acumular evidências suficientes. Você aprova na aba Cross.' },
+            { n: '3', cor: 'bg-brand-100 text-brand-700',   title: 'Propagação', desc: 'Argumento aprovado entra no CI. Sincronize com CI para aplicar em todos os agentes.' },
+            { n: '4', cor: 'bg-emerald-100 text-emerald-700', title: 'Melhoria contínua', desc: 'Agentes passam a usar o argumento. O resultado retroalimenta o sistema com novos dados.' },
+          ].map((s) => (
+            <div key={s.n} className="text-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold ${s.cor}`}>{s.n}</div>
+              <p className="text-xs font-semibold text-gray-800 mb-1">{s.title}</p>
+              <p className="text-[11px] text-gray-500 leading-relaxed">{s.desc}</p>
             </div>
           ))}
         </div>
