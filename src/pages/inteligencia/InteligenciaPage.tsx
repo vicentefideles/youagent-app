@@ -4470,42 +4470,40 @@ function TabSimulador() {
 
   return (
     <div className="space-y-5">
-      {/* ── Header rico ── */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg,#0f1729 0%,#1e3a1e 100%)' }}>
-        <div className="px-6 pt-6 pb-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                  <Play size={16} className="text-white" />
-                </div>
-                <h2 className="text-lg font-bold text-white">Simulador de Ligações</h2>
+      {/* ── Header ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Play size={14} className="text-blue-600" />
               </div>
-              <p className="text-sm text-white/60 leading-relaxed max-w-xl">
-                Ambiente seguro para treinar e certificar seu agente de IA <span className="text-white/90 font-medium">antes das primeiras ligações reais</span>. O agente só vai para produção depois de ser aprovado nos 5 cenários obrigatórios.
-              </p>
+              <h2 className="text-base font-bold text-gray-900">Simulador de Ligações</h2>
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-2xl font-bold font-mono text-white">{historico.length}</p>
-              <p className="text-xs text-white/40">simulações realizadas</p>
-            </div>
+            <p className="text-sm text-gray-500 leading-relaxed max-w-xl">
+              Ambiente seguro para treinar e certificar seu agente de IA <span className="text-gray-800 font-medium">antes das primeiras ligações reais</span>. O agente só vai para produção depois de ser aprovado nos 5 cenários obrigatórios.
+            </p>
           </div>
-          {/* Como funciona */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {[
-              { step: '1', title: 'Treine com IA', desc: 'Rode os 5 cenários de objeção reais e veja onde o agente acerta ou falha' },
-              { step: '2', title: 'Receba feedback', desc: 'A IA aponta o turno exato onde errou e sugere como corrigir o script' },
-              { step: '3', title: 'Certifique e ative', desc: 'Com score acima do mínimo em todos os cenários, o agente vai para produção' },
-            ].map(s => (
-              <div key={s.step} className="bg-white/5 rounded-xl px-3 py-2.5 flex gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-white/20 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{s.step}</span>
-                <div>
-                  <p className="text-xs font-semibold text-white/90">{s.title}</p>
-                  <p className="text-xs text-white/40 mt-0.5 leading-relaxed">{s.desc}</p>
-                </div>
+          <div className="text-right shrink-0">
+            <p className="text-2xl font-bold font-mono text-gray-900">{historico.length}</p>
+            <p className="text-xs text-gray-400">simulações realizadas</p>
+          </div>
+        </div>
+        {/* Como funciona */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { step: '1', title: 'Treine com IA', desc: 'Rode os 5 cenários de objeção reais e veja onde o agente acerta ou falha', color: 'bg-blue-50 text-blue-600' },
+            { step: '2', title: 'Receba feedback', desc: 'A IA aponta o turno exato onde errou e sugere como corrigir o script', color: 'bg-amber-50 text-amber-600' },
+            { step: '3', title: 'Certifique e ative', desc: 'Com score acima do mínimo em todos os cenários, o agente vai para produção', color: 'bg-emerald-50 text-emerald-600' },
+          ].map(s => (
+            <div key={s.step} className="border border-gray-100 rounded-xl px-3 py-3 flex gap-2.5">
+              <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 ${s.color}`}>{s.step}</span>
+              <div>
+                <p className="text-xs font-semibold text-gray-700">{s.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{s.desc}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
