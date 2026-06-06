@@ -5772,7 +5772,7 @@ function TabMercado() {
   const [gerando, setGerando] = useState(false)
   const [erroGerar, setErroGerar] = useState('')
   const [ia, setIa] = useState<MercadoIA | null>(null)
-  const [mostrarGuia, setMostrarGuia] = useState(false)
+  const [mostrarGuia, setMostrarGuia] = useState(true)
 
   const { data, isLoading } = useQuery<MercadoData>({
     queryKey: ['mercado'],
