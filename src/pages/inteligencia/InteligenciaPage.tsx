@@ -3700,6 +3700,26 @@ function TabCross() {
         </div>
       )}
 
+      {/* ── Detectar padrões — acima dos pendentes ───────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold text-gray-800">Detectar novos padrões</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">Analisa todas as ligações e gera sugestões pendentes de aprovação com os argumentos que mais converteram.</p>
+        </div>
+        <button
+          onClick={detectarPadroes}
+          disabled={detectando}
+          className="flex items-center gap-1.5 bg-emerald-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-semibold disabled:opacity-50 flex-shrink-0"
+        >
+          {detectando
+            ? <><Loader2 size={12} className="animate-spin" /> Analisando…</>
+            : detectadoOk
+            ? <><CheckCircle size={12} /> Padrões detectados!</>
+            : <><Zap size={12} /> Detectar padrões</>
+          }
+        </button>
+      </div>
+
       {/* ── Grid: pendentes + como funciona ───────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
 
@@ -3941,27 +3961,6 @@ function TabCross() {
         )}
       </div>
 
-      {/* ── Detectar novos padrões ────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Detectar novos padrões agora</h3>
-            <p className="text-xs text-gray-500 mt-0.5">O sistema analisa todas as ligações e identifica argumentos que geraram conversão — os melhores viram sugestões pendentes de aprovação.</p>
-          </div>
-          <button
-            onClick={detectarPadroes}
-            disabled={detectando}
-            className="flex items-center gap-2 bg-emerald-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-semibold disabled:opacity-50 flex-shrink-0 ml-4"
-          >
-            {detectando
-              ? <><Loader2 size={12} className="animate-spin" /> Analisando…</>
-              : detectadoOk
-              ? <><CheckCircle size={12} /> Padrões detectados!</>
-              : <><Zap size={12} /> Detectar padrões</>
-            }
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
