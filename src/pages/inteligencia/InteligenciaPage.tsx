@@ -1683,14 +1683,56 @@ function TabConhecimento() {
 }
 
 function TabBanco() {
-  const { data: bancoData } = useQuery({
+  const queryClient = useQueryClient()
+  const { data: bancoData, isLoading } = useQuery({
     queryKey: ['inteligencia-banco'],
-    queryFn: () => api.get('/inteligencia/banco').then(r => r.data as any),
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/banco').then(r => r.data as any),
   })
-  const argumentosApi: any[] = bancoData?.argumentos ?? bancoData ?? []
-  const [localItems, setLocalItems] = useState<any[]>([])
-  const argumentos = [...argumentosApi, ...localItems]
+  const argumentos: any[] = bancoData?.argumentos ?? []
+  const total: number = bancoData?.total ?? 0
+  const expirando7d: number = bancoData?.expirando7d ?? 0
+
   const [novoArg, setNovoArg] = useState({ categoria: '', descricao: '', validade: '', fonte: '' })
+  const [salvando, setSalvando] = useState(false)
+  const [erroSalvar, setErroSalvar] = useState('')
+  const [deletando, setDeletando] = useState<string | null>(null)
+
+  async function handleAdicionar() {
+    if (!novoArg.categoria || !novoArg.descricao.trim()) {
+      setErroSalvar('Preencha categoria e descrição')
+      return
+    }
+    setSalvando(true)
+    setErroSalvar('')
+    try {
+      await api.post('https://app.etztech.com/api/v1/inteligencia/banco', novoArg)
+      setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-banco'] })
+    } catch (e: any) {
+      setErroSalvar(e?.response?.data?.error || 'Erro ao salvar')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function handleDeletar(id: string) {
+    setDeletando(id)
+    try {
+      await api.delete(`https://app.etztech.com/api/v1/inteligencia/banco/${id}`)
+      queryClient.invalidateQueries({ queryKey: ['inteligencia-banco'] })
+    } catch { /* silencioso */ }
+    finally { setDeletando(null) }
+  }
+
+  // Formata expiração
+  function formatExpira(expira_em: string | null) {
+    if (!expira_em) return null
+    const diff = Math.ceil((new Date(expira_em).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    if (diff <= 0) return { label: 'Expirado', color: 'bg-red-50 text-red-600' }
+    if (diff <= 7) return { label: `Expira em ${diff}d`, color: 'bg-amber-50 text-amber-700' }
+    return { label: `Válido por ${diff}d`, color: 'bg-green-50 text-green-700' }
+  }
+
   return (
     <div className="space-y-4">
       <div
@@ -1698,14 +1740,18 @@ function TabBanco() {
         style={{ background: 'linear-gradient(135deg,#1a1f35,#1a3a1f)' }}
       >
         <h2 className="text-lg font-semibold">Banco de Argumentos</h2>
-        <p className="text-sm text-white/60 mt-0.5">Inteligência de mercado validada em campo — usada em tempo real pelos agentes</p>
+        <p className="text-sm text-white/60 mt-0.5">Inteligência de mercado injetada automaticamente nas ligações — sem necessidade de sincronização</p>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-        <p className="text-xs text-blue-700">💡 Argumentos deste banco são injetados automaticamente pelo motor IA durante as ligações quando o contexto for compatível. Adicione dados atuais de mercado para aumentar a relevância.</p>
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2">
+        <Zap size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+        <p className="text-xs text-emerald-700">
+          <strong>Automático:</strong> cada argumento adicionado aqui é injetado no motor IA imediatamente — a próxima ligação já usa. Quando o contexto da conversa for compatível, o agente cita como dado de mercado.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
+        {/* Formulário */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Adicionar inteligência de mercado</h3>
           <div className="space-y-2">
@@ -1721,14 +1767,14 @@ function TabBanco() {
               <option>Contexto político/regulatório</option>
               <option>Tecnologia</option>
               <option>Case / Referência</option>
-              <option>Concorrente/Caso</option>
+              <option>Concorrente</option>
             </select>
             <textarea
               rows={3}
               value={novoArg.descricao}
               onChange={e => setNovoArg(p => ({ ...p, descricao: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none"
-              placeholder="Descreva o argumento ou insight de mercado..."
+              placeholder="Descreva o argumento ou insight de mercado que o agente deve usar..."
             />
             <div className="flex gap-2">
               <input
@@ -1737,82 +1783,82 @@ function TabBanco() {
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
                 placeholder="Validade (dias)"
                 type="number"
+                min="1"
               />
               <input
                 value={novoArg.fonte}
                 onChange={e => setNovoArg(p => ({ ...p, fonte: e.target.value }))}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Fonte (ex: IBGE, G1, Interno)"
+                placeholder="Fonte (ex: IBGE, G1)"
               />
             </div>
+            {erroSalvar && <p className="text-xs text-red-500">{erroSalvar}</p>}
           </div>
           <button
-            className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors"
-            onClick={async () => {
-              if (!novoArg.categoria || !novoArg.descricao) { alert('Preencha os campos obrigatórios'); return }
-              const newItem = { label: novoArg.descricao, pct: 0, cat: novoArg.categoria, validade: novoArg.validade ? `${novoArg.validade}d` : '—', fonte: novoArg.fonte || 'Manual' }
-              try {
-                await api.post('/inteligencia/banco', novoArg)
-              } catch { /* fallback to local */ }
-              setLocalItems(prev => [newItem, ...prev])
-              setNovoArg({ categoria: '', descricao: '', validade: '', fonte: '' })
-            }}
+            className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            onClick={handleAdicionar}
+            disabled={salvando}
           >
-            Adicionar ao banco
+            {salvando ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : 'Adicionar ao banco'}
           </button>
         </div>
 
+        {/* KPIs reais */}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <KpiCard label="Argumentos ativos" value="28" accent="blue" />
-            <KpiCard label="Taxa de uso" value="67%" accent="green" />
-            <KpiCard label="Impacto médio" value="+14%" accent="amber" />
-            <KpiCard label="Expirando em 7d" value="3" accent="purple" />
+            <KpiCard label="Argumentos ativos" value={isLoading ? '—' : String(total)} accent="blue" />
+            <KpiCard label="Expirando em 7 dias" value={isLoading ? '—' : String(expirando7d)} accent={expirando7d > 0 ? 'amber' : 'green'} />
+          </div>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+            <p className="text-xs font-semibold text-blue-800 mb-1">Como o agente usa</p>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>• Cita dados de mercado quando cliente hesita em decidir</li>
+              <li>• Usa casos e referências para gerar urgência natural</li>
+              <li>• Menciona tendências para posicionar a solução como atual</li>
+              <li>• Rebate concorrentes com dados factuais, sem atacar</li>
+            </ul>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-3">
-            <h3 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Ranking de uso</h3>
-            {[
-              { label: 'Urgência sazonal', pct: 91 },
-              { label: 'Concorrente X', pct: 74 },
-              { label: 'Economia — juros', pct: 68 },
-            ].map((r, i) => (
-              <div key={i} className="mb-2">
-                <div className="flex justify-between text-xs mb-0.5">
-                  <span className="text-gray-600">{i + 1}. {r.label}</span>
-                  <span className="font-mono font-semibold text-gray-800">{r.pct}%</span>
-                </div>
-                <Bar pct={r.pct} color="bg-blue-400" />
-              </div>
-            ))}
+            <p className="text-xs text-gray-500 text-center">
+              {total === 0
+                ? 'Sem argumentos ainda. Adicione o primeiro insight de mercado.'
+                : `${total} argumento${total > 1 ? 's' : ''} disponível${total > 1 ? 'is' : ''} para as ligações`}
+            </p>
           </div>
         </div>
       </div>
 
+      {/* Lista real */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Inteligências cadastradas</h3>
+        {isLoading && <p className="text-xs text-gray-400 text-center py-4">Carregando...</p>}
+        {!isLoading && argumentos.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-4">Nenhum argumento cadastrado ainda. Adicione notícias, tendências ou dados de mercado que o agente pode usar nas ligações.</p>
+        )}
         <div className="space-y-2">
-          {argumentos.length === 0 && (
-            <p className="text-xs text-gray-400 text-center py-4">Nenhum argumento cadastrado ainda.</p>
-          )}
-          {argumentos.map((item: any, i: number) => (
-            <div key={i} className="border border-gray-100 rounded-lg p-3">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="text-xs font-medium text-gray-800 flex-1">{item.label ?? item.descricao ?? '—'}</p>
-                <button onClick={() => setLocalItems(p => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition-colors shrink-0">
-                  <Trash2 size={12} />
-                </button>
+          {argumentos.map((item: any) => {
+            const expInfo = formatExpira(item.expira_em)
+            return (
+              <div key={item.id} className="border border-gray-100 rounded-lg p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <p className="text-xs font-medium text-gray-800 flex-1 leading-relaxed">{item.descricao}</p>
+                  <button
+                    onClick={() => handleDeletar(item.id)}
+                    disabled={deletando === item.id}
+                    className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                  >
+                    {deletando === item.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{item.categoria}</span>
+                  {item.fonte && <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">📰 {item.fonte}</span>}
+                  {expInfo && <span className={`text-xs px-1.5 py-0.5 rounded ${expInfo.color}`}>{expInfo.label}</span>}
+                  {!item.expira_em && <span className="bg-gray-50 text-gray-400 text-xs px-1.5 py-0.5 rounded">Sem validade</span>}
+                </div>
               </div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <Bar pct={item.pct ?? 0} color="bg-emerald-500" />
-                <span className="text-xs font-mono text-emerald-600 w-8">{item.pct ?? 0}%</span>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <span className="bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{item.cat ?? item.categoria ?? '—'}</span>
-                <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">Validade: {item.validade ?? '—'}</span>
-                <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded">Fonte: {item.fonte ?? '—'}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
