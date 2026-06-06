@@ -3535,6 +3535,7 @@ interface CrossArg {
   segmento: string | null
   cliente_id: string
   origem?: string
+  tipo?: string
 }
 
 interface RedeArg {
@@ -3568,8 +3569,9 @@ function TabCross() {
     queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
   })
 
-  const pendentes = crossAll.filter(c => c.status === 'pendente')
-  const aprovados = crossAll.filter(c => c.status === 'aprovado')
+  // Cross = argumentos validados (frases prontas para usar) — não padrões comportamentais
+  const pendentes = crossAll.filter(c => c.status === 'pendente' && c.tipo !== 'padrao_comportamental')
+  const aprovados = crossAll.filter(c => c.status === 'aprovado' && c.tipo !== 'padrao_comportamental')
   const totalLigs = (ligsRaw as any[]).length
   const ligsConvertidas = (ligsRaw as any[]).filter((l: any) => l.resultado === 'agendou' || l.resultado === 'transferida')
 
@@ -3975,6 +3977,7 @@ interface PadraoArg {
   criado_em: string
   aprovado_em: string | null
   origem: string
+  tipo: string
 }
 
 function TabPadroes() {
@@ -4011,12 +4014,14 @@ function TabPadroes() {
     finally { setSalvandoAuto(false) }
   }
 
-  const { data: padroes = [], isFetching, refetch } = useQuery({
+  const { data: todosArgs = [], isFetching, refetch } = useQuery({
     queryKey: ['padroes-cross'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/cross')
       .then(r => (r.data as PadraoArg[]).sort((a, b) => (b.eficacia || 0) - (a.eficacia || 0)))
       .catch(() => [] as PadraoArg[]),
   })
+  // Padrões = comportamentais (sequências, timing, conduta detectada nas ligações)
+  const padroes = todosArgs.filter(p => p.tipo === 'padrao_comportamental')
   const { data: ligsRaw = [] } = useQuery({
     queryKey: ['padroes-ligs'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
@@ -4073,7 +4078,7 @@ function TabPadroes() {
               <span className="bg-purple-50 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">MOTOR DE IA</span>
             </div>
             <p className="text-xs text-gray-500">
-              O sistema analisa todas as ligações e identifica correlações que humanos não percebem — o que foi dito, em qual fase, com qual resultado. Os padrões com maior impacto viram argumentos aprovados no CI.
+              O sistema analisa cada ligação e descobre sequências de objeções, timing e comportamentos do lead que precedem o agendamento — insights que nenhum humano perceberia com esse volume de dados. São padrões de <strong>como conduzir</strong> a conversa, não frases prontas. As frases prontas ficam na aba Cross.
             </p>
           </div>
           <button
@@ -4199,8 +4204,8 @@ function TabPadroes() {
         {padroes.length === 0 ? (
           <div className="text-center py-10 text-gray-400">
             <GitBranch size={28} className="mx-auto mb-2 opacity-25" />
-            <p className="text-xs font-medium">Nenhum padrão detectado ainda.</p>
-            <p className="text-[11px] mt-1 text-gray-400">O sistema detecta padrões automaticamente todo dia às 00:00.<br/>Use o botão "Detectar padrões" na aba Cross para forçar uma análise agora.</p>
+            <p className="text-xs font-medium">Nenhum padrão comportamental detectado ainda.</p>
+            <p className="text-[11px] mt-1 text-gray-400">O sistema detecta padrões automaticamente todo dia às 00:00.<br/>Use o botão "Detectar padrões" na aba Cross para forçar uma análise agora.<br/>Padrões aparecem aqui quando há ligações suficientes para identificar correlações.</p>
           </div>
         ) : (
           <div className="space-y-3">
