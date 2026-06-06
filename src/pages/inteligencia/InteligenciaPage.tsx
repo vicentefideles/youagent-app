@@ -1016,7 +1016,7 @@ interface CampanhaHorario {
 
 function TabHorarios() {
   const queryClient = useQueryClient()
-  const { data: analise, isLoading, refetch } = useQuery({
+  const { data: analise, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['horarios-analise'],
     queryFn: () => inteligenciaApi.getHorariosAnalise().then(r => r.data as {
       total: number; melhorFaixa: string; atualizado: string;
@@ -1063,10 +1063,10 @@ function TabHorarios() {
         <button
           className="text-xs font-semibold px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-1.5 transition-colors disabled:opacity-60"
           onClick={() => refetch()}
-          disabled={isLoading}
+          disabled={isFetching}
         >
-          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {isLoading ? 'Analisando...' : 'Reanalisar ligações'}
+          {isFetching ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {isFetching ? 'Analisando...' : 'Reanalisar ligações'}
         </button>
       </div>
 
