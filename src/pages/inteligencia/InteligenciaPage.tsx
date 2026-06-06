@@ -5279,93 +5279,371 @@ function TabICP() {
   )
 }
 
+const TRECHOS = [
+  { id: 'abertura',           label: 'Abertura da ligação',       desc: 'Primeiros 15 segundos — antes de qualquer objeção' },
+  { id: 'objecao_preco',      label: 'Objeção de preço',          desc: 'Lead pergunta o valor ou diz que está caro' },
+  { id: 'objecao_fornecedor', label: 'Objeção de fornecedor',     desc: 'Lead já tem outro fornecedor e está satisfeito' },
+  { id: 'urgencia',           label: 'Criação de urgência',       desc: 'Lead diz que não tem tempo ou quer deixar para depois' },
+  { id: 'fechamento',         label: 'Fechamento para reunião',   desc: 'Momento de pedir o agendamento' },
+]
+
+interface AbTeste {
+  id: string; nome: string; trecho: string; status: string; vencedor: string | null
+  versao_a_nome: string; versao_a_script: string
+  versao_b_nome: string; versao_b_script: string
+  amostra_alvo: number; ligacoes_a: number; ligacoes_b: number
+  agendamentos_a: number; agendamentos_b: number
+  criado_em: string; concluido_em: string | null
+  agentes?: { nome: string }
+}
+
+function taxaConv(agendamentos: number, ligacoes: number) {
+  if (!ligacoes) return 0
+  return Math.round((agendamentos / ligacoes) * 100)
+}
+
+function impacto(a: AbTeste) {
+  const tA = taxaConv(a.agendamentos_a, a.ligacoes_a)
+  const tB = taxaConv(a.agendamentos_b, a.ligacoes_b)
+  const diff = tB - tA
+  if (!diff) return null
+  return { diff, venceB: diff > 0 }
+}
+
 function TabAB() {
-  const [versaoA, setVersaoA] = useState('')
-  const [versaoB, setVersaoB] = useState('')
+  const queryClient = useQueryClient()
+  const { data: agentes = [] } = useQuery({ queryKey: ['agentes'], queryFn: () => agentesApi.list().then(r => r.data as { id: string; nome: string }[]) })
+
+  // ── Form state
+  const [nome, setNome]       = useState('')
+  const [trecho, setTrecho]   = useState('abertura')
+  const [agenteId, setAgenteId] = useState('')
+  const [amostra, setAmostra] = useState(100)
+  const [vA, setVA]           = useState('')
+  const [vANome, setVANome]   = useState('')
+  const [vB, setVB]           = useState('')
+  const [vBNome, setVBNome]   = useState('')
+  const [gerando, setGerando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [racional, setRacional] = useState('')
+  const [erro, setErro]       = useState('')
+  const [sucesso, setSucesso] = useState('')
+  const [expandido, setExpandido] = useState<string | null>(null)
+
+  // ── Dados do banco
+  const { data: testes = [], refetch } = useQuery<AbTeste[]>({
+    queryKey: ['ab-testes'],
+    queryFn: () => inteligenciaApi.abList().then(r => r.data),
+    staleTime: 30000,
+  })
+
+  const ativos    = testes.filter(t => t.status === 'em_curso')
+  const historico = testes.filter(t => t.status !== 'em_curso')
+
+  async function gerarComIA() {
+    if (!trecho) return
+    setGerando(true); setErro(''); setRacional('')
+    try {
+      const res = await inteligenciaApi.abGerar({ agente_id: agenteId || null, trecho })
+      const d = res.data as { versao_a_nome: string; versao_a_script: string; versao_b_nome: string; versao_b_script: string; racional: string }
+      setVANome(d.versao_a_nome); setVA(d.versao_a_script)
+      setVBNome(d.versao_b_nome); setVB(d.versao_b_script)
+      setRacional(d.racional)
+    } catch { setErro('Erro ao gerar sugestões. Tente novamente.') }
+    finally { setGerando(false) }
+  }
+
+  async function iniciar() {
+    if (!nome || !vA || !vB) { setErro('Preencha nome e os dois scripts antes de iniciar.'); return }
+    setSalvando(true); setErro('')
+    try {
+      await inteligenciaApi.abCreate({ nome, trecho, agente_id: agenteId || null, versao_a_nome: vANome || 'Versão A', versao_a_script: vA, versao_b_nome: vBNome || 'Versão B', versao_b_script: vB, amostra_alvo: amostra })
+      setSucesso('Experimento iniciado!'); setNome(''); setVA(''); setVB(''); setVANome(''); setVBNome(''); setRacional('')
+      queryClient.invalidateQueries({ queryKey: ['ab-testes'] })
+      setTimeout(() => setSucesso(''), 3000)
+    } catch { setErro('Erro ao criar experimento.') }
+    finally { setSalvando(false) }
+  }
+
+  async function encerrar(id: string, vencedor: string) {
+    await inteligenciaApi.abPatch(id, { status: 'concluido', vencedor })
+    refetch()
+  }
+
+  async function pausar(id: string, status: string) {
+    await inteligenciaApi.abPatch(id, { status: status === 'em_curso' ? 'pausado' : 'em_curso' })
+    refetch()
+  }
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Novo Experimento</h3>
-          <div className="space-y-2">
-            <input id="ab-nome" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nome do experimento" />
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
-              <option>Abertura de ligação</option>
-              <option>Contorno de objeção</option>
-              <option>Agendamento</option>
-              <option>Follow-up</option>
-            </select>
-            <div>
-              <label className="text-xs text-gray-500 font-medium">Versão A</label>
-              <textarea rows={2} value={versaoA} onChange={e => setVersaoA(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none mt-1" placeholder="Script da versão A..." />
+
+      {/* ── Header ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                <GitBranch size={14} className="text-purple-600" />
+              </div>
+              <h2 className="text-base font-bold text-gray-900">Testes A/B de Script</h2>
             </div>
-            <div>
-              <label className="text-xs text-gray-500 font-medium">Versão B</label>
-              <textarea rows={2} value={versaoB} onChange={e => setVersaoB(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none mt-1" placeholder="Script da versão B..." />
-            </div>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" placeholder="Tamanho da amostra (ligações)" type="number" />
+            <p className="text-sm text-gray-500 leading-relaxed max-w-xl">
+              Teste duas abordagens diferentes em ligações reais e descubra qual converte mais. A IA gera as duas versões automaticamente — você revisa e inicia.
+            </p>
           </div>
-          <button
-            className="w-full mt-3 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-            onClick={async () => {
-              const nome = (document.querySelector('#ab-nome') as HTMLInputElement)?.value || 'Experimento'
-              try {
-                await api.post('/inteligencia/ab-tests', { nome, versao_a: versaoA, versao_b: versaoB })
-                alert('Experimento iniciado!')
-              } catch {
-                alert('Experimento iniciado localmente (sem persistência)')
-              }
-            }}
-          >
-            <Play size={14} /> Iniciar experimento
-          </button>
+          <div className="text-right shrink-0">
+            <p className="text-2xl font-bold font-mono text-gray-900">{ativos.length}</p>
+            <p className="text-xs text-gray-400">experimento{ativos.length !== 1 ? 's' : ''} ativo{ativos.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Experimentos ativos</h3>
-          <div className="border border-blue-200 rounded-xl p-3 bg-blue-50 mb-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-blue-800">Abertura consultiva vs. direta</span>
-              <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold">Em curso</span>
-            </div>
-            <p className="text-xs text-blue-600 mb-2">Trecho: Abertura de ligação · Amostra: 120 ligações</p>
-            <div className="space-y-1.5 mb-2">
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { step: '1', title: 'Escolha o trecho', desc: 'Abertura, objeção, urgência ou fechamento', color: 'bg-blue-50 text-blue-600' },
+            { step: '2', title: 'IA gera A e B', desc: 'Claude cria duas abordagens distintas com base no CI e ICP', color: 'bg-purple-50 text-purple-600' },
+            { step: '3', title: 'Resultado em dias', desc: 'Com 400+ ligações/dia, você valida em 2-3 dias', color: 'bg-emerald-50 text-emerald-600' },
+          ].map(s => (
+            <div key={s.step} className="border border-gray-100 rounded-xl px-3 py-3 flex gap-2.5">
+              <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 ${s.color}`}>{s.step}</span>
               <div>
-                <div className="flex justify-between text-xs mb-0.5">
-                  <span className="text-gray-600">Versão A — Pergunta aberta</span>
-                  <span className="font-mono text-blue-600">67%</span>
-                </div>
-                <Bar pct={67} color="bg-blue-400" />
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-0.5">
-                  <span className="text-gray-600">Versão B — Afirmação de valor</span>
-                  <span className="font-mono text-emerald-600 font-bold">73%</span>
-                </div>
-                <Bar pct={73} color="bg-emerald-500" />
+                <p className="text-xs font-semibold text-gray-700">{s.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{s.desc}</p>
               </div>
             </div>
-            <p className="text-xs text-blue-500">84 / 120 ligações concluídas · Resultado parcial: B vence</p>
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico de experimentos</h3>
-        <div className="border border-gray-100 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-5 text-xs text-gray-400 font-semibold px-4 py-2 bg-gray-50 border-b border-gray-100">
-            <span className="col-span-2">Experimento</span>
-            <span>Vencedor</span>
-            <span>Impacto</span>
-            <span>Status</span>
+      {/* ── Criar novo experimento ── */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Novo experimento</p>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1.5">Nome do experimento</label>
+            <input value={nome} onChange={e => setNome(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 bg-gray-50"
+              placeholder="Ex: Abertura consultiva vs. direta" />
           </div>
-          <div className="grid grid-cols-5 text-xs px-4 py-3 items-center">
-            <span className="col-span-2 text-gray-700 font-medium">Follow-up 2h vs. 24h</span>
-            <span className="text-emerald-600 font-semibold">Versão B (2h)</span>
-            <span className="text-emerald-600 font-mono font-bold">+12pp</span>
-            <span className="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-semibold w-fit">Aplicado</span>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1.5">Agente (opcional)</label>
+            <div className="relative">
+              <select value={agenteId} onChange={e => setAgenteId(e.target.value)}
+                className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer pr-8">
+                <option value="">Todos os agentes</option>
+                {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 8L1 3h10L6 8z"/></svg>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Trecho */}
+        <label className="text-xs font-semibold text-gray-600 block mb-2">Trecho a testar</label>
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          {TRECHOS.map(t => (
+            <button key={t.id} onClick={() => setTrecho(t.id)}
+              className={`text-left border-2 rounded-xl px-3 py-2.5 transition-all ${trecho === t.id ? 'border-purple-500 bg-purple-50' : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}>
+              <p className={`text-xs font-semibold ${trecho === t.id ? 'text-purple-700' : 'text-gray-700'}`}>{t.label}</p>
+              <p className="text-xs text-gray-400 mt-0.5 leading-tight">{t.desc}</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Gerar com IA */}
+        <button onClick={gerarComIA} disabled={gerando}
+          className="w-full mb-4 border-2 border-dashed border-purple-200 bg-purple-50 hover:bg-purple-100 rounded-xl py-3 text-sm font-semibold text-purple-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-60">
+          {gerando ? <Loader2 size={15} className="animate-spin"/> : <Sparkles size={15}/>}
+          {gerando ? 'Gerando sugestões com IA...' : 'Gerar versões A e B com IA'}
+        </button>
+
+        {racional && (
+          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <p className="text-xs font-semibold text-blue-700 mb-0.5">Racional da IA</p>
+            <p className="text-xs text-blue-800 leading-relaxed">{racional}</p>
+          </div>
+        )}
+
+        {/* Scripts A e B */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          {[
+            { label: 'Versão A', nome: vANome, setNome: setVANome, script: vA, setScript: setVA, color: 'border-blue-200 bg-blue-50', badge: 'bg-blue-100 text-blue-700' },
+            { label: 'Versão B', nome: vBNome, setNome: setVBNome, script: vB, setScript: setVB, color: 'border-emerald-200 bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700' },
+          ].map((v, i) => (
+            <div key={i} className={`border-2 rounded-xl p-4 ${v.color}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${v.badge}`}>{v.label}</span>
+                <input value={v.nome} onChange={e => v.setNome(e.target.value)}
+                  className="flex-1 text-xs font-semibold text-gray-700 bg-transparent outline-none border-b border-gray-200 pb-0.5"
+                  placeholder={`Nome da ${v.label.toLowerCase()}...`} />
+              </div>
+              <textarea rows={4} value={v.script} onChange={e => v.setScript(e.target.value)}
+                className="w-full text-sm text-gray-800 bg-transparent outline-none resize-none leading-relaxed"
+                placeholder={`Script da ${v.label.toLowerCase()}...`} />
+            </div>
+          ))}
+        </div>
+
+        {/* Amostra + iniciar */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <label className="text-xs font-semibold text-gray-600 block mb-1.5">Tamanho da amostra</label>
+            <div className="flex items-center gap-3">
+              <input type="range" min={50} max={500} step={50} value={amostra} onChange={e => setAmostra(Number(e.target.value))}
+                className="flex-1 h-1.5 accent-purple-600 cursor-pointer" />
+              <span className="text-sm font-bold font-mono text-gray-800 w-20">{amostra} lig.</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">≈ {Math.ceil(amostra / 400)} dia{Math.ceil(amostra / 400) > 1 ? 's' : ''} com volume normal</p>
+          </div>
+          <button onClick={iniciar} disabled={salvando}
+            className="bg-purple-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-60 flex items-center gap-2 shadow-sm">
+            {salvando ? <Loader2 size={14} className="animate-spin"/> : <Play size={14}/>}
+            Iniciar experimento
+          </button>
+        </div>
+
+        {erro   && <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{erro}</p>}
+        {sucesso && <p className="mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">✓ {sucesso}</p>}
       </div>
+
+      {/* ── Experimentos ativos ── */}
+      {ativos.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Em curso</p>
+          {ativos.map(t => {
+            const totalLig = t.ligacoes_a + t.ligacoes_b
+            const progresso = Math.min(100, Math.round((totalLig / t.amostra_alvo) * 100))
+            const tA = taxaConv(t.agendamentos_a, t.ligacoes_a)
+            const tB = taxaConv(t.agendamentos_b, t.ligacoes_b)
+            const bVence = tB > tA
+            const trLabel = TRECHOS.find(tr => tr.id === t.trecho)?.label || t.trecho
+            return (
+              <div key={t.id} className="bg-white border border-gray-200 rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-bold text-gray-900">{t.nome}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${t.status === 'em_curso' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {t.status === 'em_curso' ? 'Em curso' : 'Pausado'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">{trLabel} · {t.agentes?.nome || 'Todos os agentes'} · amostra: {t.amostra_alvo} ligações</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => pausar(t.id, t.status)}
+                      className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl px-3 py-1.5 hover:bg-gray-50">
+                      {t.status === 'em_curso' ? 'Pausar' : 'Retomar'}
+                    </button>
+                    {totalLig > 0 && (
+                      <>
+                        <button onClick={() => encerrar(t.id, 'a')} className="text-xs text-blue-600 border border-blue-200 rounded-xl px-3 py-1.5 hover:bg-blue-50">Declarar A vence</button>
+                        <button onClick={() => encerrar(t.id, 'b')} className="text-xs text-emerald-600 border border-emerald-200 rounded-xl px-3 py-1.5 hover:bg-emerald-50">Declarar B vence</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progresso */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>{totalLig} / {t.amostra_alvo} ligações</span>
+                    <span className="font-mono font-bold">{progresso}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${progresso}%` }} />
+                  </div>
+                </div>
+
+                {/* Comparação A vs B */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: t.versao_a_nome, taxa: tA, lig: t.ligacoes_a, ag: t.agendamentos_a, vence: !bVence && totalLig > 0, color: 'bg-blue-500', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    { label: t.versao_b_nome, taxa: tB, lig: t.ligacoes_b, ag: t.agendamentos_b, vence: bVence && totalLig > 0, color: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                  ].map((v, i) => (
+                    <div key={i} className={`border rounded-xl p-3 ${v.vence ? (i === 0 ? 'border-blue-200 bg-blue-50' : 'border-emerald-200 bg-emerald-50') : 'border-gray-100'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700">{i === 0 ? 'A' : 'B'} — {v.label}</span>
+                        {v.vence && <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${v.badge}`}>Vencendo</span>}
+                      </div>
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="text-gray-500">{v.lig} lig. · {v.ag} agend.</span>
+                        <span className={`font-mono font-bold ${v.vence ? (i === 0 ? 'text-blue-600' : 'text-emerald-600') : 'text-gray-600'}`}>{v.taxa}%</span>
+                      </div>
+                      <Bar pct={v.taxa} color={v.color} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Script expandível */}
+                <button onClick={() => setExpandido(expandido === t.id ? null : t.id)}
+                  className="mt-3 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  {expandido === t.id ? '▲' : '▼'} Ver scripts
+                </button>
+                {expandido === t.id && (
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    {[{ label: `A — ${t.versao_a_nome}`, script: t.versao_a_script }, { label: `B — ${t.versao_b_nome}`, script: t.versao_b_script }].map((v, i) => (
+                      <div key={i} className="bg-gray-50 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-gray-500 mb-1">{v.label}</p>
+                        <p className="text-xs text-gray-700 leading-relaxed">{v.script}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Histórico ── */}
+      {historico.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Histórico de experimentos</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {historico.map(t => {
+              const imp = impacto(t)
+              const trLabel = TRECHOS.find(tr => tr.id === t.trecho)?.label || t.trecho
+              return (
+                <div key={t.id} className="px-5 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{t.nome}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{trLabel} · {new Date(t.criado_em).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {t.vencedor && (
+                      <span className="text-xs font-semibold text-gray-700">
+                        Versão {t.vencedor.toUpperCase()} — {t.vencedor === 'a' ? t.versao_a_nome : t.versao_b_nome}
+                      </span>
+                    )}
+                    {imp && (
+                      <span className={`text-xs font-mono font-bold ${imp.venceB ? 'text-emerald-600' : 'text-blue-600'}`}>
+                        {imp.venceB ? '+' : ''}{imp.diff}pp
+                      </span>
+                    )}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${t.status === 'concluido' ? 'bg-gray-100 text-gray-600' : 'bg-amber-50 text-amber-700'}`}>
+                      {t.status === 'concluido' ? 'Concluído' : 'Pausado'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {ativos.length === 0 && historico.length === 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
+          <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <GitBranch size={22} className="text-purple-400" />
+          </div>
+          <p className="text-gray-700 font-semibold text-sm mb-1">Nenhum experimento ainda</p>
+          <p className="text-gray-400 text-xs max-w-sm mx-auto leading-relaxed">Crie seu primeiro experimento acima. A IA gera os dois scripts em segundos.</p>
+        </div>
+      )}
     </div>
   )
 }
