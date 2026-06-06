@@ -2064,210 +2064,153 @@ function TabBanco() {
 }
 
 function TabMetricas() {
-  const triggers = [
-    { label: 'Pede humano', pct: 91, status: 'Ótimo', statusColor: 'bg-emerald-50 text-emerald-700' },
-    { label: 'Urgência', pct: 82, status: '↑ Aumentar', statusColor: 'bg-blue-50 text-blue-700' },
-    { label: 'Pergunta preço', pct: 74, status: 'OK', statusColor: 'bg-gray-100 text-gray-600' },
-    { label: 'Pede proposta', pct: 68, status: '↑ Aumentar', statusColor: 'bg-blue-50 text-blue-700' },
-    { label: 'Menciona concorrente', pct: 43, status: '⚠ Revisar', statusColor: 'bg-amber-50 text-amber-700' },
+  const { data: totalLigacoes = 0 } = useQuery({
+    queryKey: ['metricas-ligacoes-count'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => (r.data as any[]).length).catch(() => 0),
+  })
+  const { data: conhecimentoData } = useQuery({
+    queryKey: ['metricas-conhecimento'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/conhecimento').then(r => r.data as any[]).catch(() => []),
+  })
+  const { data: bancoData } = useQuery({
+    queryKey: ['metricas-banco'],
+    queryFn: () => api.get('https://app.etztech.com/api/v1/inteligencia/banco').then(r => r.data as any).catch(() => ({ total: 0 })),
+  })
+
+  const totalMateriais: number = Array.isArray(conhecimentoData) ? conhecimentoData.length : 0
+  const totalInsights: number = Array.isArray(conhecimentoData)
+    ? conhecimentoData.reduce((s: number, m: any) => s + (m.argumentos?.length ?? 0) + (m.tecnicas?.length ?? 0), 0)
+    : 0
+  const totalBanco: number = bancoData?.total ?? 0
+  const temDados = totalLigacoes > 0
+
+  const METRICAS_FUTURAS = [
+    { icon: '🎯', titulo: 'Eficácia por gatilho', desc: 'Quais palavras e momentos da conversa mais convertem — urgência, preço, proposta, decisor.' },
+    { icon: '📈', titulo: 'Taxa de conversão por agente', desc: 'Comparativo entre agentes: qual tom, abordagem e script gera mais agendamentos.' },
+    { icon: '💬', titulo: 'Top argumentos em campo', desc: 'Os argumentos do banco e do conhecimento que o agente mais usou e que mais converteram.' },
+    { icon: '⚡', titulo: 'Impacto de cada material', desc: 'Como a taxa de conversão mudou antes e depois de cada livro, vídeo ou artigo adicionado.' },
+    { icon: '🔄', titulo: 'Evolução ao longo do tempo', desc: 'Curva de aprendizado do agente semana a semana — cada ligação torna o motor mais preciso.' },
+    { icon: '🧠', titulo: 'Argumentos descobertos pela IA', desc: 'Frases e padrões que o sistema detectou automaticamente nas ligações que mais convertem.' },
   ]
-  const months = ['Abr 1', 'Abr 2', 'Mai 1', 'Mai 2', 'Mai 3', 'Mai 4', 'Mai 5', 'Mai 6']
-  const vals = [6.1, 6.8, 7.2, 7.8, 7.4, 8.1, 8.0, 8.4]
-  const topArgs = [
-    { label: 'ROI em 6 meses', pct: 91 },
-    { label: 'Caso real similar', pct: 88 },
-    { label: 'Urgência temporal', pct: 82 },
-    { label: 'Dois horários', pct: 79 },
-    { label: 'Gatekeeper flow', pct: 74 },
-  ]
-  const impacts = [
-    { material: 'SPIN Selling', antes: '6.2%', depois: '8.4%', impacto: '+35%', usos: 312 },
-    { material: 'Objeção ROI', antes: '4.8%', depois: '7.1%', impacto: '+48%', usos: 198 },
-    { material: 'Tom consultivo', antes: '5.9%', depois: '7.8%', impacto: '+32%', usos: 287 },
-  ]
+
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Eficácia dos gatilhos</h3>
-          <div className="flex gap-4 text-xs text-gray-500">
-            <span className="font-mono font-bold text-blue-600">68% <span className="font-normal text-gray-400">conversão pós-transf.</span></span>
-            <span className="font-mono font-bold text-purple-600">47 <span className="font-normal text-gray-400">transferências</span></span>
-            <span className="font-mono font-bold text-emerald-600">Urgência <span className="font-normal text-gray-400">top gatilho</span></span>
+
+      {/* Header — padrão das abas */}
+      <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+            <BarChart2 size={18} className="text-brand-600" />
           </div>
-        </div>
-        <div className="space-y-2 mb-3">
-          {triggers.map((t, i) => (
-            <div key={i}>
-              <div className="flex justify-between text-xs mb-0.5">
-                <span className="text-gray-600">{t.label}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${t.statusColor}`}>{t.status}</span>
-                  <span className="font-mono font-semibold text-gray-900">{t.pct}%</span>
-                </div>
-              </div>
-              <Bar pct={t.pct} color={t.pct >= 80 ? 'bg-emerald-500' : t.pct >= 60 ? 'bg-blue-500' : 'bg-amber-400'} />
-            </div>
-          ))}
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-blue-800">Recomendação IA</p>
-            <p className="text-xs text-blue-600">Aumentar peso do gatilho "Pede proposta" em campanhas industriais</p>
-          </div>
-          <button className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors font-semibold">Aplicar</button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-4">
-        <KpiCard label="Taxa conversão" value="8.4%" accent="green" />
-        <KpiCard label="Argumentos" value="28" accent="blue" />
-        <KpiCard label="Materiais" value="24" accent="purple" />
-        <KpiCard label="Score médio" value="94" accent="amber" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Evolução de conversão</h3>
-          {/* event markers indexed by bar position */}
-          {(() => {
-            const events: Record<number, string> = { 2: 'v2.0', 4: 'Cross ativo', 7: 'v2.4' }
-            return (
-              <div className="relative">
-                <div className="flex items-end gap-1 h-24">
-                  {vals.map((v, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1 relative">
-                      {events[i] && (
-                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                          <span className="bg-purple-100 text-purple-700 text-xs px-1 py-0.5 rounded font-semibold" style={{ fontSize: '9px' }}>{events[i]}</span>
-                        </div>
-                      )}
-                      <div
-                        className={`w-full rounded-t ${events[i] ? 'bg-purple-500' : 'bg-blue-500'}`}
-                        style={{ height: `${(v / 10) * 96}px` }}
-                      />
-                      <span className="text-gray-400" style={{ fontSize: '9px' }}>{months[i]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Top 5 argumentos</h3>
-          <div className="space-y-2">
-            {topArgs.map((a, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 font-mono w-4">{i + 1}</span>
-                <div className="flex-1">
-                  <div className="flex justify-between text-xs mb-0.5">
-                    <span className="text-gray-700">{a.label}</span>
-                    <span className="font-mono text-emerald-600">{a.pct}%</span>
-                  </div>
-                  <Bar pct={a.pct} color="bg-emerald-400" />
-                </div>
-              </div>
-            ))}
+            <h2 className="text-base font-semibold text-gray-900">Métricas de Inteligência</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Acompanhe o impacto real de cada argumento, material e gatilho nas <span className="font-medium text-gray-700">taxas de conversão das ligações</span>.
+            </p>
           </div>
         </div>
+        {temDados && (
+          <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold shrink-0">
+            {totalLigacoes} ligações analisadas
+          </span>
+        )}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Impacto por material</h3>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-400 border-b border-gray-100">
-              <th className="text-left pb-2">Material</th>
-              <th className="text-left pb-2">Antes</th>
-              <th className="text-left pb-2">Depois</th>
-              <th className="text-left pb-2">Impacto</th>
-              <th className="text-left pb-2">Usos</th>
-            </tr>
-          </thead>
-          <tbody>
-            {impacts.map((r, i) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0">
-                <td className="py-2 text-gray-700">{r.material}</td>
-                <td className="py-2 font-mono text-gray-500">{r.antes}</td>
-                <td className="py-2 font-mono text-gray-900 font-semibold">{r.depois}</td>
-                <td className="py-2">
-                  <span className="text-emerald-600 font-mono font-bold">{r.impacto}</span>
-                </td>
-                <td className="py-2 text-gray-500">{r.usos}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* KPIs reais — o que já existe */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-brand-600">{totalMateriais}</p>
+          <p className="text-xs text-gray-500 mt-1">Materiais na base</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">livros, artigos, vídeos, áudios</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-brand-600">{totalInsights}</p>
+          <p className="text-xs text-gray-500 mt-1">Insights extraídos</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">argumentos + técnicas dos materiais</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-brand-600">{totalBanco}</p>
+          <p className="text-xs text-gray-500 mt-1">Argumentos de mercado</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">ativos no banco em tempo real</p>
+        </div>
       </div>
 
+      {/* Card explicativo — o que esta aba vai mostrar */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Argumentos aprendidos automaticamente</h3>
-          <span className="bg-purple-50 text-purple-600 text-xs px-2 py-0.5 rounded-full font-semibold">AUTO-APRENDIZADO</span>
-        </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
-          <p className="text-xs text-purple-700">O sistema analisa cada ligação e extrai padrões que aumentam conversão. Estes argumentos foram gerados autonomamente e validados em campo.</p>
-        </div>
-        <div className="space-y-3">
-          {[
-            { tag: 'Objeção de preço', quote: '"Entendo a preocupação. Nossos clientes no setor recuperam o investimento em média em 4 meses."', pct: 91 },
-            { tag: 'Decisor ausente', quote: '"Posso agendar diretamente com a [nome]? Tenho 15 minutos que valem a pena."', pct: 78 },
-            { tag: 'Urgência', quote: '"Temos 3 vagas abertas para iniciar em junho. Prefere garantir a sua?"', pct: 82 },
-            { tag: 'Proposta', quote: '"Posso enviar um comparativo direto antes da nossa conversa, facilita muito."', pct: 74 },
-          ].map((a, i) => (
-            <div key={i} className="border border-gray-100 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
-              </div>
-              <p className="text-xs text-gray-600 italic mb-2">{a.quote}</p>
-              <div className="flex items-center gap-2">
-                <Bar pct={a.pct} color="bg-emerald-500" />
-                <span className="text-xs font-mono text-emerald-600 w-8">{a.pct}%</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 border-t border-gray-100 pt-3">
-          <p className="text-xs text-gray-400 mb-2">Em validação</p>
-          <div className="space-y-2">
-            {[
-              { tag: 'Concorrente', quote: '"[Concorrente X] cobra por licença. Nós cobramos por resultado."', pct: 61 },
-              { tag: 'Follow-up', quote: '"Vi que o [segmento] cresceu 12% esse trimestre. Tem a ver com o projeto que discutimos?"', pct: 55 },
-            ].map((a, i) => (
-              <div key={i} className="border border-dashed border-gray-200 rounded-lg p-3 opacity-70">
-                <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
-                <p className="text-xs text-gray-500 italic mt-1">{a.quote}</p>
-              </div>
-            ))}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-6 h-6 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+            <TrendingUp size={12} className="text-brand-600" />
           </div>
+          <p className="text-sm font-semibold text-gray-900">O que você vai acompanhar aqui</p>
         </div>
-        <button className="w-full mt-3 text-xs text-blue-600 hover:text-blue-700 font-semibold py-1">Ver todos os argumentos →</button>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Timeline de evolução</h3>
-        <div className="relative">
-          <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
-          {[
-            { date: 'Mar 2026', label: 'Setup inicial', desc: 'Configuração base + primeiro agente', color: 'bg-gray-400' },
-            { date: 'Mar 2026', label: 'Primeiro agendamento', desc: 'Ana consegue reunião em 2h', color: 'bg-emerald-500' },
-            { date: 'Abr 2026', label: 'Primeiro padrão', desc: 'Urgência detectada como gatilho top', color: 'bg-blue-500' },
-            { date: 'Abr 2026', label: 'v2.0 deploy', desc: 'Motor de IA reescrito com pesos dinâmicos', color: 'bg-purple-500' },
-            { date: 'Mai 2026', label: 'Cross-cliente ativo', desc: 'Primeiro argumento propagado entre campanhas', color: 'bg-amber-500' },
-            { date: 'Mai 2026', label: 'Hoje — v2.4', desc: '+8.4% conversão vs baseline', color: 'bg-emerald-600' },
-          ].map((m, i) => (
-            <div key={i} className="flex gap-4 mb-3 relative pl-8">
-              <div className={`absolute left-1.5 top-1.5 w-3 h-3 rounded-full ${m.color} border-2 border-white`} />
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {METRICAS_FUTURAS.map((m, i) => (
+            <div key={i} className="flex gap-2.5 p-3 bg-gray-50 rounded-lg">
+              <span className="text-lg shrink-0">{m.icon}</span>
               <div>
-                <p className="text-xs text-gray-400">{m.date}</p>
-                <p className="text-sm font-semibold text-gray-900">{m.label}</p>
-                <p className="text-xs text-gray-500">{m.desc}</p>
+                <p className="text-xs font-semibold text-gray-800">{m.titulo}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{m.desc}</p>
               </div>
             </div>
           ))}
         </div>
+
+        {/* Estado: aguardando ligações */}
+        {!temDados && (
+          <div className="border border-dashed border-brand-200 bg-brand-50/40 rounded-xl p-5 text-center">
+            <BarChart2 size={32} className="text-brand-300 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-gray-700">Métricas disponíveis após as primeiras ligações</p>
+            <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed">
+              Cada ligação realizada alimenta automaticamente este painel. Quanto mais ligações, mais preciso fica o sistema — até o agente se tornar melhor que qualquer SDR humano.
+            </p>
+            <div className="flex items-center justify-center gap-4 mt-4">
+              <div className="text-center">
+                <p className="text-lg font-bold text-brand-600">{totalMateriais + totalBanco}</p>
+                <p className="text-[10px] text-gray-400">fontes de inteligência<br />já configuradas</p>
+              </div>
+              <div className="w-px h-8 bg-gray-200" />
+              <div className="text-center">
+                <p className="text-lg font-bold text-brand-600">{totalInsights}</p>
+                <p className="text-[10px] text-gray-400">insights prontos<br />para usar nas ligações</p>
+              </div>
+              <div className="w-px h-8 bg-gray-200" />
+              <div className="text-center">
+                <p className="text-lg font-bold text-emerald-600">Pronto</p>
+                <p className="text-[10px] text-gray-400">o agente já está<br />treinado para ligar</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Materiais cadastrados — dados reais já disponíveis */}
+      {totalMateriais > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Base de conhecimento atual</h3>
+          <div className="space-y-2">
+            {(Array.isArray(conhecimentoData) ? conhecimentoData : []).slice(0, 5).map((m: any, i: number) => {
+              const insights = (m.argumentos?.length ?? 0) + (m.tecnicas?.length ?? 0)
+              const tipoIcon: Record<string, string> = { livro: '📘', artigo: '📰', video: '🎬', audio: '🎙️', texto: '📝' }
+              return (
+                <div key={i} className="flex items-center gap-3 p-2.5 border border-gray-100 rounded-lg">
+                  <span className="text-lg shrink-0">{tipoIcon[m.tipo] ?? '📄'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-800 truncate">{m.titulo}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{m.categoria ?? m.tipo}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-brand-600">{insights}</p>
+                    <p className="text-[10px] text-gray-400">insights</p>
+                  </div>
+                </div>
+              )
+            })}
+            {totalMateriais > 5 && (
+              <p className="text-xs text-gray-400 text-center pt-1">+{totalMateriais - 5} materiais na base</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
