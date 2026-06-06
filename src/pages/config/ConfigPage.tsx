@@ -394,6 +394,132 @@ function SectionIntegracoes() {
         </div>
       </div>
       </div>
+
+      {/* ── Diagnóstico Telnyx ── */}
+      <DiagnosticoTelnyx />
+    </div>
+  )
+}
+
+// ─── Diagnóstico Telnyx ───────────────────────────────────────────────────────
+
+interface DiagAgenteCfg { id: string; nome: string; status: string; telnyx_ok: boolean; telnyx_assistant_id: string | null; score_certificacao: number | null; certificado: boolean }
+interface DiagDataCfg { timestamp: string; latencia_ms: number; webhook_url: string; resumo: { total_agentes: number; com_telnyx: number; sem_telnyx: number; ativos: number; certificados: number; integracao_ok: boolean }; agentes: DiagAgenteCfg[] }
+
+function DiagnosticoTelnyx() {
+  const [carregando, setCarregando] = useState(false)
+  const [dados, setDados] = useState<DiagDataCfg | null>(null)
+  const [erro, setErro] = useState('')
+
+  async function executar() {
+    setCarregando(true); setErro('')
+    try {
+      const res = await api.get('/inteligencia/sandbox/diagnostico')
+      setDados(res.data as DiagDataCfg)
+    } catch {
+      setErro('Não foi possível executar o diagnóstico. Verifique a conexão com o Railway.')
+    } finally { setCarregando(false) }
+  }
+
+  const scoreCor = (s: number) => s >= 80 ? 'text-emerald-600' : s >= 60 ? 'text-amber-500' : 'text-red-500'
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Diagnóstico de Integração</h3>
+          <p className="text-sm text-gray-500 mt-0.5">Verifique o status do webhook Telnyx e a configuração de cada agente.</p>
+        </div>
+        <button onClick={executar} disabled={carregando}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-60">
+          {carregando
+            ? <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Verificando...</>
+            : <>↺ Executar diagnóstico</>}
+        </button>
+      </div>
+
+      {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-4">{erro}</p>}
+
+      {dados && (
+        <div className="space-y-4">
+          {/* Resumo em cards */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-1">Webhook URL</p>
+              <p className="text-xs font-mono text-gray-700 break-all leading-relaxed">{dados.webhook_url}</p>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-1">Latência Railway</p>
+              <div className="flex items-end gap-1">
+                <span className="text-xl font-bold font-mono text-gray-900">{dados.latencia_ms}</span>
+                <span className="text-xs text-gray-400 mb-0.5">ms</span>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-2">Status Telnyx</p>
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${dados.resumo.integracao_ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                <span className={`text-sm font-bold ${dados.resumo.integracao_ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {dados.resumo.integracao_ok ? 'Conectado' : 'Desconectado'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabela de agentes */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-700">Status por agente</p>
+              <p className="text-xs text-gray-400">{dados.resumo.com_telnyx}/{dados.resumo.total_agentes} com Telnyx</p>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {dados.agentes.map((ag, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{ag.nome}</p>
+                    {ag.telnyx_assistant_id
+                      ? <p className="text-xs font-mono text-gray-400 truncate">{ag.telnyx_assistant_id}</p>
+                      : <p className="text-xs text-red-400">Sem telnyx_assistant_id</p>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ag.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {ag.status}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${ag.telnyx_ok ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${ag.telnyx_ok ? 'bg-blue-400' : 'bg-red-400'}`} />
+                      {ag.telnyx_ok ? 'Telnyx OK' : 'Sem Telnyx'}
+                    </span>
+                    {ag.score_certificacao != null && (
+                      <span className={`text-xs font-mono font-bold ${scoreCor(ag.score_certificacao)}`}>{ag.score_certificacao}pts</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Alerta sem Telnyx */}
+          {dados.resumo.sem_telnyx > 0 && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
+              <span className="text-amber-500 shrink-0 mt-0.5">⚠</span>
+              <div>
+                <p className="text-xs font-semibold text-amber-800">
+                  {dados.resumo.sem_telnyx} agente{dados.resumo.sem_telnyx > 1 ? 's' : ''} sem Telnyx configurado
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  Vá em <strong>Agentes → Editar → Integração Telnyx</strong> e configure o <code className="bg-amber-100 px-1 rounded">telnyx_assistant_id</code> para ativar as ligações.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!dados && !carregando && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <p className="text-sm text-gray-500">Clique em "Executar diagnóstico" para verificar o status da integração Telnyx e de cada agente.</p>
+        </div>
+      )}
     </div>
   )
 }
