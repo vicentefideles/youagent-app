@@ -5772,6 +5772,7 @@ function TabMercado() {
   const [gerando, setGerando] = useState(false)
   const [erroGerar, setErroGerar] = useState('')
   const [ia, setIa] = useState<MercadoIA | null>(null)
+  const [mostrarGuia, setMostrarGuia] = useState(false)
 
   const { data, isLoading } = useQuery<MercadoData>({
     queryKey: ['mercado'],
@@ -5800,8 +5801,6 @@ function TabMercado() {
       <Loader2 size={24} className="animate-spin text-gray-300" />
     </div>
   )
-
-  const [mostrarGuia, setMostrarGuia] = useState(false)
 
   return (
     <div className="space-y-4">
