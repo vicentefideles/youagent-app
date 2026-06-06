@@ -718,9 +718,15 @@ function TabFila() {
               ))}
             </select>
             <select className="input py-1.5 text-xs" value={filtroAgente} onChange={e => setFiltroAgente(e.target.value)}>
-              <option value="">Todos os agentes</option>
-              {agentesLista.map((a: any) => (
+              <option value="">Todos os agentes ativos</option>
+              {agentesLista.filter((a: any) => a.status !== 'em_treinamento').map((a: any) => (
                 <option key={a.id} value={a.nome}>{a.nome}</option>
+              ))}
+              {agentesLista.some((a: any) => a.status === 'em_treinamento') && (
+                <option disabled>── Em treinamento (bloqueados) ──</option>
+              )}
+              {agentesLista.filter((a: any) => a.status === 'em_treinamento').map((a: any) => (
+                <option key={a.id} value={a.nome} disabled>{a.nome} 🔵</option>
               ))}
             </select>
             <select className="input py-1.5 text-xs" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>

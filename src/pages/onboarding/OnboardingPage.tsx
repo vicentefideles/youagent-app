@@ -860,21 +860,118 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
   )
 }
 
+function ModalAtivacao({ agente, onClose, onAtivado }: { agente: AgenteMock; onClose: () => void; onAtivado: () => void }) {
+  const [ativando, setAtivando] = useState(false)
+  const [erro, setErro] = useState('')
+  const raw = agente as AgenteMock & { simulacoes_realizadas?: number; score_certificacao?: number; certificado_em?: string; relatorio_prontidao?: Record<string, unknown> }
+  const certificado = !!raw.certificado_em
+  const pontos = (raw.relatorio_prontidao as { pontos_fortes?: string[]; pontos_melhoria?: string[] } | undefined)
+
+  async function ativar() {
+    setAtivando(true)
+    setErro('')
+    try {
+      await agentesApi.update(agente.id, { status: 'ativo' })
+      onAtivado()
+      onClose()
+    } catch {
+      setErro('Erro ao ativar. Tente novamente.')
+    } finally {
+      setAtivando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Ativar agente para produção</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{agente.nome}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+        </div>
+
+        {/* Resumo de certificação */}
+        <div className={`rounded-xl p-4 mb-4 ${certificado ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+          <p className={`text-xs font-semibold mb-2 ${certificado ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {certificado ? '✓ Agente certificado pelo Simulador' : '⚠ Agente não certificado ainda'}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center">
+              <p className="text-lg font-bold font-mono text-gray-800">{raw.simulacoes_realizadas ?? 0}</p>
+              <p className="text-xs text-gray-500">Simulações</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold font-mono text-gray-800">{raw.score_certificacao ?? '—'}</p>
+              <p className="text-xs text-gray-500">Score final</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-800">
+                {raw.certificado_em ? new Date(raw.certificado_em).toLocaleDateString('pt-BR') : '—'}
+              </p>
+              <p className="text-xs text-gray-500">Certificado em</p>
+            </div>
+          </div>
+          {pontos?.pontos_fortes && pontos.pontos_fortes.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-emerald-700 mb-1">Pontos fortes</p>
+              {pontos.pontos_fortes.slice(0, 3).map((p, i) => (
+                <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-emerald-500">✓</span>{p}</p>
+              ))}
+            </div>
+          )}
+          {pontos?.pontos_melhoria && pontos.pontos_melhoria.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-amber-700 mb-1">Atenção antes de ativar</p>
+              {pontos.pontos_melhoria.slice(0, 2).map((p, i) => (
+                <p key={i} className="text-xs text-gray-600 flex gap-1"><span className="text-amber-500">→</span>{p}</p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {!certificado && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-4">
+            <p className="text-xs text-blue-700">Recomendamos certificar o agente no Simulador antes de ativar. Você ainda pode ativar sem certificação, mas o agente não passou pelos 5 cenários obrigatórios.</p>
+          </div>
+        )}
+
+        {erro && <p className="text-xs text-red-600 mb-3">{erro}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={ativar} disabled={ativando}
+            className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-1">
+            {ativando ? <Loader2 size={14} className="animate-spin" /> : null}
+            {ativando ? 'Ativando...' : certificado ? 'Ativar agente' : 'Ativar mesmo assim'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AgenteCard({
   agente,
   onHorarios,
   onEditar,
   onDuplicar,
+  onAtivar,
   duplicating,
 }: {
   agente: AgenteMock
   onHorarios: () => void
   onEditar: () => void
   onDuplicar: () => void
+  onAtivar: () => void
   duplicating?: boolean
 }) {
+  const emTreinamento = agente.status === 'em_treinamento'
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
+    <div className={`bg-white border rounded-xl p-5 flex flex-col gap-4 ${emTreinamento ? 'border-blue-200' : 'border-gray-200'}`}>
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-full ${agente.cor} flex items-center justify-center text-white font-bold text-base`}>
           {agente.avatar}
@@ -886,13 +983,26 @@ function AgenteCard({
           </p>
         </div>
         {agente.status === 'ativo' && (
-          <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Ativo</span>
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Ativo</span>
+        )}
+        {emTreinamento && (
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">Em treinamento</span>
         )}
       </div>
-      <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-green-500" />
-        <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
-      </div>
+
+      {emTreinamento && (
+        <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+          <p className="text-xs text-blue-700 font-medium">Aguardando certificação no Simulador antes de ir para produção.</p>
+        </div>
+      )}
+
+      {!emTreinamento && (
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-green-500" />
+          <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={onEditar}
@@ -909,13 +1019,23 @@ function AgenteCard({
           {duplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
           Duplicar
         </button>
-        <button
-          onClick={onHorarios}
-          className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
-        >
-          <Clock size={12} />
-          Horários
-        </button>
+        {!emTreinamento && (
+          <button
+            onClick={onHorarios}
+            className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <Clock size={12} />
+            Horários
+          </button>
+        )}
+        {emTreinamento && (
+          <button
+            onClick={onAtivar}
+            className="flex items-center gap-1 text-xs font-semibold py-2 px-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            Ativar agente
+          </button>
+        )}
       </div>
     </div>
   )
@@ -939,6 +1059,7 @@ export default function OnboardingPage() {
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState('')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [agenteAtivacao, setAgenteAtivacao] = useState<AgenteMock | null>(null)
   const [sincronizando, setSincronizando] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
 
@@ -1027,7 +1148,7 @@ export default function OnboardingPage() {
         voz: form['voz'],
         voz_id: form['voz'],
         tom: form['tom'],
-        status: 'ativo',
+        status: 'em_treinamento',
       })
       setActivated(true)
       refetchAgentes()
@@ -1178,6 +1299,7 @@ export default function OnboardingPage() {
                   onHorarios={() => setAgenteHorarios(agente)}
                   onEditar={() => handleEditar(agente)}
                   onDuplicar={() => handleDuplicar(agente)}
+                  onAtivar={() => setAgenteAtivacao(agente)}
                   duplicating={duplicatingId === agente.id}
                 />
               ))}
@@ -1201,6 +1323,13 @@ export default function OnboardingPage() {
 
         {agenteHorarios && (
           <ModalHorarios agente={agenteHorarios} onClose={() => setAgenteHorarios(null)} />
+        )}
+        {agenteAtivacao && (
+          <ModalAtivacao
+            agente={agenteAtivacao}
+            onClose={() => setAgenteAtivacao(null)}
+            onAtivado={() => { refetchAgentes(); setAgenteAtivacao(null) }}
+          />
         )}
       </div>
     )

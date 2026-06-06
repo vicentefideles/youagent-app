@@ -46,7 +46,7 @@ export const authApi = {
 export const agentesApi = {
   list:             ()                      => api.get('/agentes'),
   create:           (data: unknown)         => api.post('/agentes', data),
-  update:           (id: string, data: unknown) => api.put(`/agentes/${id}`, data),
+  update:           (id: string, data: unknown) => api.patch(`/agentes/${id}`, data),
   delete:           (id: string)            => api.delete(`/agentes/${id}`),
   ciPendencias:     (desde?: string)        => api.get(`/agentes/ci-pendencias${desde ? `?desde=${encodeURIComponent(desde)}` : ''}`),
   sincronizarTodos: ()                      => api.post('/agentes/sincronizar-todos', {}),
