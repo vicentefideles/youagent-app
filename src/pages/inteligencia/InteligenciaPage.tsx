@@ -2042,13 +2042,17 @@ function TabBanco() {
                     {deletando === item.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                   </button>
                 </div>
-                <div className="flex gap-1.5 flex-wrap">
+                <div className="flex gap-1.5 flex-wrap items-center">
                   <span className="bg-brand-50 text-brand-700 text-[10px] px-1.5 py-0.5 rounded font-medium">{item.categoria}</span>
                   {item.fonte && <span className="bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded">📰 {item.fonte}</span>}
                   {expInfo
                     ? <span className={`text-[10px] px-1.5 py-0.5 rounded ${expInfo.color}`}>{expInfo.label}</span>
-                    : <span className="bg-gray-50 text-gray-400 text-[10px] px-1.5 py-0.5 rounded">Sem validade</span>
+                    : <span className="bg-gray-50 text-gray-400 text-[10px] px-1.5 py-0.5 rounded">Sem expiração</span>
                   }
+                  <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                    <CheckCircle size={10} className="text-emerald-500" />
+                    Ativo nos agentes
+                  </span>
                 </div>
               </div>
             )
