@@ -4323,11 +4323,11 @@ interface CertTodosResultado {
 }
 
 const CERT_SCENARIOS = [
-  { id: 'preco',      label: 'Pergunta preço — redirecionar para reunião' },
-  { id: 'fornecedor', label: 'Já tem fornecedor — convencer a comparar'    },
-  { id: 'decisor',    label: 'Não é o decisor'                             },
-  { id: 'urgencia',   label: 'Sem tempo agora — criar urgência'            },
-  { id: 'negativa',   label: 'Negativa definitiva'                         },
+  { id: 'preco',      label: 'Pergunta de preço — converter em agendamento' },
+  { id: 'fornecedor', label: 'Já tem fornecedor — apresentar e agendar demonstração' },
+  { id: 'decisor',    label: 'Não é o decisor — pegar contato e agendar com decisor' },
+  { id: 'urgencia',   label: 'Sem tempo agora — criar urgência ou reagendar' },
+  { id: 'negativa',   label: 'Negativa definitiva — contornar objeção e agendar' },
 ]
 
 function fmtDuracao(seg: number) {
