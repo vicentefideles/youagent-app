@@ -1920,13 +1920,16 @@ function TabBanco() {
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <input
-                    value={validadeExtraida}
-                    onChange={e => setValidadeExtraida(e.target.value)}
-                    className="w-28 border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-200"
-                    placeholder="Validade (dias)"
-                    type="number" min="1"
-                  />
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-[10px] text-gray-400 font-medium px-1">Por quantos dias é válido?</label>
+                    <input
+                      value={validadeExtraida}
+                      onChange={e => setValidadeExtraida(e.target.value)}
+                      className="w-36 border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-200"
+                      placeholder="Ex: 30 dias"
+                      type="number" min="1"
+                    />
+                  </div>
                   <button
                     onClick={handleSalvarExtraidos}
                     disabled={salvandoExtraidos || extraidos.filter(a => a.selecionado).length === 0}
@@ -1975,20 +1978,26 @@ function TabBanco() {
               placeholder="Descreva o argumento ou insight de mercado que o agente deve usar em ligações..."
             />
             <div className="flex gap-2">
-              <input
-                value={novoArg.validade}
-                onChange={e => setNovoArg(p => ({ ...p, validade: e.target.value }))}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Validade (dias)"
-                type="number"
-                min="1"
-              />
-              <input
-                value={novoArg.fonte}
-                onChange={e => setNovoArg(p => ({ ...p, fonte: e.target.value }))}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Fonte (ex: IBGE, G1, Interno)"
-              />
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-[10px] text-gray-400 font-medium px-0.5">Por quantos dias é válido? <span className="text-gray-300">(vazio = sem expiração)</span></label>
+                <input
+                  value={novoArg.validade}
+                  onChange={e => setNovoArg(p => ({ ...p, validade: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200"
+                  placeholder="Ex: 30"
+                  type="number"
+                  min="1"
+                />
+              </div>
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-[10px] text-gray-400 font-medium px-0.5">Fonte</label>
+                <input
+                  value={novoArg.fonte}
+                  onChange={e => setNovoArg(p => ({ ...p, fonte: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-200"
+                  placeholder="Ex: IBGE, G1, Interno"
+                />
+              </div>
             </div>
             {erroSalvar && <p className="text-xs text-red-500">{erroSalvar}</p>}
             <button
