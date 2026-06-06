@@ -1024,7 +1024,6 @@ function TabHorarios() {
       porAgente: { nome: string; melhorFaixa: string; pctMelhor: number }[];
       porCampanha: CampanhaHorario[];
     }),
-    staleTime: 60000,
   })
   const [aplicando, setAplicando] = useState<string | null>(null)
 
@@ -1062,10 +1061,12 @@ function TabHorarios() {
           </div>
         </div>
         <button
-          className="text-xs font-semibold px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-1.5 transition-colors"
+          className="text-xs font-semibold px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-1.5 transition-colors disabled:opacity-60"
           onClick={() => refetch()}
+          disabled={isLoading}
         >
-          <RefreshCw size={12} /> Reanalisar ligações
+          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {isLoading ? 'Analisando...' : 'Reanalisar ligações'}
         </button>
       </div>
 
