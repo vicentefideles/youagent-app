@@ -13,9 +13,7 @@ import {
   Zap,
   Clock,
   X,
-  UserCheck,
   Users,
-  PhoneOutgoing,
   Loader2,
   Copy,
   Pencil,
@@ -149,43 +147,6 @@ const REGIOES_BR: Record<string, string[]> = {
   'Norte': ['AM', 'PA', 'RO', 'AC', 'RR', 'AP', 'TO'],
 }
 
-const SCRIPTS_PADRAO: Record<string, string> = {
-  agendar_vendedor: 'Olá, [nome]! Aqui é [nome-agente] da [empresa]. Estou entrando em contato porque identificamos que sua empresa pode se beneficiar de [produto]. Tenho 2 minutos do seu tempo?',
-  substituir_sdr: 'Bom dia, [nome]! Sou [nome-agente] da [empresa]. Vi que vocês estão no segmento [segmento] e queria entender melhor como vocês gerenciam a prospecção hoje. Faz sentido conversarmos?',
-  prospeccao_outbound: 'Olá, [nome]! Aqui é [nome-agente]. Somos especialistas em [produto] e ajudamos empresas como a sua a [resultados]. Posso te mostrar como funciona?',
-}
-
-interface Proposito {
-  id: string
-  titulo: string
-  descricao: string
-  icon: React.ReactNode
-  preConfig: { tom: string; voz: string }
-}
-
-const PROPOSITOS: Proposito[] = [
-  {
-    id: 'agendar_vendedor',
-    titulo: 'Agendar para meu vendedor',
-    descricao: 'O agente qualifica leads e transfere ao vivo para o vendedor fechar',
-    icon: <UserCheck size={28} className="text-blue-500" />,
-    preConfig: { tom: 'profissional', voz: 'Telnyx.NaturalHD.isadora' },
-  },
-  {
-    id: 'substituir_sdr',
-    titulo: 'Substituir equipe de SDRs',
-    descricao: 'O agente faz toda a prospecção e agenda reuniões automaticamente',
-    icon: <Users size={28} className="text-purple-500" />,
-    preConfig: { tom: 'consultivo', voz: 'Telnyx.NaturalHD.baltasar' },
-  },
-  {
-    id: 'prospeccao_outbound',
-    titulo: 'Prospecção outbound do zero',
-    descricao: 'O agente busca e qualifica leads novos de forma autônoma',
-    icon: <PhoneOutgoing size={28} className="text-green-500" />,
-    preConfig: { tom: 'direto', voz: 'Telnyx.NaturalHD.lucia' },
-  },
-]
 
 const STEPS = [
   { label: 'Empresa', icon: Building2 },
@@ -920,7 +881,6 @@ function Step4({
   activatingStep,
   objecoes,
   regioes,
-  propositoSelecionado,
   onActivate,
   onReset,
   modoEdicao,
@@ -931,7 +891,6 @@ function Step4({
   activatingStep?: number
   objecoes: Objecao[]
   regioes: string[]
-  propositoSelecionado: string | null
   onActivate: () => void
   onReset: () => void
   modoEdicao: boolean
@@ -939,7 +898,6 @@ function Step4({
   const navigate = useNavigate()
   const icpScore = calcularIcpScore(form)
   const vozNome = VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz
-  const propLabel = PROPOSITOS.find(p => p.id === propositoSelecionado)?.titulo
   const metLabel = METODOLOGIAS.find(m => m.id === form.metodologia)?.label
   const objecoesValidas = objecoes.filter(o => o.objecao.trim())
   const perguntasValidas = [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean)
@@ -1026,9 +984,6 @@ function Step4({
           <div className="col-span-2 pb-3 border-b border-gray-200">
             <p className="text-xs text-gray-400 mb-0.5">Nome do agente</p>
             <p className="font-semibold text-gray-900 text-base">{form['nome-agente'] || '—'}</p>
-            {propLabel && (
-              <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{propLabel}</span>
-            )}
           </div>
           {/* Empresa */}
           <div>
@@ -1546,7 +1501,6 @@ function AgenteCard({
   )
 }
 
-// PERFIS removed — replaced by PROPOSITOS above
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -1554,8 +1508,7 @@ function AgenteCard({
 const CI_SYNC_KEY = 'etz_ultima_sync_ci'
 
 export default function OnboardingPage() {
-  const [tela, setTela] = useState<'grid' | 'wiz0' | 'wizard'>('grid')
-  const [propositoSelecionado, setPropositoSelecionado] = useState<string | null>(null)
+  const [tela, setTela] = useState<'grid' | 'wizard'>('grid')
   const [agenteHorarios, setAgenteHorarios] = useState<AgenteMock | null>(null)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormData>(INITIAL_FORM)
@@ -1671,7 +1624,6 @@ export default function OnboardingPage() {
       regioes_cobertura: regioes.length > 0 ? regioes : null,
       compliance_anatel: form['compliance-anatel'] === 'true',
       compliance_optout: form['compliance-optout'] === 'true',
-      proposito: propositoSelecionado,
       voz_id: form['voz'],
       tom: form['tom'],
       status: 'inativo',
@@ -1734,7 +1686,6 @@ export default function OnboardingPage() {
     })
     setObjecoes(raw.objecoes && raw.objecoes.length > 0 ? raw.objecoes : INITIAL_OBJECOES)
     setRegioes((raw as any).regioes_cobertura ?? [])
-    setPropositoSelecionado(raw.proposito || null)
     setEditandoId(agente.id)
     setStep(0)
     setActivated(false)
@@ -1797,7 +1748,6 @@ export default function OnboardingPage() {
     setActivateError('')
     setErrors({})
     setTela('grid')
-    setPropositoSelecionado(null)
   }
 
   const stepTitles = [
@@ -1855,7 +1805,7 @@ export default function OnboardingPage() {
                   </span>
                 )}
               </button>
-              <button onClick={() => setTela('wiz0')} className="btn-primary gap-2">
+              <button onClick={() => { setForm(INITIAL_FORM); setStep(0); setEditandoId(null); setActivated(false); setTela('wizard') }} className="btn-primary gap-2">
                 <Bot size={15} />
                 Criar novo agente
               </button>
@@ -1968,8 +1918,8 @@ export default function OnboardingPage() {
                 Configure seu primeiro agente em menos de 5 minutos. Quanto mais detalhes você fornecer, melhor será a performance.
               </p>
               <button
-                onClick={() => setTela('wiz0')}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+                onClick={() => { setForm(INITIAL_FORM); setStep(0); setEditandoId(null); setActivated(false); setTela('wizard') }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition-colors shadow-sm"
               >
                 <Bot size={16} />
                 Criar primeiro agente
@@ -2005,178 +1955,6 @@ export default function OnboardingPage() {
             onAtivado={() => { refetchAgentes(); setAgenteAtivacao(null) }}
           />
         )}
-      </div>
-    )
-  }
-
-  // ── Tela: seleção de propósito ────────────────────────────────────────────
-  if (tela === 'wiz0') {
-    const PROPOSITOS_EX = [
-      {
-        id: 'agendar_vendedor',
-        titulo: 'Agendar para meu vendedor',
-        tag: 'SDR + Closer',
-        descricao: 'O agente liga e qualifica. Se detectar interesse real, transfere a ligação ao vivo para o vendedor fechar na hora. Leads frios são descartados — seu time só fala com quem está pronto.',
-        idealPara: 'Times com vendedor humano disponível para atender transferências. Funciona bem para inside sales, SaaS e serviços com ciclo curto.',
-        naoIdeal: 'Quem não tem vendedor disponível em tempo real para receber a ligação transferida.',
-        bullets: [
-          'Transferência condicional: só acontece quando o lead demonstra interesse real',
-          'Vendedor entra direto no momento de fechamento — sem prospectar',
-          'Leads frios são descartados automaticamente, sem ocupar o time',
-        ],
-        autoConfig: { voz: 'Isadora (voz feminina, natural)', tom: 'Profissional', script: 'Abertura + qualificação + transferência' },
-        icon: <UserCheck size={22} className="text-brand" />,
-        bg: 'bg-brand-50',
-        tagColor: 'bg-brand-100 text-brand-700',
-        preConfig: { tom: 'profissional', voz: 'Telnyx.NaturalHD.isadora' },
-      },
-      {
-        id: 'substituir_sdr',
-        titulo: 'Substituir equipe de SDRs',
-        tag: 'Agendamento automático',
-        descricao: 'O agente prospecta, qualifica e agenda reuniões diretamente no calendário do seu time — sem nenhuma intervenção humana. O vendedor só entra na reunião já marcada.',
-        idealPara: 'Empresas que querem escalar prospecção sem contratar SDRs. Ideal para ciclos de venda com reunião de apresentação antes do fechamento.',
-        naoIdeal: 'Quem precisa fechar o negócio na própria ligação — para isso use "Agendar para meu vendedor".',
-        bullets: [
-          'Agenda reuniões no calendário automaticamente — sem SDR humano',
-          'Opera 24h por dia, 7 dias por semana, sem custo fixo de equipe',
-          'Vendedor recebe reuniões prontas: só se preocupa em fechar',
-        ],
-        autoConfig: { voz: 'Baltasar (voz masculina, consultiva)', tom: 'Consultivo', script: 'Abertura + qualificação + agendamento' },
-        icon: <Users size={22} className="text-emerald-600" />,
-        bg: 'bg-emerald-50',
-        tagColor: 'bg-emerald-100 text-emerald-700',
-        preConfig: { tom: 'consultivo', voz: 'Telnyx.NaturalHD.baltasar' },
-      },
-      {
-        id: 'prospeccao_outbound',
-        titulo: 'Prospecção outbound do zero',
-        tag: 'Listas frias',
-        descricao: 'O agente aborda contatos frios, identifica interesse e filtra quem não tem perfil. Os leads qualificados seguem para o próximo passo — reunião, WhatsApp ou campanha — conforme você configurar.',
-        idealPara: 'Lançar produto novo, entrar em mercado novo ou trabalhar listas frias sem estrutura de SDR. O próximo passo é flexível.',
-        naoIdeal: 'Quem já tem base quente de leads — o script de abordagem fria não é adequado para leads que já te conhecem.',
-        bullets: [
-          'Aborda listas frias com script de primeiro contato',
-          'Filtra automaticamente leads sem perfil ou sem interesse',
-          'O próximo passo é configurável: reunião, follow-up ou campanha',
-        ],
-        autoConfig: { voz: 'Lucia (voz feminina, direta)', tom: 'Direto', script: 'Abertura fria + identificação de interesse' },
-        icon: <PhoneOutgoing size={22} className="text-amber-600" />,
-        bg: 'bg-amber-50',
-        tagColor: 'bg-amber-100 text-amber-700',
-        preConfig: { tom: 'direto', voz: 'Telnyx.NaturalHD.lucia' },
-      },
-    ]
-
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-start justify-center py-12 px-4">
-        <div className="w-full max-w-2xl">
-
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Qual é o objetivo do agente?</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Escolha como o agente vai trabalhar — configuramos voz, tom e script automaticamente.
-            </p>
-          </div>
-
-          {/* Opções */}
-          <div className="flex flex-col gap-3 mb-8">
-            {PROPOSITOS_EX.map(p => {
-              const selected = propositoSelecionado === p.id
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setPropositoSelecionado(p.id)}
-                  className={`text-left rounded-xl border-2 transition-all overflow-hidden ${
-                    selected ? 'border-brand bg-white shadow-md' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                  }`}
-                >
-                  <div className="p-4 flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-lg ${p.bg} flex items-center justify-center shrink-0 mt-0.5`}>
-                      {p.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-sm text-gray-900">{p.titulo}</p>
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${p.tagColor}`}>{p.tag}</span>
-                        </div>
-                        <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          selected ? 'border-brand bg-brand' : 'border-gray-300'
-                        }`}>
-                          {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">{p.descricao}</p>
-
-                      {selected && (
-                        <div className="mt-3 flex flex-col gap-3">
-                          {/* Bullets de benefício */}
-                          <ul className="flex flex-col gap-1">
-                            {p.bullets.map(b => (
-                              <li key={b} className="flex items-start gap-1.5 text-xs text-gray-700">
-                                <Check size={11} className="text-brand shrink-0 mt-0.5" strokeWidth={3} />
-                                {b}
-                              </li>
-                            ))}
-                          </ul>
-
-                          {/* Ideal para / Não ideal */}
-                          <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-2.5">
-                            <p className="text-[11px] text-gray-500">
-                              <span className="font-medium text-gray-700">✓ Ideal para:</span> {p.idealPara}
-                            </p>
-                            <p className="text-[11px] text-gray-400">
-                              <span className="font-medium text-gray-500">✗ Não indicado:</span> {p.naoIdeal}
-                            </p>
-                          </div>
-
-                          {/* Auto-config */}
-                          <div className="flex items-center gap-2 bg-brand-50 rounded-lg px-2.5 py-2 flex-wrap">
-                            <Zap size={11} className="text-brand shrink-0" />
-                            <span className="text-[10px] text-brand-700 font-medium">Configurado automaticamente:</span>
-                            <span className="text-[10px] text-brand-600">Voz: {p.autoConfig.voz}</span>
-                            <span className="text-brand-300 text-[10px]">·</span>
-                            <span className="text-[10px] text-brand-600">Tom: {p.autoConfig.tom}</span>
-                            <span className="text-brand-300 text-[10px]">·</span>
-                            <span className="text-[10px] text-brand-600">Script: {p.autoConfig.script}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Ações */}
-          <div className="flex gap-3 justify-between">
-            <button onClick={() => setTela('grid')} className="btn-secondary gap-1.5">
-              <ChevronLeft size={15} /> Voltar
-            </button>
-            <button
-              disabled={!propositoSelecionado}
-              onClick={() => {
-                const p = PROPOSITOS_EX.find(x => x.id === propositoSelecionado)
-                if (p) {
-                  const scriptPadrao = propositoSelecionado ? SCRIPTS_PADRAO[propositoSelecionado] ?? '' : ''
-                  setForm(prev => ({
-                    ...prev,
-                    voz: p.preConfig.voz,
-                    tom: p.preConfig.tom,
-                    'script-abertura': prev['script-abertura'] || scriptPadrao,
-                  }))
-                }
-                setTela('wizard')
-              }}
-              className="btn-primary gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Continuar <ChevronRight size={15} />
-            </button>
-          </div>
-        </div>
       </div>
     )
   }
@@ -2219,7 +1997,6 @@ export default function OnboardingPage() {
               activatingStep={activatingStep}
               objecoes={objecoes}
               regioes={regioes}
-              propositoSelecionado={propositoSelecionado}
               onActivate={handleActivate}
               onReset={reset}
               modoEdicao={!!editandoId}
@@ -2235,7 +2012,7 @@ export default function OnboardingPage() {
           {!(step === 3 && activated) && (
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
               <button
-                onClick={step === 0 ? () => setTela('wiz0') : prev}
+                onClick={step === 0 ? () => setTela('grid') : prev}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <ChevronLeft size={16} /> Anterior
