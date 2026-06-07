@@ -1443,7 +1443,7 @@ function AgenteCard({
   onAtivar: () => void
   duplicating?: boolean
 }) {
-  const emTreinamento = agente.status === 'em_treinamento'
+  const emTreinamento = agente.status === 'em_treinamento' || agente.status === 'inativo'
   const vozNome = VOZES_TELNYX.find(v => v.id === agente.voz)?.nome
   const infoTags = [
     vozNome || agente.voz,
@@ -1669,7 +1669,7 @@ export default function OnboardingPage() {
       proposito: propositoSelecionado,
       voz_id: form['voz'],
       tom: form['tom'],
-      status: 'em_treinamento',
+      status: 'inativo',
     }
     try {
       setActivatingStep(1)
@@ -1750,7 +1750,7 @@ export default function OnboardingPage() {
         icp_porte: agente.icp_porte,
         voz_id: agente.voz,
         tom: agente.tom,
-        status: 'em_treinamento',
+        status: 'inativo',
         horarios: agente.horarios,
       }
       await agentesApi.create(payload)
@@ -1788,8 +1788,8 @@ export default function OnboardingPage() {
 
   // ── Tela: grid de agentes ──────────────────────────────────────────────────
   if (tela === 'grid') {
-    const ativos = agentes.filter(a => a.status !== 'em_treinamento').length
-    const emTreinamento = agentes.filter(a => a.status === 'em_treinamento').length
+    const ativos = agentes.filter(a => a.status === 'ativo').length
+    const emTreinamento = agentes.filter(a => a.status !== 'ativo').length
 
     return (
       <div className="min-h-screen bg-gray-50">
