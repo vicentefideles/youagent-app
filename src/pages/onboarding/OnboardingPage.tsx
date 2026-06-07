@@ -2012,53 +2012,110 @@ export default function OnboardingPage() {
 
   // ── Tela: seleção de propósito ────────────────────────────────────────────
   if (tela === 'wiz0') {
+    const PROPOSITOS_EX = [
+      {
+        id: 'agendar_vendedor',
+        titulo: 'Agendar para meu vendedor',
+        descricao: 'O agente liga, qualifica o lead e, quando o momento é certo, transfere a ligação ao vivo para seu vendedor fechar o negócio.',
+        bullets: ['Qualificação antes da transferência', 'Vendedor entra só no momento certo', 'Ideal para times comerciais ativos'],
+        icon: <UserCheck size={22} className="text-brand" />,
+        bg: 'bg-brand-50',
+        preConfig: { tom: 'profissional', voz: 'Telnyx.NaturalHD.isadora' },
+      },
+      {
+        id: 'substituir_sdr',
+        titulo: 'Substituir equipe de SDRs',
+        descricao: 'O agente faz toda a prospecção, qualifica leads e agenda reuniões no calendário automaticamente — sem SDR humano.',
+        bullets: ['Agenda reuniões sem intervenção humana', 'Opera 24/7 sem custo fixo de equipe', 'Ideal para escalar sem contratar'],
+        icon: <Users size={22} className="text-emerald-600" />,
+        bg: 'bg-emerald-50',
+        preConfig: { tom: 'consultivo', voz: 'Telnyx.NaturalHD.baltasar' },
+      },
+      {
+        id: 'prospeccao_outbound',
+        titulo: 'Prospecção outbound do zero',
+        descricao: 'O agente aborda contatos frios, identifica interesse, qualifica e passa para o próximo passo — tudo de forma autônoma.',
+        bullets: ['Abordagem de listas frias', 'Filtra leads sem potencial automaticamente', 'Ideal para novos mercados ou produtos'],
+        icon: <PhoneOutgoing size={22} className="text-amber-600" />,
+        bg: 'bg-amber-50',
+        preConfig: { tom: 'direto', voz: 'Telnyx.NaturalHD.lucia' },
+      },
+    ]
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-start justify-center py-12 px-4">
         <div className="w-full max-w-2xl">
-          <div className="mb-8 text-center">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <Settings size={22} className="text-blue-600" />
-              <span className="text-lg font-bold text-gray-900">Qual é o objetivo do agente?</span>
+
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Qual é o objetivo do agente?</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Escolha como o agente vai trabalhar — configuramos voz, tom e script automaticamente.
+            </p>
+          </div>
+
+          {/* Opções */}
+          <div className="flex flex-col gap-3 mb-8">
+            {PROPOSITOS_EX.map(p => {
+              const selected = propositoSelecionado === p.id
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setPropositoSelecionado(p.id)}
+                  className={`text-left rounded-xl border-2 transition-all overflow-hidden ${
+                    selected ? 'border-brand bg-white shadow-md' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="p-4 flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-lg ${p.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                      {p.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-sm text-gray-900">{p.titulo}</p>
+                        <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selected ? 'border-brand bg-brand' : 'border-gray-300'
+                        }`}>
+                          {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">{p.descricao}</p>
+                      {selected && (
+                        <ul className="mt-2.5 flex flex-col gap-1">
+                          {p.bullets.map(b => (
+                            <li key={b} className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <Check size={11} className="text-brand shrink-0" strokeWidth={3} />
+                              {b}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Nota de configuração automática */}
+          {propositoSelecionado && (
+            <div className="flex items-start gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2.5 mb-5">
+              <Zap size={13} className="text-brand mt-0.5 shrink-0" />
+              <p className="text-xs text-brand-700">
+                Voz e tom configurados automaticamente para este objetivo. Você pode ajustar no passo seguinte.
+              </p>
             </div>
-            <p className="text-sm text-gray-500">Escolha o propósito principal — configuramos voz e tom automaticamente</p>
-          </div>
+          )}
 
-          <div className="flex flex-col gap-4 mb-6">
-            {PROPOSITOS.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setPropositoSelecionado(p.id)}
-                className={`text-left p-5 rounded-2xl border-2 transition-all flex items-center gap-5 ${
-                  propositoSelecionado === p.id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
-              >
-                <div className="shrink-0">{p.icon}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">{p.titulo}</p>
-                  <p className="text-sm text-gray-500 mt-0.5">{p.descricao}</p>
-                </div>
-                <div className={`shrink-0 w-5 h-5 rounded-full border-2 transition-colors flex items-center justify-center ${
-                  propositoSelecionado === p.id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
-                }`}>
-                  {propositoSelecionado === p.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-              </button>
-            ))}
-          </div>
-
+          {/* Ações */}
           <div className="flex gap-3 justify-between">
-            <button
-              onClick={() => setTela('grid')}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <ChevronLeft size={16} /> Voltar
+            <button onClick={() => setTela('grid')} className="btn-secondary gap-1.5">
+              <ChevronLeft size={15} /> Voltar
             </button>
             <button
               disabled={!propositoSelecionado}
               onClick={() => {
-                const p = PROPOSITOS.find(x => x.id === propositoSelecionado)
+                const p = PROPOSITOS_EX.find(x => x.id === propositoSelecionado)
                 if (p) {
                   const scriptPadrao = propositoSelecionado ? SCRIPTS_PADRAO[propositoSelecionado] ?? '' : ''
                   setForm(prev => ({
@@ -2070,9 +2127,9 @@ export default function OnboardingPage() {
                 }
                 setTela('wizard')
               }}
-              className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="btn-primary gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Continuar <ChevronRight size={16} />
+              Continuar <ChevronRight size={15} />
             </button>
           </div>
         </div>
