@@ -2098,34 +2098,6 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
     ? new Date(primeiroAgente.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : null
 
-  const GATILHOS = [
-    { label: 'Urgência ou prazo', pct: 82, color: 'bg-emerald-500', status: '↑ Aumentar', statusColor: 'bg-blue-50 text-blue-700' },
-    { label: 'Pede humano', pct: 91, color: 'bg-emerald-500', status: 'Ótimo', statusColor: 'bg-emerald-50 text-emerald-700' },
-    { label: 'Pergunta preço', pct: 74, color: 'bg-blue-500', status: 'OK', statusColor: 'bg-gray-100 text-gray-600' },
-    { label: 'Pede proposta', pct: 68, color: 'bg-blue-500', status: 'OK', statusColor: 'bg-gray-100 text-gray-600' },
-    { label: 'Menciona concorrente', pct: 43, color: 'bg-amber-400', status: '⚠ Revisar', statusColor: 'bg-amber-50 text-amber-700' },
-  ]
-
-  const TOP_ARGS = [
-    { label: 'Resposta a "não tenho orçamento"', usos: 312, pct: 74 },
-    { label: 'Resposta a "já temos fornecedor"', usos: 287, pct: 68 },
-    { label: 'Argumento custo do SDR', usos: 198, pct: 63 },
-    { label: 'Case da construtora SP', usos: 156, pct: 61 },
-    { label: 'Resposta a "me manda por email"', usos: 134, pct: 61 },
-  ]
-
-  const ARGS_APRENDIDOS = [
-    { tag: 'Não tenho orçamento', segmento: 'Todos os ramos', usos: 312, data: '03/04', frase: '"Faz sentido ser criterioso. Por isso nosso modelo é por resultado — uma reunião fechada já paga vários meses do investimento. Posso te mostrar em 20 minutos como funciona?"', pct: 74 },
-    { tag: 'Já temos fornecedor', segmento: 'Tecnologia, Indústria', usos: 287, data: '08/04', frase: '"Entendo! A maioria dos nossos clientes também tinha. A diferença é que nos complementamos o que vocês já têm e reduzimos custo. Vale uma conversa rápida de 20 minutos?"', pct: 68 },
-    { tag: 'Me manda por e-mail', segmento: 'Todos os ramos', usos: 198, data: '12/04', frase: '"Claro! Antes de enviar, me fala: qual o maior desafio da sua equipe de vendas hoje com agendamentos? Isso me ajuda a personalizar o material para o perfil de vocês."', pct: 61 },
-    { tag: 'Não é o momento', segmento: 'Agronegócio, Indústria', usos: 156, data: '20/04', frase: '"Faz sentido planejar. Por isso mesmo é importante a gente conversar agora — para quando chegar a safra vocês já estarem rodando com os agentes treinados."', pct: 58 },
-  ]
-
-  const ARGS_VALIDACAO = [
-    { tag: 'Já usamos IA', segmento: 'Tecnologia', usos: 12, data: '04/05', frase: '"Ótimo! Vocês já estão na direção certa. A diferença é que essa IA é especialista em agendamento ativo — uma função muito específica que as outras não cobrem."', pct: 52 },
-    { tag: 'Preciso consultar meu sócio', segmento: 'Todos os ramos', usos: 8, data: '05/05', frase: '"Claro, faz todo sentido! O que precisa acontecer nessa reunião para que você e seu sócio possam avaliar com todas as informações necessárias?"', pct: 47 },
-  ]
-
   const { data: metricasData } = useQuery({
     queryKey: ['inteligencia-metricas'],
     queryFn: () => inteligenciaApi.metricas().then(r => r.data as any).catch(() => null),
