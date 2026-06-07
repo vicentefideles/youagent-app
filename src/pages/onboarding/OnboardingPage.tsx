@@ -1221,15 +1221,22 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
     setHorarios(next)
   }
 
+  const [salvando, setSalvando] = useState(false)
+  const [salvoOk, setSalvoOk] = useState(false)
+
   async function handleSalvarHorarios() {
     if (!agente?.id) { onClose(); return }
+    setSalvando(true)
     try {
       await agentesApi.update(agente.id, { horarios })
-      onClose()
+      setSalvoOk(true)
+      setTimeout(() => { setSalvoOk(false); onClose() }, 1200)
     } catch(e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } }; message?: string })
         ?.response?.data?.error || 'Erro ao salvar horários'
       alert(msg)
+    } finally {
+      setSalvando(false)
     }
   }
 
@@ -1320,12 +1327,18 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
               className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
             >Limpar todos</button>
           </div>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <div className="flex gap-3 items-center">
+            {salvoOk && (
+              <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
+                <Check size={15} strokeWidth={3} /> Salvo!
+              </span>
+            )}
+            <button onClick={onClose} disabled={salvando} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
               Cancelar
             </button>
-            <button onClick={handleSalvarHorarios} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
-              Salvar horários
+            <button onClick={handleSalvarHorarios} disabled={salvando || salvoOk} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60">
+              {salvando ? <Loader2 size={14} className="animate-spin" /> : salvoOk ? <Check size={14} strokeWidth={3} /> : null}
+              {salvando ? 'Salvando...' : salvoOk ? 'Salvo!' : 'Salvar horários'}
             </button>
           </div>
         </div>
@@ -1537,16 +1550,18 @@ function AgenteCard({
             <X size={12} />
             {deleting ? '...' : 'Deletar'}
           </button>
-          {emTreinamento && (
+        </div>
+        {emTreinamento && (
+          <div className="pt-1 border-t border-gray-100">
             <button
               onClick={onAtivar}
-              className="ml-auto flex items-center gap-1.5 text-xs font-semibold py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
             >
               <Check size={12} strokeWidth={3} />
               Ativar agente
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
