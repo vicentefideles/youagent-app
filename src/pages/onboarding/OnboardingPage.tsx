@@ -23,6 +23,9 @@ import {
   RefreshCw,
   Brain,
   AlertTriangle,
+  Play,
+  MapPin,
+  Shield,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -51,6 +54,8 @@ interface FormData {
   'wiz-qualif-q3': string
   'script-abertura': string
   'metodologia': string
+  'compliance-anatel': string
+  'compliance-optout': string
   voz: string
   tom: string
 }
@@ -81,6 +86,8 @@ const INITIAL_FORM: FormData = {
   'wiz-qualif-q3': 'Você é o responsável pela decisão de novas ferramentas?',
   'script-abertura': '',
   'metodologia': '',
+  'compliance-anatel': 'true',
+  'compliance-optout': 'true',
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
 }
@@ -134,6 +141,14 @@ const METODOLOGIAS = [
   { id: 'bant', label: 'BANT', descricao: 'Budget, Authority, Need, Timeline' },
   { id: 'direto', label: 'Direto', descricao: 'Apresenta proposta rapidamente' },
 ]
+
+const REGIOES_BR: Record<string, string[]> = {
+  'Sudeste': ['SP', 'RJ', 'MG', 'ES'],
+  'Sul': ['PR', 'SC', 'RS'],
+  'Centro-Oeste': ['GO', 'MT', 'MS', 'DF'],
+  'Nordeste': ['BA', 'PE', 'CE', 'MA', 'PB', 'RN', 'AL', 'SE', 'PI'],
+  'Norte': ['AM', 'PA', 'RO', 'AC', 'RR', 'AP', 'TO'],
+}
 
 const SCRIPTS_PADRAO: Record<string, string> = {
   agendar_vendedor: 'Olá, [nome]! Aqui é [nome-agente] da [empresa]. Estou entrando em contato porque identificamos que sua empresa pode se beneficiar de [produto]. Tenho 2 minutos do seu tempo?',
@@ -465,6 +480,29 @@ type FiltroGenero = 'Todos' | 'Feminino' | 'Masculino'
 
 function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
   const [filtro, setFiltro] = useState<FiltroGenero>('Todos')
+  const [previewingId, setPreviewingId] = useState<string | null>(null)
+
+  async function playPreview(e: React.MouseEvent, voiceId: string) {
+    e.stopPropagation()
+    if (previewingId) return
+    setPreviewingId(voiceId)
+    try {
+      const token = localStorage.getItem('youagent_jwt')
+      const resp = await fetch(
+        `https://app.etztech.com/api/v1/agentes/preview-voz?voice_id=${encodeURIComponent(voiceId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!resp.ok) throw new Error('preview failed')
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => { setPreviewingId(null); URL.revokeObjectURL(url) }
+      audio.onerror = () => { setPreviewingId(null); URL.revokeObjectURL(url) }
+      audio.play()
+    } catch {
+      setPreviewingId(null)
+    }
+  }
 
   const grupos = (['pt-BR', 'pt-PT'] as const).map(idioma => ({
     idioma,
@@ -514,7 +552,19 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-lg">{v.genero === 'Feminino' ? '👩‍💼' : '👨‍💼'}</span>
-                    {form.voz === v.id && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => playPreview(e, v.id)}
+                        className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Ouvir prévia"
+                      >
+                        {previewingId === v.id
+                          ? <Loader2 size={10} className="animate-spin" />
+                          : <Play size={10} />}
+                      </button>
+                      {form.voz === v.id && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                    </div>
                   </div>
                   <p className="font-semibold text-gray-900 text-sm leading-tight">{v.nome}</p>
                   <div className="flex flex-wrap gap-1">
@@ -538,12 +588,33 @@ function Step3({
   onChange,
   objecoes,
   onObjecoesChange,
+  regioes,
+  onRegioesChange,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
   objecoes: Objecao[]
   onObjecoesChange: (o: Objecao[]) => void
+  regioes: string[]
+  onRegioesChange: (r: string[]) => void
 }) {
+  function toggleRegiao(estado: string) {
+    onRegioesChange(
+      regioes.includes(estado)
+        ? regioes.filter(r => r !== estado)
+        : [...regioes, estado]
+    )
+  }
+
+  function toggleRegiaoGrupo(estados: string[]) {
+    const allSelected = estados.every(e => regioes.includes(e))
+    if (allSelected) {
+      onRegioesChange(regioes.filter(r => !estados.includes(r)))
+    } else {
+      const novos = estados.filter(e => !regioes.includes(e))
+      onRegioesChange([...regioes, ...novos])
+    }
+  }
   function updateObjecao(i: number, field: keyof Objecao, value: string) {
     const next = objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o)
     onObjecoesChange(next)
@@ -701,6 +772,89 @@ function Step3({
                 value={obj.rebuttal}
                 onChange={e => updateObjecao(i, 'rebuttal', e.target.value)}
               />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Região / cobertura geográfica */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <MapPin size={15} className="text-gray-500" />
+          <p className="text-sm font-medium text-gray-700">Região de cobertura</p>
+          <span className="text-xs text-gray-400">(opcional — deixe vazio para todo o Brasil)</span>
+        </div>
+        <div className="flex flex-col gap-3">
+          {Object.entries(REGIOES_BR).map(([regiao, estados]) => {
+            const allSelected = estados.every(e => regioes.includes(e))
+            return (
+              <div key={regiao} className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleRegiaoGrupo(estados)}
+                    className="flex items-center gap-2"
+                  >
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                      allSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
+                    }`}>
+                      {allSelected && <Check size={10} className="text-white" />}
+                    </div>
+                    <span className="text-xs font-semibold text-gray-600">{regiao}</span>
+                  </button>
+                  <span className="text-xs text-gray-400">
+                    {estados.filter(e => regioes.includes(e)).length}/{estados.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {estados.map(estado => (
+                    <button
+                      key={estado}
+                      type="button"
+                      onClick={() => toggleRegiao(estado)}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                        regioes.includes(estado)
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-blue-300'
+                      }`}
+                    >
+                      {estado}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Compliance LGPD */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Shield size={15} className="text-gray-500" />
+          <p className="text-sm font-medium text-gray-700">Compliance e LGPD</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          {[
+            { key: 'compliance-anatel' as keyof FormData, label: 'Seguir horários Anatel', descricao: 'Ligar apenas entre 8h e 21h, sem domingos' },
+            { key: 'compliance-optout' as keyof FormData, label: 'Registrar opt-out automático', descricao: 'Quando contato pedir para não ser ligado, bloquear automaticamente' },
+          ].map(item => (
+            <div key={item.key} className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{item.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{item.descricao}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onChange(item.key, form[item.key] === 'true' ? 'false' : 'true')}
+                className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
+                  form[item.key] === 'true' ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                  form[item.key] === 'true' ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </button>
             </div>
           ))}
         </div>
@@ -1330,6 +1484,7 @@ export default function OnboardingPage() {
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
+  const [regioes, setRegioes] = useState<string[]>([])
   const [activatingStep, setActivatingStep] = useState(0)
 
   // Última sincronização CI (localStorage)
@@ -1427,6 +1582,9 @@ export default function OnboardingPage() {
       script_abertura: form['script-abertura'],
       metodologia: form['metodologia'],
       objecoes: objecoes.filter(o => o.objecao.trim()),
+      regioes_cobertura: regioes.length > 0 ? regioes : null,
+      compliance_anatel: form['compliance-anatel'] === 'true',
+      compliance_optout: form['compliance-optout'] === 'true',
       proposito: propositoSelecionado,
       voz: form['voz'],
       voz_id: form['voz'],
@@ -1484,10 +1642,13 @@ export default function OnboardingPage() {
       'wiz-qualif-q3': pergs[2] ?? INITIAL_FORM['wiz-qualif-q3'],
       'script-abertura': raw.script_abertura || '',
       'metodologia': raw.metodologia || '',
+      'compliance-anatel': (raw as any).compliance_anatel === false ? 'false' : 'true',
+      'compliance-optout': (raw as any).compliance_optout === false ? 'false' : 'true',
       voz: agente.voz || INITIAL_FORM.voz,
       tom: agente.tom || '',
     })
     setObjecoes(raw.objecoes && raw.objecoes.length > 0 ? raw.objecoes : INITIAL_OBJECOES)
+    setRegioes((raw as any).regioes_cobertura ?? [])
     setPropositoSelecionado(raw.proposito || null)
     setEditandoId(agente.id)
     setStep(0)
@@ -1753,6 +1914,8 @@ export default function OnboardingPage() {
               onChange={onChange}
               objecoes={objecoes}
               onObjecoesChange={setObjecoes}
+              regioes={regioes}
+              onRegioesChange={setRegioes}
             />
           )}
           {step === 3 && (
