@@ -1469,99 +1469,79 @@ function AgenteCard({
   ].filter(Boolean)
 
   return (
-    <div className={`bg-white border rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md ${
-      emTreinamento ? 'border-blue-200' : 'border-gray-200'
-    }`}>
-      {/* Barra de status colorida no topo */}
-      <div className={`h-1 w-full ${emTreinamento ? 'bg-blue-400' : 'bg-emerald-500'}`} />
+    <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+      {/* Linha de status */}
+      <div className={`h-0.5 w-full ${emTreinamento ? 'bg-amber-400' : 'bg-emerald-500'}`} />
 
-      <div className="p-5 flex flex-col gap-4">
-        {/* Cabeçalho do card */}
+      <div className="p-4 flex flex-col gap-3">
+        {/* Cabeçalho */}
         <div className="flex items-start gap-3">
-          <div className={`w-11 h-11 rounded-xl ${agente.cor} flex items-center justify-center text-white font-bold text-base shrink-0`}>
+          <div className={`w-10 h-10 rounded-lg ${agente.cor} flex items-center justify-center text-white font-bold text-sm shrink-0`}>
             {agente.avatar}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 truncate leading-tight">{agente.nome}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-sm text-gray-900 truncate leading-tight">{agente.nome}</p>
+              <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                emTreinamento
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              }`}>
+                {emTreinamento ? 'Configurando' : 'Ativo'}
+              </span>
+            </div>
             {agente.empresa && agente.empresa !== agente.nome && (
               <p className="text-xs text-gray-400 truncate mt-0.5">{agente.empresa}</p>
             )}
             {infoTags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {infoTags.map(tag => (
-                  <span key={tag} className="text-2xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 font-medium">{tag}</span>
+                  <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{tag}</span>
                 ))}
               </div>
             )}
           </div>
-          {!emTreinamento && (
-            <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200">Ativo</span>
-          )}
-          {emTreinamento && (
-            <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold border border-blue-200">Treinamento</span>
-          )}
         </div>
 
-        {/* Estado: em treinamento */}
-        {emTreinamento && (
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 flex items-start gap-2">
-            <Brain size={13} className="text-blue-500 mt-0.5 shrink-0" />
-            <p className="text-xs text-blue-700 leading-relaxed">Certifique este agente no <strong>Simulador</strong> antes de ativar para produção.</p>
-          </div>
-        )}
-
-        {/* Estado: ativo */}
-        {!emTreinamento && (
-          <div className="flex items-center gap-1.5 px-0.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+        {/* Info de estado */}
+        {!emTreinamento ? (
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
           </div>
-        )}
-
-        {/* Linha de ações */}
-        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-          <button
-            onClick={onEditar}
-            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
-          >
-            <Pencil size={12} />
-            Editar
-          </button>
-          <button
-            onClick={onDuplicar}
-            disabled={duplicating}
-            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50"
-          >
-            {duplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
-            Duplicar
-          </button>
-          <button
-            onClick={onHorarios}
-            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
-          >
-            <Clock size={12} />
-            Horários
-          </button>
-          <button
-            onClick={onDeletar}
-            disabled={deleting}
-            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-red-200 rounded-lg hover:bg-red-50 transition-colors text-red-500 disabled:opacity-50"
-          >
-            <X size={12} />
-            {deleting ? '...' : 'Deletar'}
-          </button>
-        </div>
-        {emTreinamento && (
-          <div className="pt-1 border-t border-gray-100">
-            <button
-              onClick={onAtivar}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-            >
-              <Check size={12} strokeWidth={3} />
-              Ativar agente
-            </button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <Brain size={12} className="text-amber-500 shrink-0" />
+            <span className="text-xs text-gray-500">Certifique no <span className="font-medium text-gray-700">Simulador</span> antes de ativar</span>
           </div>
         )}
+
+        {/* Ações */}
+        <div className="flex items-center gap-1 pt-2 border-t border-gray-100">
+          <button onClick={onEditar} title="Editar"
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900">
+            <Pencil size={12} /> Editar
+          </button>
+          <button onClick={onHorarios} title="Horários"
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900">
+            <Clock size={12} /> Horários
+          </button>
+          <button onClick={onDuplicar} disabled={duplicating} title="Duplicar"
+            className="flex items-center gap-1 text-xs font-medium p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 disabled:opacity-40">
+            {duplicating ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />}
+          </button>
+          <button onClick={onDeletar} disabled={deleting} title="Deletar"
+            className="flex items-center gap-1 text-xs font-medium p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-400 hover:text-red-500 disabled:opacity-40">
+            {deleting ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+          </button>
+          {emTreinamento && (
+            <button onClick={onAtivar}
+              className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+              <Zap size={11} />
+              Ativar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
