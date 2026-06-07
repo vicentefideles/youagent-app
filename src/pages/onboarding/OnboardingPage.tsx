@@ -16,7 +16,6 @@ import {
   UserCheck,
   Users,
   PhoneOutgoing,
-  Settings,
   Loader2,
   Copy,
   Pencil,
