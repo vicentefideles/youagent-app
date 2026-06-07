@@ -1896,36 +1896,34 @@ export default function OnboardingPage() {
         <div className="w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
 
           {/* ── Banner explicativo ─────────────────────────────────────── */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-12 translate-x-12" />
-            <div className="absolute bottom-0 right-16 w-24 h-24 bg-white/5 rounded-full translate-y-8" />
-            <div className="relative">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0 mt-0.5">
-                  <Zap size={20} className="text-white" />
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-base font-bold mb-1">Como o agente aprende e performa</h2>
-                  <p className="text-sm text-blue-100 leading-relaxed mb-4">
-                    Cada agente é uma IA treinada com o DNA da sua empresa. Quanto mais completas forem as
-                    informações que você fornece — produto, ICP, objeções, script — mais preciso o agente será
-                    na qualificação e no agendamento.
-                  </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { icon: '📋', titulo: 'Documentos e scripts', desc: 'Definem como o agente fala e argumenta' },
-                      { icon: '🎯', titulo: 'ICP bem definido', desc: 'Garante que só leads quentes avancem' },
-                      { icon: '🔄', titulo: 'Objeções mapeadas', desc: 'Agente não trava nas dúvidas mais comuns' },
-                    ].map(item => (
-                      <div key={item.titulo} className="bg-white/10 rounded-xl p-3">
-                        <span className="text-xl block mb-1">{item.icon}</span>
-                        <p className="text-xs font-semibold text-white leading-tight">{item.titulo}</p>
-                        <p className="text-xs text-blue-200 mt-0.5 leading-relaxed">{item.desc}</p>
-                      </div>
-                    ))}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                <Zap size={17} className="text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Como o agente aprende e performa</h2>
+                <p className="text-xs text-gray-500 leading-relaxed mt-0.5">
+                  Cada agente é treinado com o DNA da sua empresa. Quanto mais completas as informações — produto, ICP, objeções, script — mais preciso ele será na qualificação e no agendamento.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { icon: <Target size={14} className="text-blue-600" />, bg: 'bg-blue-50', titulo: 'ICP bem definido', desc: 'Garante que só leads quentes avancem' },
+                { icon: <Brain size={14} className="text-purple-600" />, bg: 'bg-purple-50', titulo: 'Script e objeções', desc: 'Definem como o agente fala e argumenta' },
+                { icon: <Zap size={14} className="text-amber-600" />, bg: 'bg-amber-50', titulo: 'Herança do CI', desc: 'Nasce com os aprendizados de todas as ligações' },
+              ].map(item => (
+                <div key={item.titulo} className="flex items-start gap-2.5 bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <div className={`w-7 h-7 rounded-md ${item.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800 leading-tight">{item.titulo}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{item.desc}</p>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
 
