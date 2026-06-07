@@ -2859,7 +2859,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
         ) : (
           <div className="space-y-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">🏆 Mais efetivos — aprendidos das ligações</p>
-            {ARGS_APRENDIDOS.map((a, i) => (
+            {ARGS_APRENDIDOS.map((a: any, i: number) => (
               <div key={i} className="border border-gray-100 rounded-lg p-3 opacity-40">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="bg-gray-100 text-gray-500 text-[10px] px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
