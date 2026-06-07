@@ -1816,64 +1816,52 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-gray-50">
 
-        {/* ── Header premium ─────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="w-full max-w-4xl mx-auto px-6 py-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-sm shrink-0">
-                  <Bot size={20} className="text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900 leading-tight">Setup do Agente</h1>
-                  <p className="text-xs text-gray-500 mt-0.5">Configure, treine e gerencie seus agentes de IA de vendas</p>
-                  {agentes.length > 0 && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        {ativos} ativo{ativos !== 1 ? 's' : ''}
-                      </span>
-                      {emTreinamento > 0 && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          {emTreinamento} configurando
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={sincronizarComCI}
-                  disabled={sincronizando}
-                  className={`btn disabled:opacity-60 text-sm px-4 py-2 ${
-                    ciStatus?.pendente
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm'
-                      : 'btn-secondary'
-                  }`}
-                >
-                  {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
-                  {sincronizando ? 'Sincronizando...' : 'Sincronizar com CI'}
-                  {ciStatus?.pendente && !sincronizando && (
-                    <span className="bg-white text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
-                      {ciStatus.total}
+        <div className="w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
+
+          {/* ── Header ──────────────────────────────────────────────────── */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Setup do Agente</h1>
+              <p className="text-sm text-gray-500 mt-1">Configure, treine e gerencie seus agentes de IA de vendas.</p>
+              {agentes.length > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {ativos} ativo{ativos !== 1 ? 's' : ''}
+                  </span>
+                  {emTreinamento > 0 && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      {emTreinamento} configurando
                     </span>
                   )}
-                </button>
-                <button
-                  onClick={() => setTela('wiz0')}
-                  className="btn-primary gap-2"
-                >
-                  <Bot size={15} />
-                  Criar novo agente
-                </button>
-              </div>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={sincronizarComCI}
+                disabled={sincronizando}
+                className={`btn disabled:opacity-60 ${
+                  ciStatus?.pendente
+                    ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm px-4 py-2.5 text-sm'
+                    : 'btn-secondary'
+                }`}
+              >
+                {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
+                {sincronizando ? 'Sincronizando...' : 'Sincronizar com CI'}
+                {ciStatus?.pendente && !sincronizando && (
+                  <span className="bg-white text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    {ciStatus.total}
+                  </span>
+                )}
+              </button>
+              <button onClick={() => setTela('wiz0')} className="btn-primary gap-2">
+                <Bot size={15} />
+                Criar novo agente
+              </button>
             </div>
           </div>
-        </div>
-
-        <div className="w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
 
           {/* ── Banner explicativo ─────────────────────────────────────── */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
