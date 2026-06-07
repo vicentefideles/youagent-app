@@ -1151,6 +1151,7 @@ interface AgenteMock {
   icp_porte?: string
   tom?: string
   status?: string
+  horarios?: Record<string, boolean>
 }
 
 const COR_LIST = ['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500']
@@ -1172,6 +1173,7 @@ function normalizeAgente(raw: Record<string, unknown>, idx: number): AgenteMock 
     icp_porte: raw.icp_porte as string,
     tom: raw.tom as string,
     status: raw.status as string,
+    horarios: raw.horarios as Record<string, boolean> | undefined,
     metodologia: raw.metodologia as string,
   } as AgenteMock & { metodologia?: string }
 }
@@ -1184,11 +1186,22 @@ interface HorariosState {
 }
 
 function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () => void }) {
-  const initial: HorariosState = {}
-  DIAS.forEach(d => HORAS.forEach(h => { initial[`${d}-${h}`] = true }))
-  // Sáb e Dom off por padrão
-  HORAS.forEach(h => { initial[`Sáb-${h}`] = false; initial[`Dom-${h}`] = false })
-  const [horarios, setHorarios] = useState<HorariosState>(initial)
+  function buildInitial(): HorariosState {
+    // Se o agente já tem horários salvos, usa eles
+    if (agente.horarios && Object.keys(agente.horarios).length > 0) {
+      // Garante que todas as células existam (preenche faltantes com false)
+      const base: HorariosState = {}
+      DIAS.forEach(d => HORAS.forEach(h => { base[`${d}-${h}`] = false }))
+      return { ...base, ...agente.horarios }
+    }
+    // Padrão: Seg–Sex ON, Sáb/Dom OFF
+    const def: HorariosState = {}
+    DIAS.forEach(d => HORAS.forEach(h => {
+      def[`${d}-${h}`] = d !== 'Sáb' && d !== 'Dom'
+    }))
+    return def
+  }
+  const [horarios, setHorarios] = useState<HorariosState>(buildInitial)
 
   function toggle(key: string) {
     setHorarios(prev => ({ ...prev, [key]: !prev[key] }))
@@ -1724,9 +1737,27 @@ export default function OnboardingPage() {
   async function handleDuplicar(agente: AgenteMock) {
     setDuplicatingId(agente.id)
     try {
-      const { id: _id, avatar: _avatar, cor: _cor, campanhasAtivas: _camp, ...rest } = agente
-      await agentesApi.create({ ...rest, nome: agente.nome + ' (Cópia)' })
+      // Remove campos exclusivos do frontend e campos gerados pelo backend
+      const payload = {
+        nome: agente.nome + ' (Cópia)',
+        empresa: agente.empresa,
+        segmento: agente.segmento,
+        produto: agente.produto,
+        icp_cargo: agente.icp_cargo,
+        icp_segmento: agente.icp_segmento,
+        icp_porte: agente.icp_porte,
+        voz: agente.voz,
+        tom: agente.tom,
+        status: 'em_treinamento',
+        horarios: agente.horarios,
+      }
+      await agentesApi.create(payload)
       refetchAgentes()
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } }; message?: string })
+        ?.response?.data?.error || 'Erro ao duplicar agente'
+      setSyncFeedback({ ok: false, msg })
+      setTimeout(() => setSyncFeedback(null), 4000)
     } finally {
       setDuplicatingId(null)
     }
