@@ -1428,76 +1428,99 @@ function AgenteCard({
   duplicating?: boolean
 }) {
   const emTreinamento = agente.status === 'em_treinamento'
+  const vozNome = VOZES_TELNYX.find(v => v.id === agente.voz)?.nome
+  const infoTags = [
+    vozNome || agente.voz,
+    agente.tom,
+    (agente as AgenteMock & { metodologia?: string }).metodologia,
+  ].filter(Boolean)
+
   return (
-    <div className={`bg-white border rounded-xl p-5 flex flex-col gap-4 ${emTreinamento ? 'border-blue-200' : 'border-gray-200'}`}>
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-full ${agente.cor} flex items-center justify-center text-white font-bold text-base`}>
-          {agente.avatar}
+    <div className={`bg-white border rounded-2xl overflow-hidden flex flex-col transition-shadow hover:shadow-md ${
+      emTreinamento ? 'border-blue-200' : 'border-gray-200'
+    }`}>
+      {/* Barra de status colorida no topo */}
+      <div className={`h-1 w-full ${emTreinamento ? 'bg-blue-400' : 'bg-emerald-500'}`} />
+
+      <div className="p-5 flex flex-col gap-4">
+        {/* Cabeçalho do card */}
+        <div className="flex items-start gap-3">
+          <div className={`w-11 h-11 rounded-xl ${agente.cor} flex items-center justify-center text-white font-bold text-base shrink-0`}>
+            {agente.avatar}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 truncate leading-tight">{agente.nome}</p>
+            {agente.empresa && agente.empresa !== agente.nome && (
+              <p className="text-xs text-gray-400 truncate mt-0.5">{agente.empresa}</p>
+            )}
+            {infoTags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {infoTags.map(tag => (
+                  <span key={tag} className="text-2xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 font-medium">{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          {!emTreinamento && (
+            <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200">Ativo</span>
+          )}
+          {emTreinamento && (
+            <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold border border-blue-200">Treinamento</span>
+          )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{agente.nome}</p>
-          <p className="text-xs text-gray-400">
-            {[
-              VOZES_TELNYX.find(v => v.id === agente.voz)?.nome || agente.voz,
-              agente.tom,
-              (agente as AgenteMock & { metodologia?: string }).metodologia,
-            ].filter(Boolean).join(' · ') || agente.empresa || ''}
-          </p>
-        </div>
-        {!emTreinamento && (
-          <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Ativo</span>
-        )}
+
+        {/* Estado: em treinamento */}
         {emTreinamento && (
-          <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">Em treinamento</span>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 flex items-start gap-2">
+            <Brain size={13} className="text-blue-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-blue-700 leading-relaxed">Certifique este agente no <strong>Simulador</strong> antes de ativar para produção.</p>
+          </div>
         )}
-      </div>
 
-      {emTreinamento && (
-        <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-          <p className="text-xs text-blue-700 font-medium">Aguardando certificação no Simulador antes de ir para produção.</p>
-        </div>
-      )}
-
-      {!emTreinamento && (
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
-          <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
-        </div>
-      )}
-
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={onEditar}
-          className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
-        >
-          <Pencil size={12} />
-          Editar
-        </button>
-        <button
-          onClick={onDuplicar}
-          disabled={duplicating}
-          className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50"
-        >
-          {duplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
-          Duplicar
-        </button>
+        {/* Estado: ativo */}
         {!emTreinamento && (
-          <button
-            onClick={onHorarios}
-            className="flex items-center gap-1 text-xs font-medium py-2 px-3 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
-          >
-            <Clock size={12} />
-            Horários
-          </button>
+          <div className="flex items-center gap-1.5 px-0.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
+          </div>
         )}
-        {emTreinamento && (
+
+        {/* Linha de ações */}
+        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
           <button
-            onClick={onAtivar}
-            className="flex items-center gap-1 text-xs font-semibold py-2 px-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            onClick={onEditar}
+            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
           >
-            Ativar agente
+            <Pencil size={12} />
+            Editar
           </button>
-        )}
+          <button
+            onClick={onDuplicar}
+            disabled={duplicating}
+            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50"
+          >
+            {duplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+            Duplicar
+          </button>
+          {!emTreinamento && (
+            <button
+              onClick={onHorarios}
+              className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+            >
+              <Clock size={12} />
+              Horários
+            </button>
+          )}
+          {emTreinamento && (
+            <button
+              onClick={onAtivar}
+              className="ml-auto flex items-center gap-1.5 text-xs font-semibold py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <Check size={12} strokeWidth={3} />
+              Ativar agente
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1732,54 +1755,108 @@ export default function OnboardingPage() {
 
   // ── Tela: grid de agentes ──────────────────────────────────────────────────
   if (tela === 'grid') {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="w-full max-w-3xl mx-auto">
+    const ativos = agentes.filter(a => a.status !== 'em_treinamento').length
+    const emTreinamento = agentes.filter(a => a.status === 'em_treinamento').length
 
-          {/* Header */}
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div>
-              <div className="inline-flex items-center gap-2 mb-1">
-                <Bot size={22} className="text-blue-600" />
-                <span className="text-lg font-bold text-gray-900">Meus Agentes</span>
+    return (
+      <div className="min-h-screen bg-gray-50">
+
+        {/* ── Header premium ─────────────────────────────────────────────── */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="w-full max-w-4xl mx-auto px-6 py-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-sm shrink-0">
+                  <Bot size={24} className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 leading-tight">Setup do Agente</h1>
+                  <p className="text-sm text-gray-500 mt-0.5">Configure, treine e gerencie seus agentes de IA de vendas</p>
+                  {agentes.length > 0 && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        {ativos} ativo{ativos !== 1 ? 's' : ''}
+                      </span>
+                      {emTreinamento > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          {emTreinamento} em treinamento
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-sm text-gray-500">Gerencie seus agentes de IA</p>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={sincronizarComCI}
+                  disabled={sincronizando}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors border disabled:opacity-60
+                    ${ciStatus?.pendente
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
+                      : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                    }`}
+                >
+                  {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <Brain size={15} />}
+                  {sincronizando ? 'Sincronizando...' : 'Sincronizar com CI'}
+                  {ciStatus?.pendente && !sincronizando && (
+                    <span className="bg-white text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                      {ciStatus.total}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setTela('wiz0')}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  <Bot size={16} />
+                  Criar novo agente
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Botão Sincronizar CI */}
-              <button
-                onClick={sincronizarComCI}
-                disabled={sincronizando}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors border disabled:opacity-60
-                  ${ciStatus?.pendente
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
-                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-                  }`}
-              >
-                {sincronizando
-                  ? <Loader2 size={15} className="animate-spin" />
-                  : <Brain size={15} />
-                }
-                {sincronizando ? 'Sincronizando...' : 'Sincronizar com CI'}
-                {ciStatus?.pendente && !sincronizando && (
-                  <span className="bg-white text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
-                    {ciStatus.total}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setTela('wiz0')}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
-              >
-                <Bot size={16} />
-                Criar novo agente
-              </button>
+          </div>
+        </div>
+
+        <div className="w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
+
+          {/* ── Banner explicativo ─────────────────────────────────────── */}
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-12 translate-x-12" />
+            <div className="absolute bottom-0 right-16 w-24 h-24 bg-white/5 rounded-full translate-y-8" />
+            <div className="relative">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Zap size={20} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-base font-bold mb-1">Como o agente aprende e performa</h2>
+                  <p className="text-sm text-blue-100 leading-relaxed mb-4">
+                    Cada agente é uma IA treinada com o DNA da sua empresa. Quanto mais completas forem as
+                    informações que você fornece — produto, ICP, objeções, script — mais preciso o agente será
+                    na qualificação e no agendamento.
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { icon: '📋', titulo: 'Documentos e scripts', desc: 'Definem como o agente fala e argumenta' },
+                      { icon: '🎯', titulo: 'ICP bem definido', desc: 'Garante que só leads quentes avancem' },
+                      { icon: '🔄', titulo: 'Objeções mapeadas', desc: 'Agente não trava nas dúvidas mais comuns' },
+                    ].map(item => (
+                      <div key={item.titulo} className="bg-white/10 rounded-xl p-3">
+                        <span className="text-xl block mb-1">{item.icon}</span>
+                        <p className="text-xs font-semibold text-white leading-tight">{item.titulo}</p>
+                        <p className="text-xs text-blue-200 mt-0.5 leading-relaxed">{item.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Alerta CI pendente */}
+          {/* ── Alerta CI pendente ─────────────────────────────────────── */}
           {ciStatus?.pendente && !syncFeedback && (
-            <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
               <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-amber-800">Centro de Inteligência tem novos aprendizados</p>
@@ -1803,9 +1880,9 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Feedback de sincronização */}
+          {/* ── Feedback de sincronização ──────────────────────────────── */}
           {syncFeedback && (
-            <div className={`mb-5 px-4 py-3 rounded-xl border flex items-center gap-2 text-sm font-medium
+            <div className={`px-4 py-3 rounded-xl border flex items-center gap-2 text-sm font-medium
               ${syncFeedback.ok
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                 : 'bg-red-50 border-red-200 text-red-800'
@@ -1815,35 +1892,65 @@ export default function OnboardingPage() {
             </div>
           )}
 
+          {/* ── Grid de agentes ───────────────────────────────────────── */}
           {agentes.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {agentes.map(agente => (
-                <AgenteCard
-                  key={agente.id}
-                  agente={agente}
-                  onHorarios={() => setAgenteHorarios(agente)}
-                  onEditar={() => handleEditar(agente)}
-                  onDuplicar={() => handleDuplicar(agente)}
-                  onAtivar={() => setAgenteAtivacao(agente)}
-                  duplicating={duplicatingId === agente.id}
-                />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Seus agentes</h2>
+                <span className="text-xs text-gray-400">{agentes.length} agente{agentes.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {agentes.map(agente => (
+                  <AgenteCard
+                    key={agente.id}
+                    agente={agente}
+                    onHorarios={() => setAgenteHorarios(agente)}
+                    onEditar={() => handleEditar(agente)}
+                    onDuplicar={() => handleDuplicar(agente)}
+                    onAtivar={() => setAgenteAtivacao(agente)}
+                    duplicating={duplicatingId === agente.id}
+                  />
+                ))}
+              </div>
+            </>
           )}
 
+          {/* ── Empty state ───────────────────────────────────────────── */}
           {agentes.length === 0 && (
-            <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
-              <Bot size={40} className="text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm mb-4">Nenhum agente criado ainda.</p>
+            <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-16 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                <Bot size={32} className="text-blue-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-800 mb-1">Nenhum agente criado ainda</h3>
+              <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+                Configure seu primeiro agente em menos de 5 minutos. Quanto mais detalhes você fornecer, melhor será a performance.
+              </p>
               <button
                 onClick={() => setTela('wiz0')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
               >
                 <Bot size={16} />
                 Criar primeiro agente
               </button>
             </div>
           )}
+
+          {/* ── Dica sobre qualidade das informações ──────────────────── */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+                <Brain size={16} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900 mb-1">A qualidade das informações define a performance</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Agentes com produto, ICP, script e objeções bem preenchidos convertem até <strong className="text-gray-700">3× mais</strong> do que agentes configurados com dados genéricos.
+                  Use a aba <strong className="text-gray-700">Centro de Inteligência</strong> para carregar documentos, cases de sucesso e banco de argumentos — o agente aprende continuamente com cada ligação.
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {agenteHorarios && (
