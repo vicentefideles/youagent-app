@@ -2381,19 +2381,19 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
   // ── Exportar Relatório de Métricas (PDF via print) ──────────────────────
   function exportarMetricasPDF() {
     const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const gatilhosHTML = GATILHOS.map(g => `
+    const gatilhosHTML = GATILHOS.map((g: any) => `
       <tr>
         <td>${g.label}</td>
         <td style="text-align:center;font-weight:700;color:${g.pct >= 70 ? '#059669' : g.pct >= 50 ? '#2563eb' : '#d97706'}">${g.pct}%</td>
         <td style="text-align:center"><span style="background:${g.pct >= 80 ? '#ecfdf5' : g.pct >= 60 ? '#eff6ff' : '#fffbeb'};color:${g.pct >= 80 ? '#065f46' : g.pct >= 60 ? '#1e40af' : '#92400e'};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600">${g.status}</span></td>
       </tr>`).join('')
-    const argsHTML = TOP_ARGS.map((a, i) => `
+    const argsHTML = TOP_ARGS.map((a: any, i: number) => `
       <tr>
         <td style="width:24px;text-align:center;font-weight:700;color:#6d28d9">${i + 1}</td>
         <td>${a.label}</td>
         <td style="text-align:center;font-weight:700;color:#059669">${a.pct}%</td>
       </tr>`).join('')
-    const aprendidosHTML = ARGS_APRENDIDOS.map(a => `
+    const aprendidosHTML = ARGS_APRENDIDOS.map((a: any) => `
       <tr>
         <td><strong>${a.tag}</strong></td>
         <td style="color:#6b7280;font-size:11px">${a.frase}</td>
@@ -2591,7 +2591,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             </div>
             <p className="text-xs font-semibold text-gray-700 mb-2">Eficácia por gatilho ativado</p>
             <div className="space-y-2">
-              {GATILHOS.map((g, i) => (
+              {GATILHOS.map((g: any, i: number) => (
                 <div key={i}>
                   <div className="flex justify-between items-center text-xs mb-1">
                     <span className="text-gray-600">{g.label}</span>
@@ -2625,7 +2625,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             </div>
             <p className="text-xs font-semibold text-gray-700 mb-2">Eficácia por gatilho ativado</p>
             <div className="space-y-2">
-              {GATILHOS.map((g, i) => (
+              {GATILHOS.map((g: any, i: number) => (
                 <div key={i}>
                   <div className="flex justify-between items-center text-xs mb-1">
                     <span className="text-gray-400">{g.label}</span>
@@ -2687,7 +2687,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Argumentos mais efetivos</h3>
           {temDados ? (
             <div className="space-y-3">
-              {TOP_ARGS.map((a, i) => (
+              {TOP_ARGS.map((a: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
@@ -2700,7 +2700,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             </div>
           ) : (
             <div className="space-y-3">
-              {TOP_ARGS.map((_a, i) => (
+              {TOP_ARGS.map((_a: any, i: number) => (
                 <div key={i} className="flex items-center gap-2 opacity-35">
                   <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
@@ -2722,7 +2722,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
           <h3 className="text-sm font-semibold text-gray-900 mb-1">Comparativo entre agentes</h3>
           <p className="text-[11px] text-gray-400 mb-3">Taxa de conversão real por agente nos últimos 90 dias</p>
           <div className="space-y-2.5">
-            {comparativoAgentes.map((ag, i) => (
+            {comparativoAgentes.map((ag: any, i: number) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold flex items-center justify-center shrink-0">
                   {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1)}
@@ -2827,7 +2827,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
           <>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">🏆 Mais efetivos — aprendidos das ligações</p>
             <div className="space-y-3 mb-4">
-              {ARGS_APRENDIDOS.map((a, i) => (
+              {ARGS_APRENDIDOS.map((a: any, i: number) => (
                 <div key={i} className="border border-gray-100 rounded-lg p-3 cursor-pointer hover:border-brand-200 hover:bg-brand-50/20 transition-colors group" onClick={() => setArgHistorico(a)}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
@@ -2844,7 +2844,7 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             </div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">⏳ Aprendidos esta semana — em validação</p>
             <div className="space-y-2">
-              {ARGS_VALIDACAO.map((a, i) => (
+              {ARGS_VALIDACAO.map((a: any, i: number) => (
                 <div key={i} className="border border-dashed border-amber-200 rounded-lg p-3 bg-amber-50/30">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
@@ -2985,6 +2985,52 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
         </div>
       </div>
 
+      {/* ── Modal histórico de argumento ─────────────────────────────────────── */}
+      {argHistorico && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setArgHistorico(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">{argHistorico.tag}</span>
+                <h3 className="text-sm font-semibold text-gray-900 mt-2">Histórico do argumento</h3>
+              </div>
+              <button onClick={() => setArgHistorico(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 mb-4">
+              <p className="text-xs text-gray-600 italic leading-relaxed">{argHistorico.frase}</p>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Eficácia atual</span>
+                <span className="font-bold text-emerald-600">{argHistorico.pct}%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Aprendido em</span>
+                <span className="font-medium text-gray-700">{argHistorico.data}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Segmento</span>
+                <span className="font-medium text-gray-700">{argHistorico.segmento}</span>
+              </div>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-[11px] text-blue-700 font-medium mb-1">Como usar este argumento</p>
+              <p className="text-[11px] text-blue-600 leading-relaxed">
+                Este argumento é ativado automaticamente pelo agente quando detecta o gatilho <strong>{argHistorico.tag}</strong> na ligação. Com {argHistorico.pct}% de eficácia, ele é um dos mais efetivos da sua base.
+              </p>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
+              <button
+                onClick={() => setArgHistorico(null)}
+                className="flex-1 text-xs border border-gray-200 py-2 rounded-lg text-gray-600 hover:bg-gray-50 font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3362,52 +3408,6 @@ function TabAjusteFino() {
         </div>
       </div>
 
-      {/* ── Modal histórico de argumento ─────────────────────────────────────── */}
-      {argHistorico && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setArgHistorico(null)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">{argHistorico.tag}</span>
-                <h3 className="text-sm font-semibold text-gray-900 mt-2">Histórico do argumento</h3>
-              </div>
-              <button onClick={() => setArgHistorico(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3 mb-4">
-              <p className="text-xs text-gray-600 italic leading-relaxed">{argHistorico.frase}</p>
-            </div>
-            <div className="space-y-3 mb-4">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Eficácia atual</span>
-                <span className="font-bold text-emerald-600">{argHistorico.pct}%</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Aprendido em</span>
-                <span className="font-medium text-gray-700">{argHistorico.data}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Segmento</span>
-                <span className="font-medium text-gray-700">{argHistorico.segmento}</span>
-              </div>
-            </div>
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-              <p className="text-[11px] text-blue-700 font-medium mb-1">Como usar este argumento</p>
-              <p className="text-[11px] text-blue-600 leading-relaxed">
-                Este argumento é ativado automaticamente pelo agente quando detecta o gatilho <strong>{argHistorico.tag}</strong> na ligação. Com {argHistorico.pct}% de eficácia, ele é um dos mais efetivos da sua base.
-              </p>
-            </div>
-            <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
-              <button
-                onClick={() => setArgHistorico(null)}
-                className="flex-1 text-xs border border-gray-200 py-2 rounded-lg text-gray-600 hover:bg-gray-50 font-medium"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
