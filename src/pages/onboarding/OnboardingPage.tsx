@@ -29,6 +29,7 @@ import {
 
 interface FormData {
   // Step 1
+  'nome-agente': string
   'empresa-nome': string
   'empresa-segmento': string
   'empresa-site': string
@@ -48,11 +49,19 @@ interface FormData {
   'wiz-qualif-q1': string
   'wiz-qualif-q2': string
   'wiz-qualif-q3': string
+  'script-abertura': string
+  'metodologia': string
   voz: string
   tom: string
 }
 
+interface Objecao {
+  objecao: string
+  rebuttal: string
+}
+
 const INITIAL_FORM: FormData = {
+  'nome-agente': '',
   'empresa-nome': '',
   'empresa-segmento': '',
   'empresa-site': '',
@@ -70,9 +79,17 @@ const INITIAL_FORM: FormData = {
   'wiz-qualif-q1': 'Vocês já usam alguma ferramenta de prospecção ativa?',
   'wiz-qualif-q2': 'Qual o volume mensal de reuniões da equipe hoje?',
   'wiz-qualif-q3': 'Você é o responsável pela decisão de novas ferramentas?',
+  'script-abertura': '',
+  'metodologia': '',
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
 }
+
+const INITIAL_OBJECOES: Objecao[] = [
+  { objecao: '', rebuttal: '' },
+  { objecao: '', rebuttal: '' },
+  { objecao: '', rebuttal: '' },
+]
 
 const SEGMENTOS = ['Tech/SaaS', 'Indústria', 'Serviços B2B', 'Saúde', 'Educação', 'Financeiro', 'Outro']
 const PORTES = ['1–10', '11–50', '51–200', '201–1000', '1000+']
@@ -110,6 +127,19 @@ const TONS_CARDS = [
   { id: 'direto', label: 'Direto', descricao: 'Objetivo, sem rodeios' },
   { id: 'amigavel', label: 'Amigável', descricao: 'Próximo, cria rapport rapidamente' },
 ]
+
+const METODOLOGIAS = [
+  { id: 'consultivo', label: 'Consultivo', descricao: 'Faz perguntas, descobre necessidades' },
+  { id: 'spin', label: 'SPIN Selling', descricao: 'Situação → Problema → Implicação → Necessidade' },
+  { id: 'bant', label: 'BANT', descricao: 'Budget, Authority, Need, Timeline' },
+  { id: 'direto', label: 'Direto', descricao: 'Apresenta proposta rapidamente' },
+]
+
+const SCRIPTS_PADRAO: Record<string, string> = {
+  agendar_vendedor: 'Olá, [nome]! Aqui é [nome-agente] da [empresa]. Estou entrando em contato porque identificamos que sua empresa pode se beneficiar de [produto]. Tenho 2 minutos do seu tempo?',
+  substituir_sdr: 'Bom dia, [nome]! Sou [nome-agente] da [empresa]. Vi que vocês estão no segmento [segmento] e queria entender melhor como vocês gerenciam a prospecção hoje. Faz sentido conversarmos?',
+  prospeccao_outbound: 'Olá, [nome]! Aqui é [nome-agente]. Somos especialistas em [produto] e ajudamos empresas como a sua a [resultados]. Posso te mostrar como funciona?',
+}
 
 interface Proposito {
   id: string
@@ -284,6 +314,17 @@ function Step1({
 
   return (
     <div className="grid grid-cols-2 gap-4">
+      <div className="col-span-2">
+        <Field label="Nome do agente" required error={errors['nome-agente']}>
+          <input
+            id="nome-agente"
+            className={inputCls}
+            value={form['nome-agente']}
+            onChange={e => onChange('nome-agente', e.target.value)}
+            placeholder="Ex: Maria — Prospecção SP"
+          />
+        </Field>
+      </div>
       <div className="col-span-2">
         <Field label="Nome da empresa" required error={errors['empresa-nome']}>
           <input
@@ -495,12 +536,30 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
 function Step3({
   form,
   onChange,
+  objecoes,
+  onObjecoesChange,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
+  objecoes: Objecao[]
+  onObjecoesChange: (o: Objecao[]) => void
 }) {
+  function updateObjecao(i: number, field: keyof Objecao, value: string) {
+    const next = objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o)
+    onObjecoesChange(next)
+  }
+
+  function addObjecao() {
+    if (objecoes.length < 5) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '' }])
+  }
+
+  function removeObjecao(i: number) {
+    if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      {/* ICP */}
       <div className="grid grid-cols-3 gap-4">
         <Field label="Cargo do decisor">
           <select
@@ -537,6 +596,42 @@ function Step3({
         </Field>
       </div>
 
+      {/* Metodologia */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-3">Metodologia de vendas</p>
+        <div className="grid grid-cols-2 gap-2">
+          {METODOLOGIAS.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onChange('metodologia', m.id)}
+              className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
+                form.metodologia === m.id
+                  ? 'border-purple-500 bg-purple-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <p className="font-semibold text-gray-900 text-sm">{m.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{m.descricao}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Script de abertura */}
+      <Field label="Script de abertura">
+        <textarea
+          id="script-abertura"
+          className={textareaCls}
+          rows={4}
+          value={form['script-abertura']}
+          onChange={e => onChange('script-abertura', e.target.value)}
+          placeholder="Como o agente se apresenta e inicia a conversa? Use [nome], [empresa], [produto] como variáveis."
+        />
+        <p className="text-xs text-gray-400 mt-1">Variáveis: [nome], [empresa], [produto], [cargo]</p>
+      </Field>
+
+      {/* Sinais de compra */}
       <Field label="Sinais de compra customizados">
         <textarea
           id="gatilhos-customizados"
@@ -548,6 +643,7 @@ function Step3({
         />
       </Field>
 
+      {/* Perguntas de qualificação */}
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">Perguntas de qualificação</p>
         <div className="flex flex-col gap-2">
@@ -559,6 +655,51 @@ function Step3({
                 className={inputCls}
                 value={form[k]}
                 onChange={e => onChange(k, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Objeções + Rebuttals */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-gray-700">Objeções e respostas</p>
+          {objecoes.length < 5 && (
+            <button
+              type="button"
+              onClick={addObjecao}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+            >
+              + Adicionar objeção
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col gap-3">
+          {objecoes.map((obj, i) => (
+            <div key={i} className="border border-gray-200 rounded-xl p-3 flex flex-col gap-2 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500">Objeção {i + 1}</span>
+                {objecoes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeObjecao(i)}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                  >✕</button>
+                )}
+              </div>
+              <input
+                className={inputCls}
+                placeholder='Ex: "Não tenho orçamento agora"'
+                value={obj.objecao}
+                onChange={e => updateObjecao(i, 'objecao', e.target.value)}
+              />
+              <textarea
+                className={textareaCls}
+                rows={2}
+                placeholder="Como o agente responde a essa objeção..."
+                value={obj.rebuttal}
+                onChange={e => updateObjecao(i, 'rebuttal', e.target.value)}
               />
             </div>
           ))}
@@ -623,30 +764,83 @@ function Step4({
   form,
   activated,
   activating,
+  activatingStep,
+  objecoes,
+  propositoSelecionado,
   onActivate,
   onReset,
+  modoEdicao,
 }: {
   form: FormData
   activated: boolean
   activating?: boolean
+  activatingStep?: number
+  objecoes: Objecao[]
+  propositoSelecionado: string | null
   onActivate: () => void
   onReset: () => void
+  modoEdicao: boolean
 }) {
   const navigate = useNavigate()
   const icpScore = calcularIcpScore(form)
+  const vozNome = VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz
+  const propLabel = PROPOSITOS.find(p => p.id === propositoSelecionado)?.titulo
+  const metLabel = METODOLOGIAS.find(m => m.id === form.metodologia)?.label
+  const objecoesValidas = objecoes.filter(o => o.objecao.trim())
+  const perguntasValidas = [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean)
+
+  const LOADING_STEPS = [
+    modoEdicao ? 'Atualizando agente no Telnyx...' : 'Criando agente no Telnyx...',
+    'Injetando inteligência herdada do CI...',
+    'Configurando script e objeções...',
+    modoEdicao ? 'Agente atualizado! ✓' : 'Agente em treinamento! ✓',
+  ]
+
+  if (activating) {
+    return (
+      <div className="flex flex-col items-center py-10 gap-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+          <Loader2 size={32} className="text-blue-600 animate-spin" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            {modoEdicao ? 'Atualizando agente...' : 'Ativando agente...'}
+          </h2>
+          <div className="flex flex-col gap-2 text-left w-64 mx-auto">
+            {LOADING_STEPS.map((s, i) => (
+              <div key={i} className={`flex items-center gap-2 text-sm transition-all ${
+                i < (activatingStep ?? 0) ? 'text-green-600' : i === (activatingStep ?? 0) ? 'text-blue-600 font-medium' : 'text-gray-300'
+              }`}>
+                {i < (activatingStep ?? 0)
+                  ? <Check size={14} strokeWidth={3} className="shrink-0" />
+                  : i === (activatingStep ?? 0)
+                  ? <Loader2 size={14} className="animate-spin shrink-0" />
+                  : <div className="w-3.5 h-3.5 rounded-full border border-gray-200 shrink-0" />
+                }
+                {s}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (activated) {
     return (
       <div className="flex flex-col items-center py-10 gap-6 text-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center animate-[scale-in_0.3s_ease-out]">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
           <Check size={40} className="text-green-600" strokeWidth={3} />
         </div>
         <div>
           <h2 className="text-xl font-semibold text-gray-900">
-            Agente {form['empresa-nome'] || 'ETZ'} ativado com sucesso!
+            {modoEdicao ? `Agente ${form['nome-agente'] || form['empresa-nome']} atualizado!` : `Agente ${form['nome-agente'] || form['empresa-nome']} criado com sucesso!`}
           </h2>
           <p className="text-sm text-gray-500 mt-2 max-w-md">
-            O agente está aprendendo com os dados da sua empresa e estará pronto para ligar em instantes.
+            {modoEdicao
+              ? 'As configurações foram salvas e o sistema do Telnyx foi atualizado.'
+              : 'O agente está em treinamento. Certifique-o no Simulador antes de ativar para produção.'
+            }
           </p>
         </div>
         <div className="flex gap-3">
@@ -660,7 +854,7 @@ function Step4({
             onClick={onReset}
             className="px-5 py-2.5 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Criar outro agente
+            {modoEdicao ? 'Voltar aos agentes' : 'Criar outro agente'}
           </button>
         </div>
       </div>
@@ -673,40 +867,76 @@ function Step4({
         <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Resumo da configuração</h3>
 
         <div className="grid grid-cols-2 gap-4 text-sm">
+          {/* Agente */}
+          <div className="col-span-2 pb-3 border-b border-gray-200">
+            <p className="text-xs text-gray-400 mb-0.5">Nome do agente</p>
+            <p className="font-semibold text-gray-900 text-base">{form['nome-agente'] || '—'}</p>
+            {propLabel && (
+              <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{propLabel}</span>
+            )}
+          </div>
+          {/* Empresa */}
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Empresa</p>
             <p className="font-medium text-gray-900">{form['empresa-nome'] || '—'}</p>
             {form['empresa-segmento'] && (
-              <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                {form['empresa-segmento']}
-              </span>
+              <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{form['empresa-segmento']}</span>
             )}
           </div>
+          {/* Produto */}
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Produto</p>
             <p className="font-medium text-gray-900">{form['prod-nome'] || '—'}</p>
           </div>
+          {/* ICP */}
           <div>
             <p className="text-xs text-gray-400 mb-0.5">ICP</p>
             <p className="font-medium text-gray-900">
-              {[form['icp-cargo-tipo'], form['icp-porte-alvo'], form['icp-segmento-alvo']]
-                .filter(Boolean)
-                .join(' · ') || '—'}
+              {[form['icp-cargo-tipo'], form['icp-porte-alvo'], form['icp-segmento-alvo']].filter(Boolean).join(' · ') || '—'}
             </p>
           </div>
+          {/* Voz + Tom */}
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Voz · Tom</p>
-            <p className="font-medium text-gray-900">
-              {[VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz, form.tom].filter(Boolean).join(' · ') || '—'}
-            </p>
+            <p className="font-medium text-gray-900">{[vozNome, form.tom].filter(Boolean).join(' · ') || '—'}</p>
           </div>
+          {/* Metodologia */}
+          {metLabel && (
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">Metodologia</p>
+              <p className="font-medium text-gray-900">{metLabel}</p>
+            </div>
+          )}
+          {/* Script */}
+          {form['script-abertura'] && (
+            <div className="col-span-2">
+              <p className="text-xs text-gray-400 mb-0.5">Script de abertura</p>
+              <p className="font-medium text-gray-900 text-xs leading-relaxed line-clamp-2">{form['script-abertura']}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Perguntas + Objeções */}
+        <div className="flex gap-4 text-xs text-gray-500 pt-1 border-t border-gray-200">
+          <span>✓ {perguntasValidas.length} perguntas de qualificação</span>
+          {objecoesValidas.length > 0 && <span>✓ {objecoesValidas.length} objeção(ões) mapeada(s)</span>}
+          {form['gatilhos-customizados'] && <span>✓ Sinais de compra configurados</span>}
+        </div>
+
+        {/* Badge herança CI */}
+        <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+          <Brain size={14} className="text-purple-600 shrink-0" />
+          <p className="text-xs text-purple-700">Este agente herdará os argumentos aprovados e padrões de ICP do Centro de Inteligência.</p>
         </div>
 
         <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
           <span className="text-xs text-gray-500">Score ICP estimado</span>
           <div className="flex items-center gap-2">
             <div className="w-24 bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${icpScore}%` }} />
+              <div
+                className={`h-2 rounded-full transition-all ${icpScore >= 60 ? 'bg-green-500' : icpScore >= 30 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                style={{ width: `${icpScore}%` }}
+              />
             </div>
             <span className="text-sm font-semibold text-blue-600">{icpScore}/100</span>
           </div>
@@ -715,20 +945,10 @@ function Step4({
 
       <button
         onClick={onActivate}
-        disabled={activating}
-        className="flex items-center justify-center gap-2 w-full py-3.5 bg-green-600 text-white font-semibold text-base rounded-xl hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center justify-center gap-2 w-full py-3.5 bg-green-600 text-white font-semibold text-base rounded-xl hover:bg-green-700 transition-colors"
       >
-        {activating ? (
-          <>
-            <Loader2 size={20} className="animate-spin" />
-            Ativando...
-          </>
-        ) : (
-          <>
-            <Bot size={20} />
-            Ativar Agente
-          </>
-        )}
+        <Bot size={20} />
+        {modoEdicao ? 'Salvar alterações' : 'Ativar Agente'}
       </button>
     </div>
   )
@@ -776,7 +996,7 @@ function normalizeAgente(raw: Record<string, unknown>, idx: number): AgenteMock 
   }
 }
 
-const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
+const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const HORAS = ['8h', '9h', '10h', '11h', '12h', '13h', '14h', '15h', '16h', '17h', '18h']
 
 interface HorariosState {
@@ -786,10 +1006,26 @@ interface HorariosState {
 function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () => void }) {
   const initial: HorariosState = {}
   DIAS.forEach(d => HORAS.forEach(h => { initial[`${d}-${h}`] = true }))
+  // Sáb e Dom off por padrão
+  HORAS.forEach(h => { initial[`Sáb-${h}`] = false; initial[`Dom-${h}`] = false })
   const [horarios, setHorarios] = useState<HorariosState>(initial)
 
   function toggle(key: string) {
     setHorarios(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function toggleDia(d: string) {
+    const allOn = HORAS.every(h => horarios[`${d}-${h}`])
+    const next: HorariosState = { ...horarios }
+    HORAS.forEach(h => { next[`${d}-${h}`] = !allOn })
+    setHorarios(next)
+  }
+
+  function toggleHora(h: string) {
+    const allOn = DIAS.every(d => horarios[`${d}-${h}`])
+    const next: HorariosState = { ...horarios }
+    DIAS.forEach(d => { next[`${d}-${h}`] = !allOn })
+    setHorarios(next)
   }
 
   async function handleSalvarHorarios() {
@@ -814,20 +1050,36 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
           </button>
         </div>
 
+        <p className="text-xs text-gray-400">Clique no dia ou horário para marcar/desmarcar toda a coluna/linha.</p>
+
         <div className="overflow-x-auto">
           <table className="text-xs w-full">
             <thead>
               <tr>
                 <th className="text-gray-400 font-medium pb-2 pr-3 text-left">Horário</th>
                 {DIAS.map(d => (
-                  <th key={d} className="text-gray-700 font-semibold pb-2 px-2 text-center">{d}</th>
+                  <th key={d} className="pb-2 px-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleDia(d)}
+                      className={`text-xs font-semibold px-1.5 py-0.5 rounded transition-colors ${
+                        d === 'Sáb' || d === 'Dom' ? 'text-orange-500 hover:bg-orange-50' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >{d}</button>
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {HORAS.map(h => (
                 <tr key={h}>
-                  <td className="py-1.5 pr-3 text-gray-500 font-mono">{h}</td>
+                  <td className="py-1.5 pr-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleHora(h)}
+                      className="text-gray-500 font-mono hover:text-blue-600 hover:underline transition-colors"
+                    >{h}</button>
+                  </td>
                   {DIAS.map(d => {
                     const key = `${d}-${h}`
                     return (
@@ -847,13 +1099,27 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
           </table>
         </div>
 
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            Cancelar
-          </button>
-          <button onClick={handleSalvarHorarios} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
-            Salvar horários
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { const s: HorariosState = {}; DIAS.forEach(d => HORAS.forEach(h => { s[`${d}-${h}`] = true })); setHorarios(s) }}
+              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
+            >Marcar todos</button>
+            <button
+              type="button"
+              onClick={() => { const s: HorariosState = {}; DIAS.forEach(d => HORAS.forEach(h => { s[`${d}-${h}`] = false })); setHorarios(s) }}
+              className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
+            >Limpar todos</button>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleSalvarHorarios} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+              Salvar horários
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1062,6 +1328,9 @@ export default function OnboardingPage() {
   const [agenteAtivacao, setAgenteAtivacao] = useState<AgenteMock | null>(null)
   const [sincronizando, setSincronizando] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
+  const [activatingStep, setActivatingStep] = useState(0)
 
   // Última sincronização CI (localStorage)
   const [ultimaSync, setUltimaSync] = useState<string>(() =>
@@ -1113,6 +1382,9 @@ export default function OnboardingPage() {
 
   function validate(): boolean {
     const newErrors: Partial<Record<keyof FormData, string>> = {}
+    if (step === 0 && !form['nome-agente'].trim()) {
+      newErrors['nome-agente'] = 'Nome do agente é obrigatório'
+    }
     if (step === 0 && !form['empresa-nome'].trim()) {
       newErrors['empresa-nome'] = 'Nome da empresa é obrigatório'
     }
@@ -1134,43 +1406,90 @@ export default function OnboardingPage() {
 
   async function handleActivate() {
     setActivating(true)
+    setActivatingStep(0)
     setActivateError('')
+    const payload = {
+      nome: form['nome-agente'] || form['empresa-nome'] + ' — Agente IA',
+      empresa: form['empresa-nome'],
+      segmento: form['empresa-segmento'],
+      site: form['empresa-site'],
+      descricao_empresa: form['empresa-descricao'],
+      produto: form['prod-nome'],
+      descricao_produto: form['prod-descricao'],
+      resultados_clientes: form['prod-resultados'],
+      concorrentes: form['prod-concorrentes'],
+      info_adicional: form['prod-info-extra'],
+      icp_cargo: form['icp-cargo-tipo'],
+      icp_segmento: form['icp-segmento-alvo'],
+      icp_porte: form['icp-porte-alvo'],
+      gatilhos_customizados: form['gatilhos-customizados'],
+      perguntas_qualificacao: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
+      script_abertura: form['script-abertura'],
+      metodologia: form['metodologia'],
+      objecoes: objecoes.filter(o => o.objecao.trim()),
+      proposito: propositoSelecionado,
+      voz: form['voz'],
+      voz_id: form['voz'],
+      tom: form['tom'],
+      status: 'em_treinamento',
+    }
     try {
-      await agentesApi.create({
-        nome: form['empresa-nome'] + ' — Agente IA',
-        empresa: form['empresa-nome'],
-        segmento: form['empresa-segmento'],
-        produto: form['prod-nome'],
-        descricao_produto: form['prod-descricao'],
-        icp_cargo: form['icp-cargo-tipo'],
-        icp_segmento: form['icp-segmento-alvo'],
-        icp_porte: form['icp-porte-alvo'],
-        voz: form['voz'],
-        voz_id: form['voz'],
-        tom: form['tom'],
-        status: 'em_treinamento',
-      })
+      setActivatingStep(1)
+      if (editandoId) {
+        await agentesApi.update(editandoId, payload)
+      } else {
+        await agentesApi.create(payload)
+      }
+      setActivatingStep(2)
+      await new Promise(r => setTimeout(r, 600))
+      setActivatingStep(3)
+      await new Promise(r => setTimeout(r, 400))
       setActivated(true)
       refetchAgentes()
     } catch {
-      setActivateError('Erro ao ativar agente. Tente novamente.')
+      setActivateError('Erro ao salvar agente. Tente novamente.')
     } finally {
       setActivating(false)
     }
   }
 
   function handleEditar(agente: AgenteMock) {
+    const raw = agente as AgenteMock & {
+      site?: string; descricao_empresa?: string; descricao_produto?: string
+      resultados_clientes?: string; concorrentes?: string; info_adicional?: string
+      gatilhos_customizados?: string; perguntas_qualificacao?: string[]
+      script_abertura?: string; metodologia?: string; proposito?: string
+      objecoes?: Objecao[]
+    }
+    const pergs = raw.perguntas_qualificacao ?? []
     setForm({
       ...INITIAL_FORM,
+      'nome-agente': agente.nome,
       'empresa-nome': agente.empresa || agente.nome,
       'empresa-segmento': agente.segmento || '',
+      'empresa-site': raw.site || '',
+      'empresa-porte': agente.icp_porte || '',
+      'empresa-descricao': raw.descricao_empresa || '',
       'prod-nome': agente.produto || '',
+      'prod-descricao': raw.descricao_produto || '',
+      'prod-resultados': raw.resultados_clientes || '',
+      'prod-concorrentes': raw.concorrentes || '',
+      'prod-info-extra': raw.info_adicional || '',
       'icp-cargo-tipo': agente.icp_cargo || '',
       'icp-segmento-alvo': agente.icp_segmento || '',
       'icp-porte-alvo': agente.icp_porte || '',
-      voz: agente.voz || '',
+      'gatilhos-customizados': raw.gatilhos_customizados || '',
+      'wiz-qualif-q1': pergs[0] ?? INITIAL_FORM['wiz-qualif-q1'],
+      'wiz-qualif-q2': pergs[1] ?? INITIAL_FORM['wiz-qualif-q2'],
+      'wiz-qualif-q3': pergs[2] ?? INITIAL_FORM['wiz-qualif-q3'],
+      'script-abertura': raw.script_abertura || '',
+      'metodologia': raw.metodologia || '',
+      voz: agente.voz || INITIAL_FORM.voz,
       tom: agente.tom || '',
     })
+    setObjecoes(raw.objecoes && raw.objecoes.length > 0 ? raw.objecoes : INITIAL_OBJECOES)
+    setPropositoSelecionado(raw.proposito || null)
+    setEditandoId(agente.id)
     setStep(0)
     setActivated(false)
     setTela('wizard')
@@ -1189,9 +1508,12 @@ export default function OnboardingPage() {
 
   function reset() {
     setForm(INITIAL_FORM)
+    setObjecoes(INITIAL_OBJECOES)
+    setEditandoId(null)
     setStep(0)
     setActivated(false)
     setActivating(false)
+    setActivatingStep(0)
     setActivateError('')
     setErrors({})
     setTela('grid')
@@ -1385,7 +1707,13 @@ export default function OnboardingPage() {
               onClick={() => {
                 const p = PROPOSITOS.find(x => x.id === propositoSelecionado)
                 if (p) {
-                  setForm(prev => ({ ...prev, voz: p.preConfig.voz, tom: p.preConfig.tom }))
+                  const scriptPadrao = propositoSelecionado ? SCRIPTS_PADRAO[propositoSelecionado] ?? '' : ''
+                  setForm(prev => ({
+                    ...prev,
+                    voz: p.preConfig.voz,
+                    tom: p.preConfig.tom,
+                    'script-abertura': prev['script-abertura'] || scriptPadrao,
+                  }))
                 }
                 setTela('wizard')
               }}
@@ -1406,9 +1734,9 @@ export default function OnboardingPage() {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2 mb-3">
             <Bot size={24} className="text-blue-600" />
-            <span className="text-lg font-bold text-gray-900">Novo Agente de IA</span>
+            <span className="text-lg font-bold text-gray-900">{editandoId ? 'Editar Agente' : 'Novo Agente de IA'}</span>
           </div>
-          <p className="text-sm text-gray-500">Configure seu agente de vendas autônomo em 4 passos</p>
+          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : 'Configure seu agente de vendas autônomo em 4 passos'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -1419,14 +1747,25 @@ export default function OnboardingPage() {
 
           {step === 0 && <Step1 form={form} onChange={onChange} errors={errors} />}
           {step === 1 && <Step2 form={form} onChange={onChange} errors={errors} />}
-          {step === 2 && <Step3 form={form} onChange={onChange} />}
+          {step === 2 && (
+            <Step3
+              form={form}
+              onChange={onChange}
+              objecoes={objecoes}
+              onObjecoesChange={setObjecoes}
+            />
+          )}
           {step === 3 && (
             <Step4
               form={form}
               activated={activated}
               activating={activating}
+              activatingStep={activatingStep}
+              objecoes={objecoes}
+              propositoSelecionado={propositoSelecionado}
               onActivate={handleActivate}
               onReset={reset}
+              modoEdicao={!!editandoId}
             />
           )}
           {activateError && (
