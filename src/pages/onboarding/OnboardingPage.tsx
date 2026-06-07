@@ -1987,7 +1987,7 @@ export default function OnboardingPage() {
         </div>
 
         {agenteHorarios && (
-          <ModalHorarios agente={agenteHorarios} onClose={() => setAgenteHorarios(null)} />
+          <ModalHorarios agente={agenteHorarios} onClose={() => { setAgenteHorarios(null); refetchAgentes() }} />
         )}
         {agenteAtivacao && (
           <ModalAtivacao
