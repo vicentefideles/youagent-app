@@ -920,6 +920,7 @@ function Step4({
   activating,
   activatingStep,
   objecoes,
+  regioes,
   propositoSelecionado,
   onActivate,
   onReset,
@@ -930,6 +931,7 @@ function Step4({
   activating?: boolean
   activatingStep?: number
   objecoes: Objecao[]
+  regioes: string[]
   propositoSelecionado: string | null
   onActivate: () => void
   onReset: () => void
@@ -1070,11 +1072,34 @@ function Step4({
           )}
         </div>
 
+        {/* Cobertura + Compliance */}
+        {(regioes.length > 0 || form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
+          <div className="grid grid-cols-2 gap-4 text-sm pt-2 border-t border-gray-200">
+            {regioes.length > 0 && (
+              <div className="col-span-2">
+                <p className="text-xs text-gray-400 mb-1">Cobertura geográfica</p>
+                <p className="text-xs font-medium text-gray-700 leading-relaxed">{regioes.join(', ')}</p>
+              </div>
+            )}
+            {(form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
+              <div className="col-span-2 flex flex-wrap gap-2">
+                {form['compliance-anatel'] === 'true' && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">✓ Anatel 8h–21h</span>
+                )}
+                {form['compliance-optout'] === 'true' && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">✓ Opt-out automático</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Perguntas + Objeções */}
-        <div className="flex gap-4 text-xs text-gray-500 pt-1 border-t border-gray-200">
+        <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1 border-t border-gray-200">
           <span>✓ {perguntasValidas.length} perguntas de qualificação</span>
           {objecoesValidas.length > 0 && <span>✓ {objecoesValidas.length} objeção(ões) mapeada(s)</span>}
           {form['gatilhos-customizados'] && <span>✓ Sinais de compra configurados</span>}
+          {regioes.length === 0 && <span className="text-gray-400">🌎 Todo Brasil</span>}
         </div>
 
         {/* Badge herança CI */}
@@ -1147,7 +1172,8 @@ function normalizeAgente(raw: Record<string, unknown>, idx: number): AgenteMock 
     icp_porte: raw.icp_porte as string,
     tom: raw.tom as string,
     status: raw.status as string,
-  }
+    metodologia: raw.metodologia as string,
+  } as AgenteMock & { metodologia?: string }
 }
 
 const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
@@ -1254,7 +1280,19 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const s: HorariosState = {}
+                DIAS.forEach(d => HORAS.forEach(h => {
+                  const hr = parseInt(h)
+                  s[`${d}-${h}`] = !['Sáb', 'Dom'].includes(d) && hr >= 9 && hr <= 18
+                }))
+                setHorarios(s)
+              }}
+              className="text-xs px-3 py-1.5 border border-blue-200 rounded-lg hover:bg-blue-50 text-blue-600 font-medium transition-colors"
+            >Comercial (Seg–Sex 9h–18h)</button>
             <button
               type="button"
               onClick={() => { const s: HorariosState = {}; DIAS.forEach(d => HORAS.forEach(h => { s[`${d}-${h}`] = true })); setHorarios(s) }}
@@ -1399,10 +1437,14 @@ function AgenteCard({
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 truncate">{agente.nome}</p>
           <p className="text-xs text-gray-400">
-            {agente.voz ? `Voz: ${agente.voz}` : agente.empresa || ''}
+            {[
+              VOZES_TELNYX.find(v => v.id === agente.voz)?.nome || agente.voz,
+              agente.tom,
+              (agente as AgenteMock & { metodologia?: string }).metodologia,
+            ].filter(Boolean).join(' · ') || agente.empresa || ''}
           </p>
         </div>
-        {agente.status === 'ativo' && (
+        {!emTreinamento && (
           <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Ativo</span>
         )}
         {emTreinamento && (
@@ -1925,6 +1967,7 @@ export default function OnboardingPage() {
               activating={activating}
               activatingStep={activatingStep}
               objecoes={objecoes}
+              regioes={regioes}
               propositoSelecionado={propositoSelecionado}
               onActivate={handleActivate}
               onReset={reset}
