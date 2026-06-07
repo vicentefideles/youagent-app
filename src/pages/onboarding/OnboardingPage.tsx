@@ -2015,28 +2015,55 @@ export default function OnboardingPage() {
       {
         id: 'agendar_vendedor',
         titulo: 'Agendar para meu vendedor',
-        descricao: 'O agente liga, qualifica o lead e, quando o momento é certo, transfere a ligação ao vivo para seu vendedor fechar o negócio.',
-        bullets: ['Qualificação antes da transferência', 'Vendedor entra só no momento certo', 'Ideal para times comerciais ativos'],
+        tag: 'SDR + Closer',
+        descricao: 'O agente liga, qualifica o lead e — quando identifica interesse real — transfere a ligação ao vivo para seu vendedor fechar o negócio na hora.',
+        idealPara: 'Times com vendedor humano que fecha negócio na ligação (inside sales, SaaS, serviços).',
+        naoIdeal: 'Quem não tem vendedor disponível para atender transferências em tempo real.',
+        bullets: [
+          'Qualifica antes de transferir — vendedor fala só com leads prontos',
+          'Transferência ao vivo: o lead não sente que foi passado para outro',
+          'Reduz tempo de ciclo: qualificação + fechamento na mesma ligação',
+        ],
+        autoConfig: { voz: 'Isadora (voz feminina, natural)', tom: 'Profissional', script: 'Abertura + qualificação + transferência' },
         icon: <UserCheck size={22} className="text-brand" />,
         bg: 'bg-brand-50',
+        tagColor: 'bg-brand-100 text-brand-700',
         preConfig: { tom: 'profissional', voz: 'Telnyx.NaturalHD.isadora' },
       },
       {
         id: 'substituir_sdr',
         titulo: 'Substituir equipe de SDRs',
-        descricao: 'O agente faz toda a prospecção, qualifica leads e agenda reuniões no calendário automaticamente — sem SDR humano.',
-        bullets: ['Agenda reuniões sem intervenção humana', 'Opera 24/7 sem custo fixo de equipe', 'Ideal para escalar sem contratar'],
+        tag: 'Agendamento automático',
+        descricao: 'O agente faz toda a prospecção e qualificação e agenda reuniões diretamente no calendário do seu time — sem nenhum SDR humano no meio.',
+        idealPara: 'Empresas que querem escalar prospecção sem contratar SDRs. Funciona bem com ciclos de venda mais longos.',
+        naoIdeal: 'Quem precisa que o negócio seja fechado na mesma ligação.',
+        bullets: [
+          'Agenda reuniões sem intervenção humana — 24h por dia, 7 dias por semana',
+          'Elimina o custo fixo de uma equipe de SDRs',
+          'Vendedor recebe reuniões prontas na agenda, sem prospectar',
+        ],
+        autoConfig: { voz: 'Baltasar (voz masculina, consultiva)', tom: 'Consultivo', script: 'Abertura + qualificação + agendamento' },
         icon: <Users size={22} className="text-emerald-600" />,
         bg: 'bg-emerald-50',
+        tagColor: 'bg-emerald-100 text-emerald-700',
         preConfig: { tom: 'consultivo', voz: 'Telnyx.NaturalHD.baltasar' },
       },
       {
         id: 'prospeccao_outbound',
         titulo: 'Prospecção outbound do zero',
-        descricao: 'O agente aborda contatos frios, identifica interesse, qualifica e passa para o próximo passo — tudo de forma autônoma.',
-        bullets: ['Abordagem de listas frias', 'Filtra leads sem potencial automaticamente', 'Ideal para novos mercados ou produtos'],
+        tag: 'Listas frias',
+        descricao: 'O agente aborda contatos que nunca ouviram falar da sua empresa, identifica os que têm interesse e filtra os que não têm — sem gastar tempo com leads frios.',
+        idealPara: 'Lançar produto novo, entrar em mercado novo ou trabalhar listas compradas sem estrutura de SDR.',
+        naoIdeal: 'Quem já tem base quente de leads — use outra modalidade para não desperdiçar contatos.',
+        bullets: [
+          'Aborda listas frias com script adaptado ao primeiro contato',
+          'Filtra automaticamente leads sem perfil ou sem interesse',
+          'Passa os qualificados para o próximo passo sem intervenção',
+        ],
+        autoConfig: { voz: 'Lucia (voz feminina, direta)', tom: 'Direto', script: 'Abertura fria + identificação de interesse' },
         icon: <PhoneOutgoing size={22} className="text-amber-600" />,
         bg: 'bg-amber-50',
+        tagColor: 'bg-amber-100 text-amber-700',
         preConfig: { tom: 'direto', voz: 'Telnyx.NaturalHD.lucia' },
       },
     ]
@@ -2071,7 +2098,10 @@ export default function OnboardingPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-sm text-gray-900">{p.titulo}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm text-gray-900">{p.titulo}</p>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${p.tagColor}`}>{p.tag}</span>
+                        </div>
                         <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
                           selected ? 'border-brand bg-brand' : 'border-gray-300'
                         }`}>
@@ -2079,15 +2109,40 @@ export default function OnboardingPage() {
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-1 leading-relaxed">{p.descricao}</p>
+
                       {selected && (
-                        <ul className="mt-2.5 flex flex-col gap-1">
-                          {p.bullets.map(b => (
-                            <li key={b} className="flex items-center gap-1.5 text-xs text-gray-600">
-                              <Check size={11} className="text-brand shrink-0" strokeWidth={3} />
-                              {b}
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="mt-3 flex flex-col gap-3">
+                          {/* Bullets de benefício */}
+                          <ul className="flex flex-col gap-1">
+                            {p.bullets.map(b => (
+                              <li key={b} className="flex items-start gap-1.5 text-xs text-gray-700">
+                                <Check size={11} className="text-brand shrink-0 mt-0.5" strokeWidth={3} />
+                                {b}
+                              </li>
+                            ))}
+                          </ul>
+
+                          {/* Ideal para / Não ideal */}
+                          <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-2.5">
+                            <p className="text-[11px] text-gray-500">
+                              <span className="font-medium text-gray-700">✓ Ideal para:</span> {p.idealPara}
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              <span className="font-medium text-gray-500">✗ Não indicado:</span> {p.naoIdeal}
+                            </p>
+                          </div>
+
+                          {/* Auto-config */}
+                          <div className="flex items-center gap-2 bg-brand-50 rounded-lg px-2.5 py-2 flex-wrap">
+                            <Zap size={11} className="text-brand shrink-0" />
+                            <span className="text-[10px] text-brand-700 font-medium">Configurado automaticamente:</span>
+                            <span className="text-[10px] text-brand-600">Voz: {p.autoConfig.voz}</span>
+                            <span className="text-brand-300 text-[10px]">·</span>
+                            <span className="text-[10px] text-brand-600">Tom: {p.autoConfig.tom}</span>
+                            <span className="text-brand-300 text-[10px]">·</span>
+                            <span className="text-[10px] text-brand-600">Script: {p.autoConfig.script}</span>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2095,16 +2150,6 @@ export default function OnboardingPage() {
               )
             })}
           </div>
-
-          {/* Nota de configuração automática */}
-          {propositoSelecionado && (
-            <div className="flex items-start gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2.5 mb-5">
-              <Zap size={13} className="text-brand mt-0.5 shrink-0" />
-              <p className="text-xs text-brand-700">
-                Voz e tom configurados automaticamente para este objetivo. Você pode ajustar no passo seguinte.
-              </p>
-            </div>
-          )}
 
           {/* Ações */}
           <div className="flex gap-3 justify-between">
