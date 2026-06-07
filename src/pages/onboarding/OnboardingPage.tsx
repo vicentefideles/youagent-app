@@ -1161,7 +1161,7 @@ function normalizeAgente(raw: Record<string, unknown>, idx: number): AgenteMock 
   return {
     id: (raw.id as string) || String(idx),
     nome,
-    voz: (raw.voz as string) || '',
+    voz: (raw.voz_id as string) || (raw.voz as string) || '',
     campanhasAtivas: (raw.campanhas_ativas as number) ?? 0,
     avatar: nome.charAt(0).toUpperCase(),
     cor: COR_LIST[idx % COR_LIST.length],
@@ -1222,12 +1222,15 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
   }
 
   async function handleSalvarHorarios() {
+    if (!agente?.id) { onClose(); return }
     try {
-      if (agente?.id) {
-        await agentesApi.update(agente.id, { horarios })
-      }
-    } catch(e) { /* silencioso */ }
-    onClose()
+      await agentesApi.update(agente.id, { horarios })
+      onClose()
+    } catch(e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } }; message?: string })
+        ?.response?.data?.error || 'Erro ao salvar horários'
+      alert(msg)
+    }
   }
 
   return (
@@ -1664,7 +1667,6 @@ export default function OnboardingPage() {
       compliance_anatel: form['compliance-anatel'] === 'true',
       compliance_optout: form['compliance-optout'] === 'true',
       proposito: propositoSelecionado,
-      voz: form['voz'],
       voz_id: form['voz'],
       tom: form['tom'],
       status: 'em_treinamento',
@@ -1746,7 +1748,7 @@ export default function OnboardingPage() {
         icp_cargo: agente.icp_cargo,
         icp_segmento: agente.icp_segmento,
         icp_porte: agente.icp_porte,
-        voz: agente.voz,
+        voz_id: agente.voz,
         tom: agente.tom,
         status: 'em_treinamento',
         horarios: agente.horarios,
