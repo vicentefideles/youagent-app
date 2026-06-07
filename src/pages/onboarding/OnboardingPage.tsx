@@ -1434,14 +1434,18 @@ function AgenteCard({
   onEditar,
   onDuplicar,
   onAtivar,
+  onDeletar,
   duplicating,
+  deleting,
 }: {
   agente: AgenteMock
   onHorarios: () => void
   onEditar: () => void
   onDuplicar: () => void
   onAtivar: () => void
+  onDeletar: () => void
   duplicating?: boolean
+  deleting?: boolean
 }) {
   const emTreinamento = agente.status === 'em_treinamento' || agente.status === 'inativo'
   const vozNome = VOZES_TELNYX.find(v => v.id === agente.voz)?.nome
@@ -1518,15 +1522,21 @@ function AgenteCard({
             {duplicating ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
             Duplicar
           </button>
-          {!emTreinamento && (
-            <button
-              onClick={onHorarios}
-              className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
-            >
-              <Clock size={12} />
-              Horários
-            </button>
-          )}
+          <button
+            onClick={onHorarios}
+            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+          >
+            <Clock size={12} />
+            Horários
+          </button>
+          <button
+            onClick={onDeletar}
+            disabled={deleting}
+            className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 border border-red-200 rounded-lg hover:bg-red-50 transition-colors text-red-500 disabled:opacity-50"
+          >
+            <X size={12} />
+            {deleting ? '...' : 'Deletar'}
+          </button>
           {emTreinamento && (
             <button
               onClick={onAtivar}
@@ -1560,6 +1570,7 @@ export default function OnboardingPage() {
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState('')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [agenteAtivacao, setAgenteAtivacao] = useState<AgenteMock | null>(null)
   const [sincronizando, setSincronizando] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -1765,6 +1776,22 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleDeletar(agente: AgenteMock) {
+    if (!window.confirm(`Deletar o agente "${agente.nome}"? Esta ação não pode ser desfeita.`)) return
+    setDeletingId(agente.id)
+    try {
+      await agentesApi.delete(agente.id)
+      refetchAgentes()
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } }; message?: string })
+        ?.response?.data?.error || 'Erro ao deletar agente'
+      setSyncFeedback({ ok: false, msg })
+      setTimeout(() => setSyncFeedback(null), 4000)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   function reset() {
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
@@ -1941,7 +1968,9 @@ export default function OnboardingPage() {
                     onEditar={() => handleEditar(agente)}
                     onDuplicar={() => handleDuplicar(agente)}
                     onAtivar={() => setAgenteAtivacao(agente)}
+                    onDeletar={() => handleDeletar(agente)}
                     duplicating={duplicatingId === agente.id}
+                    deleting={deletingId === agente.id}
                   />
                 ))}
               </div>
