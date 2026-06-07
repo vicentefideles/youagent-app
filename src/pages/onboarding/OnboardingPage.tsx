@@ -1336,7 +1336,7 @@ function ModalHorarios({ agente, onClose }: { agente: AgenteMock; onClose: () =>
             <button onClick={onClose} disabled={salvando} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
               Cancelar
             </button>
-            <button onClick={handleSalvarHorarios} disabled={salvando || salvoOk} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60">
+            <button onClick={handleSalvarHorarios} disabled={salvando || salvoOk} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-60">
               {salvando ? <Loader2 size={14} className="animate-spin" /> : salvoOk ? <Check size={14} strokeWidth={3} /> : null}
               {salvando ? 'Salvando...' : salvoOk ? 'Salvo!' : 'Salvar horários'}
             </button>
@@ -1536,7 +1536,7 @@ function AgenteCard({
           </button>
           {emTreinamento && (
             <button onClick={onAtivar}
-              className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+              className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-brand text-white rounded-lg hover:bg-brand-600 transition-colors shadow-sm">
               <Zap size={11} />
               Ativar
             </button>
@@ -1821,22 +1821,22 @@ export default function OnboardingPage() {
           <div className="w-full max-w-4xl mx-auto px-6 py-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-sm shrink-0">
-                  <Bot size={24} className="text-white" />
+                <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-sm shrink-0">
+                  <Bot size={20} className="text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 leading-tight">Setup do Agente</h1>
-                  <p className="text-sm text-gray-500 mt-0.5">Configure, treine e gerencie seus agentes de IA de vendas</p>
+                  <h1 className="text-lg font-bold text-gray-900 leading-tight">Setup do Agente</h1>
+                  <p className="text-xs text-gray-500 mt-0.5">Configure, treine e gerencie seus agentes de IA de vendas</p>
                   {agentes.length > 0 && (
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         {ativos} ativo{ativos !== 1 ? 's' : ''}
                       </span>
                       {emTreinamento > 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          {emTreinamento} em treinamento
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          {emTreinamento} configurando
                         </span>
                       )}
                     </div>
@@ -1847,13 +1847,13 @@ export default function OnboardingPage() {
                 <button
                   onClick={sincronizarComCI}
                   disabled={sincronizando}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors border disabled:opacity-60
-                    ${ciStatus?.pendente
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
-                      : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-                    }`}
+                  className={`btn disabled:opacity-60 text-sm px-4 py-2 ${
+                    ciStatus?.pendente
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm'
+                      : 'btn-secondary'
+                  }`}
                 >
-                  {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <Brain size={15} />}
+                  {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
                   {sincronizando ? 'Sincronizando...' : 'Sincronizar com CI'}
                   {ciStatus?.pendente && !sincronizando && (
                     <span className="bg-white text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
@@ -1863,9 +1863,9 @@ export default function OnboardingPage() {
                 </button>
                 <button
                   onClick={() => setTela('wiz0')}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+                  className="btn-primary gap-2"
                 >
-                  <Bot size={16} />
+                  <Bot size={15} />
                   Criar novo agente
                 </button>
               </div>
@@ -1878,8 +1878,8 @@ export default function OnboardingPage() {
           {/* ── Banner explicativo ─────────────────────────────────────── */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                <Zap size={17} className="text-blue-600" />
+              <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+                <Zap size={17} className="text-brand" />
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-gray-900">Como o agente aprende e performa</h2>
