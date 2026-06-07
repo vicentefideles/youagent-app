@@ -143,6 +143,8 @@ export const inteligenciaApi = {
   // Mercado
   mercado:      ()                          => api.get('/inteligencia/mercado'),
   mercadoGerar: ()                          => api.post('/inteligencia/mercado/gerar', {}),
+  // Métricas
+  metricas: ()                             => api.get('/inteligencia/metricas'),
   // Sandbox
   sandboxDiagnostico: ()                   => api.get('/inteligencia/sandbox/diagnostico'),
   sandboxInterativo:  (data: unknown)      => api.post('/inteligencia/simulador/interativo', data),

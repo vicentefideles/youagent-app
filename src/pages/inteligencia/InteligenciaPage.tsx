@@ -2126,6 +2126,49 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
     { tag: 'Preciso consultar meu sócio', segmento: 'Todos os ramos', usos: 8, data: '05/05', frase: '"Claro, faz todo sentido! O que precisa acontecer nessa reunião para que você e seu sócio possam avaliar com todas as informações necessárias?"', pct: 47 },
   ]
 
+  const { data: metricasData } = useQuery({
+    queryKey: ['inteligencia-metricas'],
+    queryFn: () => inteligenciaApi.metricas().then(r => r.data as any).catch(() => null),
+    staleTime: 60_000,
+  })
+
+  // ── Gatilhos (real ou fallback vazio) ────────────────────────────────────
+  const GATILHOS = metricasData?.gatilhos?.map((g: any) => {
+    const pct = g.pct ?? 0
+    const status = pct >= 80 ? 'Ótimo' : pct >= 60 ? 'OK' : pct >= 40 ? '↑ Aumentar' : '⚠ Revisar'
+    const statusColor = pct >= 80 ? 'bg-emerald-50 text-emerald-700' : pct >= 60 ? 'bg-gray-100 text-gray-600' : pct >= 40 ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
+    const color = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 40 ? 'bg-blue-400' : 'bg-amber-400'
+    return { label: g.label, pct, color, status, statusColor }
+  }) ?? []
+
+  // ── Top argumentos aprovados ──────────────────────────────────────────────
+  const TOP_ARGS = metricasData?.top_args?.map((a: any, i: number) => ({
+    label: a.label ?? a.frase ?? '—',
+    usos: 0,
+    pct: Math.round((a.eficacia ?? 0) * 100),
+    rank: i + 1,
+  })) ?? []
+
+  // ── Argumentos aprendidos (cross aprovados) ───────────────────────────────
+  const ARGS_APRENDIDOS = metricasData?.aprendidos?.map((a: any) => ({
+    tag: a.tag ?? '—',
+    segmento: 'Todos os ramos',
+    usos: 0,
+    data: a.criado_em ? new Date(a.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—',
+    frase: a.frase ? `"${a.frase}"` : '—',
+    pct: Math.round((a.eficacia ?? 0) * 100),
+  })) ?? []
+
+  // ── Argumentos em validação (cross pendentes) ─────────────────────────────
+  const ARGS_VALIDACAO = metricasData?.em_validacao?.map((a: any) => ({
+    tag: a.tag ?? '—',
+    segmento: 'Todos os ramos',
+    usos: 0,
+    data: a.criado_em ? new Date(a.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—',
+    frase: a.frase ? `"${a.frase}"` : '—',
+    pct: 0,
+  })) ?? []
+
   const tipoIcon: Record<string, string> = { livro: '📘', artigo: '📰', video: '🎬', audio: '🎙️', texto: '📝' }
 
   // ── Exportar Relatório de Materiais (PDF via print) ──────────────────────
@@ -2340,9 +2383,10 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
     if (win) { win.document.write(html); win.document.close() }
   }
 
-  // Meses para gráfico de evolução (últimas 10 semanas - estrutura visual)
-  const SEMANAS = ['Abr 1', 'Abr 7', 'Abr 14', 'Abr 21', 'Abr 28', 'Mai 5', 'Mai 12', 'Mai 19', 'Mai 26', 'Jun 2']
-  const VALS = [6.1, 6.8, 7.2, 7.8, 7.4, 8.1, 8.0, 8.4, 8.6, 8.9]
+  // Gráfico de evolução — score médio semanal (real ou vazio)
+  const grafico = metricasData?.grafico_semanas ?? []
+  const SEMANAS: string[] = grafico.length > 0 ? grafico.map((s: any) => s.label) : []
+  const VALS: number[] = grafico.length > 0 ? grafico.map((s: any) => s.media ?? 0) : []
   const EVENTOS: Record<number, { label: string; color: string }> = {
     2: { label: 'Receita Prev.', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
     4: { label: '+8 argumentos', color: 'bg-purple-100 text-purple-700 border-purple-200' },
