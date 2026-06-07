@@ -2132,6 +2132,26 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
     staleTime: 60_000,
   })
 
+  // Comparativo por agente: agrega ligações por agente_id
+  const comparativoAgentes = (() => {
+    if (!temDados || ligacoesRaw.length === 0 || agentesData.length === 0) return []
+    const SUCESSO = ['agendou', 'transferida']
+    const byAgent: Record<string, { nome: string; total: number; sucesso: number }> = {}
+    for (const ag of agentesData as any[]) {
+      byAgent[ag.id] = { nome: ag.nome ?? 'Agente', total: 0, sucesso: 0 }
+    }
+    for (const lig of ligacoesRaw as any[]) {
+      const id = lig.agente_id
+      if (!id || !byAgent[id]) continue
+      byAgent[id].total++
+      if (SUCESSO.includes(lig.resultado)) byAgent[id].sucesso++
+    }
+    return Object.values(byAgent)
+      .filter(a => a.total > 0)
+      .map(a => ({ ...a, taxa: a.total > 0 ? Math.round((a.sucesso / a.total) * 100) : 0 }))
+      .sort((a, b) => b.taxa - a.taxa)
+  })()
+
   // ── Gatilhos (real ou fallback vazio) ────────────────────────────────────
   const GATILHOS = metricasData?.gatilhos?.map((g: any) => {
     const pct = g.pct ?? 0
@@ -2170,6 +2190,9 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
   })) ?? []
 
   const tipoIcon: Record<string, string> = { livro: '📘', artigo: '📰', video: '🎬', audio: '🎙️', texto: '📝' }
+
+  // Modal de histórico por argumento
+  const [argHistorico, setArgHistorico] = useState<any | null>(null)
 
   // ── Exportar Relatório de Materiais (PDF via print) ──────────────────────
   function exportarRelatorioMateriais() {
@@ -2383,6 +2406,71 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
     if (win) { win.document.write(html); win.document.close() }
   }
 
+  // ── Exportar Relatório de Métricas (PDF via print) ──────────────────────
+  function exportarMetricasPDF() {
+    const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const gatilhosHTML = GATILHOS.map(g => `
+      <tr>
+        <td>${g.label}</td>
+        <td style="text-align:center;font-weight:700;color:${g.pct >= 70 ? '#059669' : g.pct >= 50 ? '#2563eb' : '#d97706'}">${g.pct}%</td>
+        <td style="text-align:center"><span style="background:${g.pct >= 80 ? '#ecfdf5' : g.pct >= 60 ? '#eff6ff' : '#fffbeb'};color:${g.pct >= 80 ? '#065f46' : g.pct >= 60 ? '#1e40af' : '#92400e'};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600">${g.status}</span></td>
+      </tr>`).join('')
+    const argsHTML = TOP_ARGS.map((a, i) => `
+      <tr>
+        <td style="width:24px;text-align:center;font-weight:700;color:#6d28d9">${i + 1}</td>
+        <td>${a.label}</td>
+        <td style="text-align:center;font-weight:700;color:#059669">${a.pct}%</td>
+      </tr>`).join('')
+    const aprendidosHTML = ARGS_APRENDIDOS.map(a => `
+      <tr>
+        <td><strong>${a.tag}</strong></td>
+        <td style="color:#6b7280;font-size:11px">${a.frase}</td>
+        <td style="text-align:center;font-weight:700;color:#059669">${a.pct}%</td>
+      </tr>`).join('')
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>ETZ — Relatório de Métricas de Inteligência</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;color:#111;padding:40px;font-size:13px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #6d28d9}
+  h1{font-size:20px;font-weight:700}.sub{font-size:12px;color:#6b7280;margin-top:4px}
+  .badge{font-size:11px;background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;padding:4px 10px;border-radius:999px;font-weight:600}
+  section{margin-bottom:28px}.section-title{font-size:14px;font-weight:700;color:#111;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e5e7eb}
+  table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;text-align:left;font-size:12px;border-bottom:1px solid #f3f4f6}
+  th{background:#f9fafb;font-weight:600;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .kpi-row{display:flex;gap:16px;margin-bottom:28px}
+  .kpi{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;text-align:center}
+  .kpi-val{font-size:22px;font-weight:700;color:#6d28d9;font-family:monospace}
+  .kpi-label{font-size:11px;color:#6b7280;margin-top:4px}
+  @media print{body{padding:20px}}
+</style></head><body>
+<div class="header">
+  <div><h1>Métricas de Inteligência</h1><p class="sub">ETZ — Relatório gerado em ${hoje}</p></div>
+  <span class="badge">${totalLigacoes} ligações analisadas</span>
+</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-val">${metricasData?.taxa_conversao ?? 0}%</div><div class="kpi-label">Taxa de Conversão</div></div>
+  <div class="kpi"><div class="kpi-val">${metricasData?.total_transferencias ?? 0}</div><div class="kpi-label">Transferências</div></div>
+  <div class="kpi"><div class="kpi-val">${TOP_ARGS.length}</div><div class="kpi-label">Argumentos Aprovados</div></div>
+  <div class="kpi"><div class="kpi-val">${GATILHOS.length}</div><div class="kpi-label">Gatilhos Monitorados</div></div>
+</div>
+<section><div class="section-title">Eficácia por Gatilho</div>
+<table><thead><tr><th>Gatilho</th><th style="text-align:center">Taxa de Conversão</th><th style="text-align:center">Status</th></tr></thead>
+<tbody>${gatilhosHTML || '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:20px">Nenhum dado ainda</td></tr>'}</tbody></table></section>
+<section><div class="section-title">Top Argumentos por Eficácia</div>
+<table><thead><tr><th>#</th><th>Argumento</th><th style="text-align:center">Eficácia</th></tr></thead>
+<tbody>${argsHTML || '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:20px">Nenhum argumento aprovado ainda</td></tr>'}</tbody></table></section>
+<section><div class="section-title">Argumentos Aprendidos</div>
+<table><thead><tr><th>Gatilho</th><th>Frase</th><th style="text-align:center">Eficácia</th></tr></thead>
+<tbody>${aprendidosHTML || '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:20px">Nenhum argumento aprendido ainda</td></tr>'}</tbody></table></section>
+<p style="margin-top:32px;font-size:10px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:12px">
+  Relatório gerado automaticamente pela plataforma ETZ · ${hoje}
+</p>
+</body></html>`
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 400) }
+  }
+
   // Gráfico de evolução — score médio semanal (real ou vazio)
   const grafico = metricasData?.grafico_semanas ?? []
   const SEMANAS: string[] = grafico.length > 0 ? grafico.map((s: any) => s.label) : []
@@ -2409,15 +2497,25 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             </p>
           </div>
         </div>
-        {temDados ? (
-          <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold shrink-0">
-            {totalLigacoes} ligações analisadas
-          </span>
-        ) : (
-          <span className="text-xs bg-brand-50 text-brand-600 border border-brand-200 px-2.5 py-1 rounded-full font-semibold shrink-0">
-            {totalMateriais + totalBanco} fontes configuradas
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {temDados && (
+            <button
+              onClick={exportarMetricasPDF}
+              className="flex items-center gap-1.5 text-xs border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 font-medium"
+            >
+              <Download size={12} /> Exportar PDF
+            </button>
+          )}
+          {temDados ? (
+            <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold">
+              {totalLigacoes} ligações analisadas
+            </span>
+          ) : (
+            <span className="text-xs bg-brand-50 text-brand-600 border border-brand-200 px-2.5 py-1 rounded-full font-semibold">
+              {totalMateriais + totalBanco} fontes configuradas
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Card explicativo ─────────────────────────────────────────────────── */}
@@ -2646,6 +2744,39 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
         </div>
       </div>
 
+      {/* ── Comparativo entre agentes ────────────────────────────────────────── */}
+      {comparativoAgentes.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Comparativo entre agentes</h3>
+          <p className="text-[11px] text-gray-400 mb-3">Taxa de conversão real por agente nos últimos 90 dias</p>
+          <div className="space-y-2.5">
+            {comparativoAgentes.map((ag, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-medium text-gray-800 truncate">{ag.nome}</span>
+                    <span className="font-mono font-bold text-gray-900 shrink-0 ml-2">{ag.taxa}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${ag.taxa >= 15 ? 'bg-emerald-500' : ag.taxa >= 8 ? 'bg-blue-500' : 'bg-amber-400'}`}
+                      style={{ width: `${Math.min(100, ag.taxa * 4)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-mono text-gray-500">{ag.sucesso}/{ag.total}</p>
+                  <p className="text-[9px] text-gray-300">conv/lig</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Impacto por material ─────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex items-center justify-between mb-1">
@@ -2725,15 +2856,16 @@ function TabMetricas({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">🏆 Mais efetivos — aprendidos das ligações</p>
             <div className="space-y-3 mb-4">
               {ARGS_APRENDIDOS.map((a, i) => (
-                <div key={i} className="border border-gray-100 rounded-lg p-3">
+                <div key={i} className="border border-gray-100 rounded-lg p-3 cursor-pointer hover:border-brand-200 hover:bg-brand-50/20 transition-colors group" onClick={() => setArgHistorico(a)}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">{a.tag}</span>
-                    <span className="text-[10px] text-gray-400">{a.segmento} · {a.usos} usos · Aprendido em {a.data}</span>
+                    <span className="text-[10px] text-gray-400">{a.segmento} · Aprendido em {a.data}</span>
+                    <span className="text-[9px] text-brand-500 opacity-0 group-hover:opacity-100 ml-auto transition-opacity">Ver histórico →</span>
                   </div>
                   <p className="text-xs text-gray-600 italic mb-2">{a.frase}</p>
                   <div className="flex items-center gap-2">
                     <Bar pct={a.pct} color="bg-emerald-500" />
-                    <span className="text-xs font-bold text-emerald-600 w-8 shrink-0">—%</span>
+                    <span className="text-xs font-bold text-emerald-600 w-8 shrink-0">{a.pct}%</span>
                   </div>
                 </div>
               ))}
@@ -3257,6 +3389,53 @@ function TabAjusteFino() {
           </p>
         </div>
       </div>
+
+      {/* ── Modal histórico de argumento ─────────────────────────────────────── */}
+      {argHistorico && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setArgHistorico(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">{argHistorico.tag}</span>
+                <h3 className="text-sm font-semibold text-gray-900 mt-2">Histórico do argumento</h3>
+              </div>
+              <button onClick={() => setArgHistorico(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 mb-4">
+              <p className="text-xs text-gray-600 italic leading-relaxed">{argHistorico.frase}</p>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Eficácia atual</span>
+                <span className="font-bold text-emerald-600">{argHistorico.pct}%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Aprendido em</span>
+                <span className="font-medium text-gray-700">{argHistorico.data}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Segmento</span>
+                <span className="font-medium text-gray-700">{argHistorico.segmento}</span>
+              </div>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-[11px] text-blue-700 font-medium mb-1">Como usar este argumento</p>
+              <p className="text-[11px] text-blue-600 leading-relaxed">
+                Este argumento é ativado automaticamente pelo agente quando detecta o gatilho <strong>{argHistorico.tag}</strong> na ligação. Com {argHistorico.pct}% de eficácia, ele é um dos mais efetivos da sua base.
+              </p>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
+              <button
+                onClick={() => setArgHistorico(null)}
+                className="flex-1 text-xs border border-gray-200 py-2 rounded-lg text-gray-600 hover:bg-gray-50 font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3599,6 +3778,8 @@ function TabCross() {
   const [detectando, setDetectando] = useState(false)
   const [detectadoOk, setDetectadoOk] = useState(false)
   const [bannerSync, setBannerSync] = useState(false)
+  const [aprovandoLote, setAprovandoLote] = useState(false)
+  const [loteOk, setLoteOk] = useState(false)
 
   const { data: crossAll = [], refetch: refetchCross } = useQuery({
     queryKey: ['cross-all'],
@@ -3657,6 +3838,23 @@ function TabCross() {
       await refetchCross()
       qc.invalidateQueries({ queryKey: ['inteligencia-cross'] })
     } catch { /* silencioso */ } finally { setRejeitando(null) }
+  }
+
+  async function aprovarTodos() {
+    if (pendentes.length === 0) return
+    setAprovandoLote(true)
+    setLoteOk(false)
+    try {
+      await Promise.all(pendentes.map(a =>
+        api.post(`https://app.etztech.com/api/v1/inteligencia/cross/${a.id}/aprovar`)
+      ))
+      await refetchCross()
+      setBannerSync(true)
+      setLoteOk(true)
+      qc.invalidateQueries({ queryKey: ['inteligencia-cross'] })
+      qc.invalidateQueries({ queryKey: ['inteligencia-metricas'] })
+      setTimeout(() => setLoteOk(false), 3000)
+    } catch { /* silencioso */ } finally { setAprovandoLote(false) }
   }
 
   async function importarDaRede(id: string) {
@@ -3773,7 +3971,19 @@ function TabCross() {
         <div id="cross-pending-list" className="bg-white border-l-4 border-l-amber-400 border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900">Pendentes de aprovação</h3>
-            <span id="cross-pending-count" className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{pendentes.length} pendentes</span>
+            <div className="flex items-center gap-2">
+              <span id="cross-pending-count" className="bg-amber-50 text-amber-700 text-xs px-2 py-0.5 rounded-full font-semibold">{pendentes.length} pendentes</span>
+              {pendentes.length > 1 && (
+                <button
+                  onClick={aprovarTodos}
+                  disabled={aprovandoLote}
+                  className="flex items-center gap-1 bg-emerald-600 text-white text-[10px] px-2.5 py-1 rounded-lg hover:bg-emerald-700 transition-colors font-semibold disabled:opacity-50"
+                >
+                  {aprovandoLote ? <Loader2 size={10} className="animate-spin" /> : loteOk ? <CheckCircle size={10} /> : <CheckCircle size={10} />}
+                  {loteOk ? 'Aprovados!' : aprovandoLote ? 'Aprovando…' : `Aprovar todos (${pendentes.length})`}
+                </button>
+              )}
+            </div>
           </div>
 
           {pendentes.length === 0 ? (
@@ -4414,6 +4624,10 @@ function TabSimulador() {
   const [chatInput, setChatInput]         = useState('')
   const [chatLoading, setChatLoading]     = useState(false)
   const [chatAnalise, setChatAnalise]     = useState<{ gatilho?: string; sentimento?: string; fase?: string; probabilidade?: number } | null>(null)
+  // ── Feedback loop: extrair argumentos da sessão ───────────────
+  const [extraindo, setExtraindo]         = useState(false)
+  const [feedbackArgs, setFeedbackArgs]   = useState<{ gatilho: string; frase: string }[]>([])
+  const [feedbackOk, setFeedbackOk]       = useState(false)
 
   // ── Relatório ─────────────────────────────────────────────────
   const [relatorioAgenteId, setRelatorioAgenteId] = useState('')
@@ -4969,6 +5183,58 @@ function TabSimulador() {
                 {chatLoading ? <Loader2 size={15} className="animate-spin"/> : <Send size={15}/>}
               </button>
             </div>
+
+            {/* ── Feedback loop: extrair argumentos da sessão ─────────────────── */}
+            {chatHistorico.length >= 4 && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">Extrair aprendizados desta sessão</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">O sistema analisa as respostas do agente e extrai argumentos para revisão no Cross-Cliente</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (extraindo) return
+                      setExtraindo(true)
+                      setFeedbackOk(false)
+                      setFeedbackArgs([])
+                      try {
+                        const res = await inteligenciaApi.sandboxScore({ historico: chatHistorico })
+                        const data = res.data as any
+                        const extraidos: { gatilho: string; frase: string }[] = []
+                        if (data?.ponto_forte) extraidos.push({ gatilho: 'abertura', frase: data.ponto_forte })
+                        if (data?.dimensoes) {
+                          for (const d of data.dimensoes) {
+                            if ((d.score ?? 0) >= 7 && d.comentario) extraidos.push({ gatilho: d.label?.toLowerCase() ?? 'generico', frase: d.comentario })
+                          }
+                        }
+                        setFeedbackArgs(extraidos)
+                        setFeedbackOk(true)
+                      } catch { /* silencioso */ } finally { setExtraindo(false) }
+                    }}
+                    disabled={extraindo}
+                    className="flex items-center gap-1.5 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 font-semibold disabled:opacity-50 shrink-0"
+                  >
+                    {extraindo ? <><Loader2 size={11} className="animate-spin" /> Analisando…</> : <><Sparkles size={11} /> Extrair argumentos</>}
+                  </button>
+                </div>
+                {feedbackOk && feedbackArgs.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{feedbackArgs.length} argumento{feedbackArgs.length > 1 ? 's' : ''} identificado{feedbackArgs.length > 1 ? 's' : ''} — enviados para Cross-Cliente como pendentes</p>
+                    {feedbackArgs.map((a, i) => (
+                      <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5">
+                        <span className="bg-emerald-100 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase">{a.gatilho}</span>
+                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{a.frase}</p>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-gray-400 text-center pt-1">Vá na aba Cross-Cliente para aprovar e propagar para os agentes</p>
+                  </div>
+                )}
+                {feedbackOk && feedbackArgs.length === 0 && (
+                  <p className="text-[11px] text-gray-400 mt-2">Sessão curta — continue a conversa para extrair mais aprendizados.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -5353,7 +5619,7 @@ function impacto(a: AbTeste) {
   return { diff, venceB: diff > 0 }
 }
 
-function TabAB() {
+function TabAB({ sugestoesAB = [] }: { sugestoesAB?: any[] }) {
   const queryClient = useQueryClient()
   const { data: agentes = [] } = useQuery({ queryKey: ['agentes'], queryFn: () => agentesApi.list().then(r => r.data as { id: string; nome: string }[]) })
 
@@ -5466,6 +5732,42 @@ function TabAB() {
           ))}
         </div>
       </div>
+
+      {/* ── Sugestões automáticas de A/B ─────────────────────────────────────── */}
+      {sugestoesAB.length > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-purple-600" />
+            <p className="text-xs font-semibold text-purple-900">Sugestões automáticas de experimento</p>
+            <span className="bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{sugestoesAB.length}</span>
+          </div>
+          <div className="space-y-2">
+            {sugestoesAB.map((s: any, i: number) => (
+              <div key={i} className="bg-white border border-purple-100 rounded-lg p-3 flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <GitBranch size={11} className="text-purple-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-semibold text-gray-800">{s.gatilho}</span>
+                    <span className="bg-amber-50 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">Eficácia média: {s.eficacia_media}%</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 leading-relaxed">{s.motivo}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('ab-trecho-select')
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }}
+                  className="text-[10px] bg-purple-600 text-white px-2.5 py-1 rounded-lg hover:bg-purple-700 font-semibold shrink-0"
+                >
+                  Criar teste
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Criar novo experimento ── */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
@@ -6383,6 +6685,17 @@ export default function InteligenciaPage() {
       .catch(() => {})
   }, [])
 
+  const { data: saudeData } = useQuery({
+    queryKey: ['inteligencia-saude'],
+    queryFn: () => inteligenciaApi.saude().then(r => r.data as any).catch(() => null),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  })
+
+  const alertas: any[] = saudeData?.alertas ?? []
+  const sugestoesAB: any[] = saudeData?.sugestoes_ab ?? []
+  const scoreSaude: number | null = saudeData?.score ?? null
+
   const tabContent: Record<TabId, React.ReactNode> = {
     testes: <TabTestes />,
     qualidade: <TabQualidade />,
@@ -6398,7 +6711,7 @@ export default function InteligenciaPage() {
     padroes: <TabPadroes />,
     simulador: <TabSimulador />,
     icp: <TabICP />,
-    ab: <TabAB />,
+    ab: <TabAB sugestoesAB={sugestoesAB} />,
     mercado: <TabMercado />,
   }
 
@@ -6448,7 +6761,9 @@ export default function InteligenciaPage() {
                 </div>
                 <div>
                   <p className="text-2xs text-gray-400 leading-none mb-0.5">Conversão</p>
-                  <p className="text-lg font-mono font-bold text-emerald-600 leading-none">+3.7%</p>
+                  <p className="text-lg font-mono font-bold text-emerald-600 leading-none">
+                    {saudeData?.resumo?.taxa_conversao != null ? `${saudeData.resumo.taxa_conversao}%` : '—'}
+                  </p>
                 </div>
               </div>
 
@@ -6459,12 +6774,66 @@ export default function InteligenciaPage() {
                 </div>
                 <div>
                   <p className="text-2xs text-gray-400 leading-none mb-0.5">Ligações</p>
-                  <p className="text-lg font-mono font-bold text-gray-900 leading-none">1.284</p>
+                  <p className="text-lg font-mono font-bold text-gray-900 leading-none">
+                    {saudeData?.resumo ? saudeData.resumo.aprovados + saudeData.resumo.pendentes > 0 ? (saudeData.resumo.aprovados + saudeData.resumo.pendentes).toLocaleString('pt-BR') : '—' : '—'}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* ── Score de Saúde + Alertas proativos ──────────────────────────────── */}
+        {(scoreSaude != null || alertas.length > 0) && (
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            {/* Score bar */}
+            <div className="px-5 py-3 flex items-center gap-4 border-b border-gray-50">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${scoreSaude == null ? 'bg-gray-100' : scoreSaude >= 70 ? 'bg-emerald-100' : scoreSaude >= 40 ? 'bg-amber-100' : 'bg-red-100'}`}>
+                  <Sparkles size={13} className={scoreSaude == null ? 'text-gray-400' : scoreSaude >= 70 ? 'text-emerald-600' : scoreSaude >= 40 ? 'text-amber-600' : 'text-red-600'} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 leading-none">Saúde do CI</p>
+                  <p className={`text-base font-mono font-bold leading-none ${scoreSaude == null ? 'text-gray-400' : scoreSaude >= 70 ? 'text-emerald-600' : scoreSaude >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {scoreSaude ?? '—'}<span className="text-[10px] text-gray-400 font-normal">/100</span>
+                  </p>
+                </div>
+              </div>
+              {scoreSaude != null && (
+                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${scoreSaude >= 70 ? 'bg-emerald-500' : scoreSaude >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                    style={{ width: `${scoreSaude}%` }}
+                  />
+                </div>
+              )}
+              {scoreSaude != null && (
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${scoreSaude >= 70 ? 'bg-emerald-50 text-emerald-700' : scoreSaude >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                  {scoreSaude >= 70 ? 'Saudável' : scoreSaude >= 40 ? 'Atenção necessária' : 'Ação urgente'}
+                </span>
+              )}
+            </div>
+            {/* Alertas */}
+            {alertas.length > 0 && (
+              <div className="divide-y divide-gray-50">
+                {alertas.map((a: any, i: number) => (
+                  <div key={i} className={`flex items-start gap-3 px-5 py-2.5 ${a.nivel === 'erro' ? 'bg-red-50/40' : a.nivel === 'aviso' ? 'bg-amber-50/40' : 'bg-blue-50/20'}`}>
+                    <AlertCircle size={13} className={`mt-0.5 shrink-0 ${a.nivel === 'erro' ? 'text-red-500' : a.nivel === 'aviso' ? 'text-amber-500' : 'text-blue-400'}`} />
+                    <p className={`text-[11px] flex-1 leading-relaxed ${a.nivel === 'erro' ? 'text-red-700' : a.nivel === 'aviso' ? 'text-amber-700' : 'text-blue-600'}`}>{a.mensagem}</p>
+                    {a.acao && (
+                      <button
+                        onClick={() => setActiveTab(a.acao as TabId)}
+                        className={`text-[10px] font-semibold shrink-0 px-2 py-0.5 rounded border ${a.nivel === 'erro' ? 'border-red-200 text-red-600 hover:bg-red-50' : a.nivel === 'aviso' ? 'border-amber-200 text-amber-600 hover:bg-amber-50' : 'border-blue-200 text-blue-600 hover:bg-blue-50'}`}
+                      >
+                        Ver →
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Tab bar ──────────────────────────────────────────────────────────── */}
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm px-5 py-3 flex flex-col gap-2.5">

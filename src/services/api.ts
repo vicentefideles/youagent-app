@@ -145,6 +145,8 @@ export const inteligenciaApi = {
   mercadoGerar: ()                          => api.post('/inteligencia/mercado/gerar', {}),
   // Métricas
   metricas: ()                             => api.get('/inteligencia/metricas'),
+  // Saúde / alertas proativos
+  saude: ()                                => api.get('/inteligencia/saude'),
   // Sandbox
   sandboxDiagnostico: ()                   => api.get('/inteligencia/sandbox/diagnostico'),
   sandboxInterativo:  (data: unknown)      => api.post('/inteligencia/simulador/interativo', data),
