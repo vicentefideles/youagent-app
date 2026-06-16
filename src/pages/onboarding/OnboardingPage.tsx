@@ -38,6 +38,8 @@ interface FormData {
   'empresa-porte': string
   'empresa-descricao': string
   'empresa-diferenciais': string
+  'empresa-objecoes-comuns': string
+  'empresa-contexto-mercado': string
   // Step 2
   'prod-nome': string
   'prod-descricao': string
@@ -76,6 +78,8 @@ const INITIAL_FORM: FormData = {
   'empresa-porte': '',
   'empresa-descricao': '',
   'empresa-diferenciais': '',
+  'empresa-objecoes-comuns': '',
+  'empresa-contexto-mercado': '',
   'prod-nome': '',
   'prod-descricao': '',
   'prod-resultados': '',
@@ -280,19 +284,22 @@ function Step1({
         descricao?: string
         diferenciais?: string
         concorrentes?: string
-        icp_cargo?: string
         icp_porte?: string
         icp_segmento?: string
         gatilhos?: string
+        objecoes_comuns?: string
+        contexto_mercado?: string
         script_abertura?: string
       }
       if (data.descricao) onChange('empresa-descricao', data.descricao)
       if (data.diferenciais) onChange('empresa-diferenciais', data.diferenciais)
       if (data.concorrentes) onChange('prod-concorrentes', data.concorrentes)
-      if (data.icp_cargo) onChange('icp-cargo-tipo', data.icp_cargo)
       if (data.icp_porte) onChange('icp-porte-alvo', data.icp_porte)
       if (data.icp_segmento) onChange('icp-segmento-alvo', data.icp_segmento)
       if (data.gatilhos) onChange('gatilhos-customizados', data.gatilhos)
+      if (data.objecoes_comuns) onChange('empresa-objecoes-comuns', data.objecoes_comuns)
+      if (data.contexto_mercado) onChange('empresa-contexto-mercado', data.contexto_mercado)
+      if (data.script_abertura) onChange('script-abertura', data.script_abertura)
     } catch {
       setPesquisaErro('Erro ao pesquisar. Verifique a conexão Claude API.')
     } finally {
@@ -1756,6 +1763,8 @@ export default function OnboardingPage() {
       site: form['empresa-site'],
       descricao_empresa: form['empresa-descricao'],
       diferenciais_empresa: form['empresa-diferenciais'],
+      objecoes_comuns: form['empresa-objecoes-comuns'],
+      contexto_mercado: form['empresa-contexto-mercado'],
       produto: form['prod-nome'],
       descricao_produto: form['prod-descricao'],
       resultados_clientes: form['prod-resultados'],
