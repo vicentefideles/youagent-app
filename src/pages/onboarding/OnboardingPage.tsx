@@ -297,7 +297,11 @@ function Step1({
       if (data.icp_porte) onChange('icp-porte-alvo', data.icp_porte)
       if (data.icp_segmento) onChange('icp-segmento-alvo', data.icp_segmento)
       if (data.gatilhos) onChange('gatilhos-customizados', data.gatilhos)
-      if (data.objecoes_comuns) onChange('empresa-objecoes-comuns', data.objecoes_comuns)
+      const mercadoTexto = [
+        data.concorrentes ? `Concorrentes: ${data.concorrentes}` : '',
+        data.objecoes_comuns ? `\nObjeções:\n${data.objecoes_comuns}` : '',
+      ].filter(Boolean).join('')
+      if (mercadoTexto) onChange('empresa-objecoes-comuns', mercadoTexto)
       if (data.contexto_mercado) onChange('empresa-contexto-mercado', data.contexto_mercado)
       if (data.script_abertura) onChange('script-abertura', data.script_abertura)
     } catch (err: unknown) {
@@ -410,6 +414,21 @@ function Step1({
           />
         </Field>
         <p className="text-xs text-gray-400 mt-1">O que você tem que os concorrentes não têm</p>
+      </div>
+
+      {/* Concorrentes e objeções do mercado */}
+      <div className="col-span-2">
+        <Field label="Concorrentes e objeções do mercado">
+          <textarea
+            id="empresa-objecoes-comuns"
+            className={textareaCls}
+            rows={3}
+            value={form['empresa-objecoes-comuns']}
+            onChange={e => onChange('empresa-objecoes-comuns', e.target.value)}
+            placeholder="Ex: Concorrentes: Salesforce, RD Station, Moskit&#10;&#10;Objeções: 'Já temos CRM' → Respondemos que o ETZ complementa o CRM existente sem substituí-lo..."
+          />
+        </Field>
+        <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar — você pode editar antes de ativar o agente</p>
       </div>
 
       {/* Banner Pesquisar com IA */}
