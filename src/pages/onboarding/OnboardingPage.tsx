@@ -32,10 +32,12 @@ interface FormData {
   // Step 1
   'nome-agente': string
   'empresa-nome': string
+  'empresa-cnpj': string
   'empresa-segmento': string
   'empresa-site': string
   'empresa-porte': string
   'empresa-descricao': string
+  'empresa-diferenciais': string
   // Step 2
   'prod-nome': string
   'prod-descricao': string
@@ -68,10 +70,12 @@ interface Objecao {
 const INITIAL_FORM: FormData = {
   'nome-agente': '',
   'empresa-nome': '',
+  'empresa-cnpj': '',
   'empresa-segmento': '',
   'empresa-site': '',
   'empresa-porte': '',
   'empresa-descricao': '',
+  'empresa-diferenciais': '',
   'prod-nome': '',
   'prod-descricao': '',
   'prod-resultados': '',
@@ -267,10 +271,13 @@ function Step1({
     try {
       const res = await claudeApi.pesquisarMercado({
         empresa: form['empresa-nome'],
+        cnpj: form['empresa-cnpj'],
         segmento: form['empresa-segmento'],
+        site: form['empresa-site'],
         produto: form['prod-nome'],
       })
       const data = res.data as {
+        descricao?: string
         diferenciais?: string
         concorrentes?: string
         icp_cargo?: string
@@ -279,7 +286,8 @@ function Step1({
         gatilhos?: string
         script_abertura?: string
       }
-      if (data.diferenciais) onChange('empresa-descricao', data.diferenciais)
+      if (data.descricao) onChange('empresa-descricao', data.descricao)
+      if (data.diferenciais) onChange('empresa-diferenciais', data.diferenciais)
       if (data.concorrentes) onChange('prod-concorrentes', data.concorrentes)
       if (data.icp_cargo) onChange('icp-cargo-tipo', data.icp_cargo)
       if (data.icp_porte) onChange('icp-porte-alvo', data.icp_porte)
@@ -294,6 +302,7 @@ function Step1({
 
   return (
     <div className="grid grid-cols-2 gap-4">
+      {/* Nome do agente */}
       <div className="col-span-2">
         <Field label="Nome do agente" required error={errors['nome-agente']}>
           <input
@@ -305,17 +314,29 @@ function Step1({
           />
         </Field>
       </div>
-      <div className="col-span-2">
-        <Field label="Nome da empresa" required error={errors['empresa-nome']}>
-          <input
-            id="empresa-nome"
-            className={inputCls}
-            value={form['empresa-nome']}
-            onChange={e => onChange('empresa-nome', e.target.value)}
-            placeholder="Ex: Acme Tecnologia"
-          />
-        </Field>
-      </div>
+
+      {/* Nome da empresa + CNPJ */}
+      <Field label="Nome da empresa" required error={errors['empresa-nome']}>
+        <input
+          id="empresa-nome"
+          className={inputCls}
+          value={form['empresa-nome']}
+          onChange={e => onChange('empresa-nome', e.target.value)}
+          placeholder="Ex: Acme Tecnologia"
+        />
+      </Field>
+      <Field label="CNPJ da empresa">
+        <input
+          id="empresa-cnpj"
+          className={inputCls}
+          value={form['empresa-cnpj']}
+          onChange={e => onChange('empresa-cnpj', e.target.value)}
+          placeholder="00.000.000/0001-00"
+          maxLength={18}
+        />
+      </Field>
+
+      {/* Segmento + Porte */}
       <Field label="Segmento de atuação">
         <select
           id="empresa-segmento"
@@ -338,6 +359,8 @@ function Step1({
           {PORTES.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </Field>
+
+      {/* Site */}
       <div className="col-span-2">
         <Field label="Site da empresa">
           <input
@@ -349,30 +372,56 @@ function Step1({
           />
         </Field>
       </div>
+
+      {/* Descrição — o que faz e para quem */}
       <div className="col-span-2">
-        <Field label="Descrição da empresa">
+        <Field label="O que sua empresa faz e para quem">
           <textarea
             id="empresa-descricao"
             className={textareaCls}
             rows={3}
             value={form['empresa-descricao']}
             onChange={e => onChange('empresa-descricao', e.target.value)}
-            placeholder="O que sua empresa faz, há quanto tempo, diferenciais..."
+            placeholder="Ex: Somos uma plataforma B2B de automação de vendas que ajuda empresas de tecnologia com 5 a 100 funcionários a aumentarem o número de reuniões comerciais sem contratar mais SDRs..."
           />
         </Field>
+        <p className="text-xs text-gray-400 mt-1">Seja específico — o agente vai usar isso na abertura da ligação</p>
       </div>
-      <div className="col-span-2 flex items-center gap-3">
+
+      {/* Diferenciais competitivos */}
+      <div className="col-span-2">
+        <Field label="Principais diferenciais competitivos">
+          <textarea
+            id="empresa-diferenciais"
+            className={textareaCls}
+            rows={2}
+            value={form['empresa-diferenciais']}
+            onChange={e => onChange('empresa-diferenciais', e.target.value)}
+            placeholder="Ex: Único sistema com IA de voz em PT-BR nativo, integração direta com Google Meet, custo 70% menor que um SDR humano..."
+          />
+        </Field>
+        <p className="text-xs text-gray-400 mt-1">O que você tem que os concorrentes não têm</p>
+      </div>
+
+      {/* Banner Pesquisar com IA */}
+      <div className="col-span-2 flex items-center justify-between gap-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-gray-800">🔍 Deixa a IA pesquisar seu mercado</span>
+          <span className="text-xs text-gray-500">Informando empresa e site, nossa IA pesquisa concorrentes, perfil do decisor, objeções e argumentos do seu setor — e preenche os campos automaticamente.</span>
+        </div>
         <button
           type="button"
           onClick={pesquisarComIA}
           disabled={pesquisando}
-          className="flex items-center gap-1.5 text-sm px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-lg transition-colors"
+          className="shrink-0 flex items-center gap-1.5 text-sm px-4 py-2 bg-brand hover:bg-brand-600 disabled:opacity-60 text-white font-medium rounded-lg transition-colors"
         >
-          {pesquisando ? '🔍 Pesquisando...' : '🔍 Pesquisar com IA'}
+          {pesquisando
+            ? <><Loader2 size={14} className="animate-spin" /> Pesquisando...</>
+            : <><Brain size={14} /> Pesquisar com IA</>
+          }
         </button>
-        <span className="text-xs text-gray-400">Preenche automaticamente ICP, concorrentes e gatilhos</span>
-        {pesquisaErro && <span className="text-xs text-red-500">{pesquisaErro}</span>}
       </div>
+      {pesquisaErro && <p className="col-span-2 text-xs text-red-500">{pesquisaErro}</p>}
     </div>
   )
 }
@@ -1702,9 +1751,11 @@ export default function OnboardingPage() {
     const payload = {
       nome: form['nome-agente'] || form['empresa-nome'] + ' — Agente IA',
       empresa: form['empresa-nome'],
+      cnpj: form['empresa-cnpj'],
       segmento: form['empresa-segmento'],
       site: form['empresa-site'],
       descricao_empresa: form['empresa-descricao'],
+      diferenciais_empresa: form['empresa-diferenciais'],
       produto: form['prod-nome'],
       descricao_produto: form['prod-descricao'],
       resultados_clientes: form['prod-resultados'],
@@ -1749,9 +1800,9 @@ export default function OnboardingPage() {
 
   function handleEditar(agente: AgenteMock) {
     const raw = agente as AgenteMock & {
-      site?: string; descricao_empresa?: string; descricao_produto?: string
-      resultados_clientes?: string; concorrentes?: string; info_adicional?: string
-      gatilhos_customizados?: string; perguntas_qualificacao?: string[]
+      cnpj?: string; site?: string; descricao_empresa?: string; diferenciais_empresa?: string
+      descricao_produto?: string; resultados_clientes?: string; concorrentes?: string
+      info_adicional?: string; gatilhos_customizados?: string; perguntas_qualificacao?: string[]
       script_abertura?: string; metodologia?: string; proposito?: string
       objecoes?: Objecao[]
     }
@@ -1761,9 +1812,11 @@ export default function OnboardingPage() {
       'nome-agente': agente.nome,
       'empresa-nome': agente.empresa || agente.nome,
       'empresa-segmento': agente.segmento || '',
+      'empresa-cnpj': raw.cnpj || '',
       'empresa-site': raw.site || '',
       'empresa-porte': agente.icp_porte || '',
       'empresa-descricao': raw.descricao_empresa || '',
+      'empresa-diferenciais': raw.diferenciais_empresa || '',
       'prod-nome': agente.produto || '',
       'prod-descricao': raw.descricao_produto || '',
       'prod-resultados': raw.resultados_clientes || '',

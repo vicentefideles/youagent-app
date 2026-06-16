@@ -275,7 +275,7 @@ export const emailsApi = {
 // Claude AI
 export const claudeApi = {
   status: () => api.get('/claude/status'),
-  pesquisarMercado: (data: { empresa?: string; segmento?: string; produto?: string }) =>
+  pesquisarMercado: (data: { empresa?: string; cnpj?: string; segmento?: string; site?: string; produto?: string }) =>
     api.post('/claude/pesquisar-mercado', data),
   gerarModelo: (data: { tipo: string; contexto?: string; campanha?: string }) =>
     api.post('/claude/gerar-modelo', data),
