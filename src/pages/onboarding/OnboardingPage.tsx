@@ -1868,68 +1868,103 @@ export default function OnboardingPage() {
 
         {/* Modal de boas-vindas — exibido ao clicar em "Criar novo agente" */}
         {showBemVindo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col">
 
               {/* Header */}
-              <div className="bg-gradient-to-r from-brand to-purple-600 px-8 py-6 text-white">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-3xl">🚀</span>
-                    <div>
-                      <h2 className="text-xl font-bold leading-tight">Como deixar seu agente de IA superior desde o primeiro dia</h2>
-                      <p className="mt-1 text-sm text-white/80 leading-relaxed">
-                        O agente não vai para a ligação no escuro. Tudo que você preencher aqui — materiais da empresa, objeções mapeadas, ligações de referência — é carregado para ele antes de cada ligação. Quanto mais rico o treinamento inicial, mais preparado o agente chega.
-                      </p>
-                    </div>
+              <div className="px-7 pt-7 pb-5 flex items-start justify-between gap-4 border-b border-gray-100">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
+                    <Zap size={18} className="text-brand" />
                   </div>
-                  <button onClick={() => setShowBemVindo(false)} className="text-white/60 hover:text-white transition-colors mt-0.5 shrink-0">
-                    <X size={20} />
-                  </button>
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900 leading-snug">Como seu agente aprende e performa</h2>
+                    <p className="mt-1 text-sm text-gray-500 leading-relaxed max-w-lg">
+                      O agente não vai para a ligação no escuro. Tudo que você preencher aqui é carregado para ele antes de cada ligação — quanto mais rico o treinamento, mais preparado ele chega.
+                    </p>
+                  </div>
                 </div>
-
-                {/* Tipos de material */}
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {['Apresentações e ebooks', 'Ligações de vendedores humanos', 'Objeções já mapeadas', 'Cases e diferenciais'].map(t => (
-                    <span key={t} className="bg-white/20 text-white text-xs font-medium px-3 py-1 rounded-full">{t}</span>
-                  ))}
-                </div>
+                <button onClick={() => setShowBemVindo(false)} className="text-gray-300 hover:text-gray-500 transition-colors shrink-0 mt-0.5">
+                  <X size={18} />
+                </button>
               </div>
 
               {/* Fases */}
-              <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
-                <div className="px-5 py-4 flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-brand uppercase tracking-wide">Fase 1 — Treinamento inicial</span>
-                  <p className="text-xs text-gray-600 leading-relaxed">Você alimenta o agente aqui no Setup com tudo que sabe sobre sua empresa, produto, mercado e clientes. Quanto mais detalhe, melhor o ponto de partida.</p>
+              <div className="px-7 py-5 grid grid-cols-3 gap-4">
+                <div className="flex flex-col gap-2 p-4 rounded-xl bg-blue-50 border border-blue-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-brand flex items-center justify-center">
+                      <span className="text-white text-[10px] font-bold">1</span>
+                    </div>
+                    <span className="text-xs font-semibold text-brand">Treinamento inicial</span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">Você alimenta o agente com tudo sobre sua empresa, produto e clientes. Quanto mais detalhe, melhor o ponto de partida.</p>
                 </div>
-                <div className="px-5 py-4 flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Fase 2 — Aprendizado automático</span>
-                  <p className="text-xs text-gray-600 leading-relaxed">Depois de ativado, o agente aprende sozinho com cada ligação — detecta o que funciona, atualiza seus argumentos e melhora continuamente sem intervenção.</p>
+                <div className="flex flex-col gap-2 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <span className="text-white text-[10px] font-bold">2</span>
+                    </div>
+                    <span className="text-xs font-semibold text-emerald-700">Aprendizado automático</span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">Depois de ativo, o agente aprende com cada ligação — detecta o que funciona e melhora continuamente sem intervenção.</p>
                 </div>
-                <div className="px-5 py-4 flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Fase 3 — Enriquecimento contínuo</span>
-                  <p className="text-xs text-gray-600 leading-relaxed">Você continua alimentando o Centro de Inteligência com novos materiais, argumentos e inteligência de mercado. Cada adição torna o agente mais afiado.</p>
+                <div className="flex flex-col gap-2 p-4 rounded-xl bg-purple-50 border border-purple-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+                      <span className="text-white text-[10px] font-bold">3</span>
+                    </div>
+                    <span className="text-xs font-semibold text-purple-700">Enriquecimento contínuo</span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">Você continua alimentando o Centro de Inteligência com novos materiais. Cada adição torna o agente mais afiado.</p>
                 </div>
               </div>
 
+              {/* Tipos de material */}
+              <div className="px-7 pb-5 flex flex-wrap gap-1.5">
+                {[
+                  { icon: '📄', label: 'Apresentações e ebooks' },
+                  { icon: '🎙️', label: 'Ligações de vendedores humanos' },
+                  { icon: '💬', label: 'Objeções já mapeadas' },
+                  { icon: '🏆', label: 'Cases e diferenciais' },
+                ].map(({ icon, label }) => (
+                  <span key={label} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                    <span>{icon}</span> {label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Aviso CI */}
+              <div className="mx-7 mb-5 flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <Brain size={15} className="text-brand shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  <span className="font-semibold text-gray-800">Após ativar:</span> acesse o <span className="text-brand font-medium">Centro de Inteligência</span> para adicionar PDFs, vídeos, áudios e inteligência de mercado — cada material adicionado torna o agente mais persuasivo.
+                </p>
+              </div>
+
               {/* Rodapé */}
-              <div className="px-8 py-5 flex flex-col gap-4">
-                <div className="flex items-start gap-3 bg-purple-50 rounded-xl p-4">
-                  <Brain size={16} className="text-brand shrink-0 mt-0.5" />
-                  <p className="text-xs text-gray-700 leading-relaxed">
-                    <span className="font-semibold">Após ativar o agente:</span> acesse o <span className="text-brand font-semibold">Centro de Inteligência</span> para adicionar livros, PDFs, vídeos, áudios e inteligência de mercado nas abas <span className="font-semibold">Base de Conhecimento</span> e <span className="font-semibold">Banco de Argumentos</span>. Tudo está conectado — cada material adicionado torna o agente mais inteligente e persuasivo.
-                  </p>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-gray-400">Ao continuar, você confirma que entendeu como funciona o treinamento do agente.</p>
-                  <button
-                    onClick={() => { setShowBemVindo(false); setForm(INITIAL_FORM); setStep(0); setEditandoId(null); setActivated(false); setTela('wizard') }}
-                    className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition-colors shadow-sm"
-                  >
-                    Entendi, vamos começar
-                    <ChevronRight size={15} />
-                  </button>
-                </div>
+              <div className="px-7 py-5 border-t border-gray-100 flex items-center justify-between gap-4">
+                <p className="text-xs text-gray-400 leading-relaxed max-w-xs">
+                  Ao clicar em <span className="font-medium text-gray-500">Entendi</span>, você confirma que compreendeu como funciona o treinamento do agente. Esse aceite é registrado com data e hora.
+                </p>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('etz_aceite_treinamento', JSON.stringify({
+                      aceito_em: new Date().toISOString(),
+                      user: localStorage.getItem('youagent_jwt') ? 'autenticado' : 'anonimo',
+                    }))
+                    setShowBemVindo(false)
+                    setForm(INITIAL_FORM)
+                    setStep(0)
+                    setEditandoId(null)
+                    setActivated(false)
+                    setTela('wizard')
+                  }}
+                  className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition-colors shadow-sm"
+                >
+                  Entendi, vamos começar
+                  <ChevronRight size={15} />
+                </button>
               </div>
 
             </div>
