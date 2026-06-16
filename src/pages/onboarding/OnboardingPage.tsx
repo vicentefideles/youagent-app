@@ -301,7 +301,8 @@ function Step1({
       if (data.contexto_mercado) onChange('empresa-contexto-mercado', data.contexto_mercado)
       if (data.script_abertura) onChange('script-abertura', data.script_abertura)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao pesquisar'
+      const axiosData = (err as { response?: { data?: { error?: string } } })?.response?.data
+      const msg = axiosData?.error ?? (err instanceof Error ? err.message : 'Erro ao pesquisar')
       setPesquisaErro(`Erro: ${msg}`)
     } finally {
       setPesquisando(false)
