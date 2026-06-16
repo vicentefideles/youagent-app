@@ -300,8 +300,9 @@ function Step1({
       if (data.objecoes_comuns) onChange('empresa-objecoes-comuns', data.objecoes_comuns)
       if (data.contexto_mercado) onChange('empresa-contexto-mercado', data.contexto_mercado)
       if (data.script_abertura) onChange('script-abertura', data.script_abertura)
-    } catch {
-      setPesquisaErro('Erro ao pesquisar. Verifique a conexão Claude API.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao pesquisar'
+      setPesquisaErro(`Erro: ${msg}`)
     } finally {
       setPesquisando(false)
     }
