@@ -18,6 +18,7 @@ import {
   Pencil,
   RefreshCw,
   Brain,
+  Search,
   AlertTriangle,
   Play,
   MapPin,
@@ -267,6 +268,59 @@ function Step1({
 }) {
   const [pesquisando, setPesquisando] = useState(false)
   const [pesquisaErro, setPesquisaErro] = useState<string | null>(null)
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false)
+  const [cnpjErro, setCnpjErro] = useState<string | null>(null)
+
+  function formatarCnpj(v: string) {
+    const n = v.replace(/\D/g, '').slice(0, 14)
+    return n
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2')
+  }
+
+  async function buscarCNPJ() {
+    const cnpj = form['empresa-cnpj'].replace(/\D/g, '')
+    if (cnpj.length !== 14) { setCnpjErro('CNPJ deve ter 14 dígitos'); return }
+    setBuscandoCnpj(true)
+    setCnpjErro(null)
+    try {
+      const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
+      if (!resp.ok) throw new Error('CNPJ não encontrado')
+      const d = await resp.json()
+      if (d.razao_social) onChange('empresa-nome', d.razao_social)
+      if (d.descricao_situacao_cadastral === 'ATIVA') {
+        // mapear porte
+        const porte = d.porte === 'MICRO EMPRESA' ? '1–10'
+          : d.porte === 'EMPRESA DE PEQUENO PORTE' ? '11–50'
+          : d.porte === 'MEDIO PORTE' ? '51–200'
+          : d.porte === 'GRANDE PORTE' ? '201–1000' : ''
+        if (porte) onChange('empresa-porte', porte)
+      }
+      if (d.cnae_fiscal_descricao) {
+        // tentar mapear CNAE para segmento
+        const desc = d.cnae_fiscal_descricao.toLowerCase()
+        const seg = desc.includes('software') || desc.includes('tecnologia') ? 'Tech/SaaS'
+          : desc.includes('consult') ? 'Serviços B2B'
+          : desc.includes('saúde') || desc.includes('médic') ? 'Saúde'
+          : desc.includes('educação') || desc.includes('ensino') ? 'Educação'
+          : desc.includes('financ') || desc.includes('crédito') || desc.includes('seguro') ? 'Financeiro'
+          : ''
+        if (seg) onChange('empresa-segmento', seg)
+      }
+      if (d.municipio && d.uf) {
+        // preencher site se vier
+        if (d.email) onChange('empresa-site', d.email.startsWith('http') ? d.email : '')
+      }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : 'Erro ao buscar CNPJ')
+      setCnpjErro(msg)
+    } finally {
+      setBuscandoCnpj(false)
+    }
+  }
 
   async function pesquisarComIA() {
     if (pesquisando) return
@@ -339,14 +393,27 @@ function Step1({
         />
       </Field>
       <Field label="CNPJ da empresa">
-        <input
-          id="empresa-cnpj"
-          className={inputCls}
-          value={form['empresa-cnpj']}
-          onChange={e => onChange('empresa-cnpj', e.target.value)}
-          placeholder="00.000.000/0001-00"
-          maxLength={18}
-        />
+        <div className="flex gap-2">
+          <input
+            id="empresa-cnpj"
+            className={inputCls}
+            value={form['empresa-cnpj']}
+            onChange={e => onChange('empresa-cnpj', formatarCnpj(e.target.value))}
+            placeholder="00.000.000/0001-00"
+            maxLength={18}
+          />
+          <button
+            type="button"
+            onClick={buscarCNPJ}
+            disabled={buscandoCnpj}
+            title="Buscar dados pelo CNPJ"
+            className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-medium rounded-lg transition-colors whitespace-nowrap"
+          >
+            {buscandoCnpj ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+            {buscandoCnpj ? 'Buscando...' : 'Buscar'}
+          </button>
+        </div>
+        {cnpjErro && <p className="text-xs text-red-500 mt-1">{cnpjErro}</p>}
       </Field>
 
       {/* Segmento + Porte */}
