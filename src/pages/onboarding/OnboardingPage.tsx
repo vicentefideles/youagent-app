@@ -28,6 +28,8 @@ import {
   CalendarCheck,
   Paperclip,
   Plus,
+  FileText,
+  Upload,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,6 +61,7 @@ interface FormData {
   'wiz-qualif-q2': string
   'wiz-qualif-q3': string
   'script-abertura': string
+  'script-ligacao': string
   'metodologia': string
   'compliance-anatel': string
   'compliance-optout': string
@@ -97,6 +100,7 @@ const INITIAL_FORM: FormData = {
   'wiz-qualif-q2': 'Qual o volume mensal de reuniões da equipe hoje?',
   'wiz-qualif-q3': 'Você é o responsável pela decisão de novas ferramentas?',
   'script-abertura': '',
+  'script-ligacao': '',
   'metodologia': '',
   'compliance-anatel': 'true',
   'compliance-optout': 'true',
@@ -169,6 +173,7 @@ const STEPS = [
   { label: 'Empresa e Produto', icon: Building2 },
   { label: 'ICP & Script', icon: Target },
   { label: 'Metodologia', icon: BarChart2 },
+  { label: 'Script de Ligação', icon: FileText },
   { label: 'Voz e Tom', icon: Mic },
   { label: 'Ativação', icon: Zap },
 ]
@@ -1144,6 +1149,122 @@ function Step3({
   )
 }
 
+function StepScriptLigacao({ form, onChange, scriptFile, onScriptFileChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+  scriptFile: File | null
+  onScriptFileChange: (f: File | null) => void
+}) {
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0 mt-0.5">
+          <FileText size={18} className="text-brand-600" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Script de ligação</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Se sua empresa já tem um script de vendas ou abordagem comercial, forneça aqui. O agente vai aprender o flow de conversa, os argumentos e o vocabulário que funciona para o seu público.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        {/* Coluna esquerda — upload de arquivo */}
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold text-brand uppercase tracking-wide">
+            Enviar arquivo do script <span className="text-gray-400 font-normal normal-case">(recomendado)</span>
+          </p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            className="hidden"
+            onChange={e => onScriptFileChange(e.target.files?.[0] ?? null)}
+          />
+          <div
+            onClick={() => inputRef.current?.click()}
+            className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl p-8 cursor-pointer transition-colors ${
+              scriptFile
+                ? 'border-emerald-300 bg-emerald-50'
+                : 'border-gray-200 bg-gray-50 hover:border-brand-300 hover:bg-brand-50'
+            }`}
+          >
+            {scriptFile ? (
+              <>
+                <FileText size={28} className="text-emerald-500" />
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-emerald-700 truncate max-w-[200px]">{scriptFile.name}</p>
+                  <p className="text-xs text-emerald-500 mt-0.5">{(scriptFile.size / 1024).toFixed(0)} KB · clique para trocar</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); onScriptFileChange(null) }}
+                  className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
+                >
+                  <X size={12} /> Remover
+                </button>
+              </>
+            ) : (
+              <>
+                <Upload size={28} className="text-gray-400" />
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-gray-700">Enviar arquivo do script</p>
+                  <p className="text-xs text-gray-400 mt-0.5">PDF, Word ou TXT</p>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-start gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2.5">
+            <Brain size={14} className="text-brand-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-brand-700 leading-relaxed">
+              <span className="font-semibold">O agente vai estudar o arquivo:</span> extrairá argumentos, objeções, técnicas e o fluxo de conversa — tudo vira inteligência aplicada em cada ligação.
+            </p>
+          </div>
+        </div>
+
+        {/* Coluna direita — texto livre */}
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold text-brand uppercase tracking-wide">
+            Ou cole o script aqui
+          </p>
+          <textarea
+            rows={14}
+            value={form['script-ligacao']}
+            onChange={e => onChange('script-ligacao', e.target.value)}
+            placeholder={`Cole o texto do script de vendas da sua empresa...
+
+Exemplo:
+"Olá [Nome], tudo bem? Aqui é [Agente] da [Empresa]. Estou ligando porque vimos que vocês [contexto]. Você tem 2 minutinhos?
+
+[Se sim] Perfeito! Então deixa eu te fazer uma pergunta rápida: vocês hoje..."`}
+            className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300"
+          />
+          {form['script-ligacao'] && (
+            <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+              <Check size={12} />
+              {form['script-ligacao'].length.toLocaleString('pt-BR')} caracteres — o agente vai estudar esse conteúdo
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Nota sobre uso conjunto */}
+      {scriptFile && form['script-ligacao'] && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700">
+            Você preencheu o arquivo e o campo de texto. O agente vai usar <span className="font-semibold">os dois</span> — o arquivo tem prioridade para o fluxo, o texto serve como complemento.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
   return (
     <div className="flex flex-col gap-6">
@@ -1895,6 +2016,7 @@ export default function OnboardingPage() {
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const [regioes, setRegioes] = useState<string[]>([])
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '' }])
+  const [scriptFile, setScriptFile] = useState<File | null>(null)
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -1998,6 +2120,7 @@ export default function OnboardingPage() {
       gatilhos_customizados: form['gatilhos-customizados'],
       perguntas_qualificacao: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
       script_abertura: form['script-abertura'],
+      script_ligacao: form['script-ligacao'],
       metodologia: form['metodologia'],
       objecoes: objecoes.filter(o => o.objecao.trim()),
       regioes_cobertura: regioes.length > 0 ? regioes : null,
@@ -2020,12 +2143,15 @@ export default function OnboardingPage() {
       }
       setActivatingStep(2)
 
-      // Upload de materiais (silencioso — não bloqueia ativação se falhar)
+      // Upload de materiais + script (silencioso — não bloqueia ativação se falhar)
       const comArquivo = materiais.filter(m => m.file !== null)
-      if (comArquivo.length > 0 && agenteId) {
+      const todosArquivos = scriptFile
+        ? [...comArquivo, { file: scriptFile, tipo: 'Script de Ligação' }]
+        : comArquivo
+      if (todosArquivos.length > 0 && agenteId) {
         try {
           const fd = new FormData()
-          comArquivo.forEach(m => {
+          todosArquivos.forEach(m => {
             fd.append('files', m.file!)
             fd.append('tipos', m.tipo || 'Outro')
           })
@@ -2153,6 +2279,7 @@ export default function OnboardingPage() {
     setObjecoes(INITIAL_OBJECOES)
     setRegioes([])
     setMateriais([{ file: null, tipo: '' }])
+    setScriptFile(null)
     setEditandoId(null)
     setStep(0)
     setActivated(false)
@@ -2167,6 +2294,7 @@ export default function OnboardingPage() {
     'Empresa e produto',
     'ICP & Script do agente',
     'Metodologia de vendas',
+    'Script de ligação',
     'Voz e tom do agente',
     'Ativação do agente',
   ]
@@ -2508,8 +2636,9 @@ export default function OnboardingPage() {
             />
           )}
           {step === 2 && <StepMetodologia form={form} onChange={onChange} />}
-          {step === 3 && <StepVozTom form={form} onChange={onChange} />}
-          {step === 4 && (
+          {step === 3 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
+          {step === 4 && <StepVozTom form={form} onChange={onChange} />}
+          {step === 5 && (
             <Step4
               form={form}
               activated={activated}
@@ -2529,7 +2658,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 4 && activated) && (
+          {!(step === 5 && activated) && (
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
