@@ -10,6 +10,8 @@ import {
   Building2,
   Target,
   Zap,
+  BarChart2,
+  Mic,
   Clock,
   X,
   Loader2,
@@ -163,7 +165,9 @@ const REGIOES_BR: Record<string, string[]> = {
 
 const STEPS = [
   { label: 'Empresa e Produto', icon: Building2 },
-  { label: 'ICP', icon: Target },
+  { label: 'ICP & Script', icon: Target },
+  { label: 'Metodologia', icon: BarChart2 },
+  { label: 'Voz e Tom', icon: Mic },
   { label: 'Ativação', icon: Zap },
 ]
 
@@ -788,28 +792,6 @@ function Step3({
         </Field>
       </div>
 
-      {/* Metodologia */}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Metodologia de vendas</p>
-        <div className="grid grid-cols-2 gap-2">
-          {METODOLOGIAS.map(m => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => onChange('metodologia', m.id)}
-              className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
-                form.metodologia === m.id
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
-              <p className="font-semibold text-gray-900 text-sm">{m.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{m.descricao}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Script de abertura */}
       <Field label="Script de abertura">
         <textarea
@@ -1055,8 +1037,41 @@ function Step3({
         </div>
       </div>
 
-      <VozSelector form={form} onChange={onChange} />
+    </div>
+  )
+}
 
+function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-3">Metodologia de vendas</p>
+        <div className="grid grid-cols-2 gap-2">
+          {METODOLOGIAS.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onChange('metodologia', m.id)}
+              className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
+                form.metodologia === m.id
+                  ? 'border-purple-500 bg-purple-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <p className="font-semibold text-gray-900 text-sm">{m.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{m.descricao}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <VozSelector form={form} onChange={onChange} />
       <div>
         <p className="text-sm font-medium text-gray-700 mb-3">Tom de comunicação</p>
         <div className="grid grid-cols-2 gap-2">
@@ -2019,7 +2034,9 @@ export default function OnboardingPage() {
   const stepTitles = [
     'Empresa e produto',
     'ICP & Script do agente',
-    'Revisar e ativar',
+    'Metodologia de vendas',
+    'Voz e tom do agente',
+    'Ativação do agente',
   ]
 
   // ── Tela: grid de agentes ──────────────────────────────────────────────────
@@ -2338,7 +2355,7 @@ export default function OnboardingPage() {
             <Bot size={24} className="text-blue-600" />
             <span className="text-lg font-bold text-gray-900">{editandoId ? 'Editar Agente' : 'Novo Agente de IA'}</span>
           </div>
-          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : 'Configure seu agente de vendas autônomo em 3 passos'}</p>
+          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : 'Configure seu agente de vendas autônomo em 5 passos'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -2358,7 +2375,9 @@ export default function OnboardingPage() {
               onRegioesChange={setRegioes}
             />
           )}
-          {step === 2 && (
+          {step === 2 && <StepMetodologia form={form} onChange={onChange} />}
+          {step === 3 && <StepVozTom form={form} onChange={onChange} />}
+          {step === 4 && (
             <Step4
               form={form}
               activated={activated}
@@ -2378,7 +2397,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 2 && activated) && (
+          {!(step === 4 && activated) && (
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
