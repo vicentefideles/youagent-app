@@ -22,7 +22,6 @@ import {
   Search,
   AlertTriangle,
   Play,
-  MapPin,
   Shield,
   PhoneForwarded,
   CalendarCheck,
@@ -151,7 +150,15 @@ const SEGMENTOS = [
   'Outros',
 ]
 const PORTES = ['1–10', '11–50', '51–200', '201–1000', '1000+']
-const CARGOS = ['Diretor', 'VP', 'CEO', 'Gerente', 'Coordenador', 'Outro']
+
+const CARGOS_ICP = [
+  'Donos de empresa', 'CEOs', 'COOs',
+  'CFOs', 'Gerentes de vendas', 'Gerentes de marketing',
+  'Gerentes de RH', 'Diretores de operações', 'Diretores financeiros',
+  'Diretores de TI', 'Diretores de inovação', 'Empreendedores',
+  'Startups founders', 'Consultores de negócios', 'Consultores de marketing',
+  'Outro',
+]
 
 const VOZES_TELNYX = [
   // ── pt-BR NaturalHD
@@ -192,14 +199,6 @@ const METODOLOGIAS = [
   { id: 'bant', label: 'BANT', descricao: 'Budget, Authority, Need, Timeline' },
   { id: 'direto', label: 'Direto', descricao: 'Apresenta proposta rapidamente' },
 ]
-
-const REGIOES_BR: Record<string, string[]> = {
-  'Sudeste': ['SP', 'RJ', 'MG', 'ES'],
-  'Sul': ['PR', 'SC', 'RS'],
-  'Centro-Oeste': ['GO', 'MT', 'MS', 'DF'],
-  'Nordeste': ['BA', 'PE', 'CE', 'MA', 'PB', 'RN', 'AL', 'SE', 'PI'],
-  'Norte': ['AM', 'PA', 'RO', 'AC', 'RR', 'AP', 'TO'],
-}
 
 
 const STEPS = [
@@ -1035,33 +1034,18 @@ function Step3({
   onChange,
   objecoes,
   onObjecoesChange,
-  regioes,
-  onRegioesChange,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
   objecoes: Objecao[]
   onObjecoesChange: (o: Objecao[]) => void
-  regioes: string[]
-  onRegioesChange: (r: string[]) => void
 }) {
-  function toggleRegiao(estado: string) {
-    onRegioesChange(
-      regioes.includes(estado)
-        ? regioes.filter(r => r !== estado)
-        : [...regioes, estado]
-    )
+  function toggleCargo(cargo: string) {
+    const atual = form['icp-cargo-tipo'] ? form['icp-cargo-tipo'].split(', ').filter(Boolean) : []
+    const next = atual.includes(cargo) ? atual.filter(c => c !== cargo) : [...atual, cargo]
+    onChange('icp-cargo-tipo', next.join(', '))
   }
 
-  function toggleRegiaoGrupo(estados: string[]) {
-    const allSelected = estados.every(e => regioes.includes(e))
-    if (allSelected) {
-      onRegioesChange(regioes.filter(r => !estados.includes(r)))
-    } else {
-      const novos = estados.filter(e => !regioes.includes(e))
-      onRegioesChange([...regioes, ...novos])
-    }
-  }
   function updateObjecao(i: number, field: keyof Objecao, value: string) {
     const next = objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o)
     onObjecoesChange(next)
@@ -1075,43 +1059,43 @@ function Step3({
     if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
   }
 
+  const cargosSelecionados = form['icp-cargo-tipo'] ? form['icp-cargo-tipo'].split(', ').filter(Boolean) : []
+
   return (
     <div className="flex flex-col gap-6">
-      {/* ICP */}
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Cargo do decisor">
-          <select
-            id="icp-cargo-tipo"
-            className={selectCls}
-            value={form['icp-cargo-tipo']}
-            onChange={e => onChange('icp-cargo-tipo', e.target.value)}
-          >
-            <option value="">Selecione...</option>
-            {CARGOS.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </Field>
-        <Field label="Porte alvo">
-          <select
-            id="icp-porte-alvo"
-            className={selectCls}
-            value={form['icp-porte-alvo']}
-            onChange={e => onChange('icp-porte-alvo', e.target.value)}
-          >
-            <option value="">Selecione...</option>
-            {PORTES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </Field>
-        <Field label="Segmento prioritário">
-          <select
-            id="icp-segmento-alvo"
-            className={selectCls}
-            value={form['icp-segmento-alvo']}
-            onChange={e => onChange('icp-segmento-alvo', e.target.value)}
-          >
-            <option value="">Selecione...</option>
-            {SEGMENTOS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </Field>
+      {/* ICP — Público-alvo */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Selecione o público-alvo</p>
+        <p className="text-xs text-gray-400 mb-3">Quem são os decisores que o agente vai abordar? Selecione todos que se aplicam.</p>
+        <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+          {CARGOS_ICP.map(cargo => {
+            const selecionado = cargosSelecionados.includes(cargo)
+            return (
+              <button
+                key={cargo}
+                type="button"
+                onClick={() => toggleCargo(cargo)}
+                className="flex items-center gap-2.5 text-left group"
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  selecionado
+                    ? 'border-brand bg-brand'
+                    : 'border-gray-300 bg-white group-hover:border-brand/50'
+                }`}>
+                  {selecionado && <Check size={11} className="text-white" />}
+                </div>
+                <span className={`text-sm transition-colors ${selecionado ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                  {cargo}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {cargosSelecionados.length > 0 && (
+          <p className="text-xs text-brand font-medium mt-3">
+            {cargosSelecionados.length} perfil(is) selecionado(s)
+          </p>
+        )}
       </div>
 
       {/* Script de abertura */}
@@ -1199,57 +1183,6 @@ function Step3({
               />
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Região / cobertura geográfica */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <MapPin size={15} className="text-gray-500" />
-          <p className="text-sm font-medium text-gray-700">Região de cobertura</p>
-          <span className="text-xs text-gray-400">(opcional — deixe vazio para todo o Brasil)</span>
-        </div>
-        <div className="flex flex-col gap-3">
-          {Object.entries(REGIOES_BR).map(([regiao, estados]) => {
-            const allSelected = estados.every(e => regioes.includes(e))
-            return (
-              <div key={regiao} className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleRegiaoGrupo(estados)}
-                    className="flex items-center gap-2"
-                  >
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                      allSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
-                    }`}>
-                      {allSelected && <Check size={10} className="text-white" />}
-                    </div>
-                    <span className="text-xs font-semibold text-gray-600">{regiao}</span>
-                  </button>
-                  <span className="text-xs text-gray-400">
-                    {estados.filter(e => regioes.includes(e)).length}/{estados.length}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {estados.map(estado => (
-                    <button
-                      key={estado}
-                      type="button"
-                      onClick={() => toggleRegiao(estado)}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
-                        regioes.includes(estado)
-                          ? 'border-blue-500 bg-blue-500 text-white'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-blue-300'
-                      }`}
-                    >
-                      {estado}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
         </div>
       </div>
 
@@ -1712,7 +1645,6 @@ function Step4({
   activating,
   activatingStep,
   objecoes,
-  regioes,
   onActivate,
   onReset,
   modoEdicao,
@@ -1722,7 +1654,6 @@ function Step4({
   activating?: boolean
   activatingStep?: number
   objecoes: Objecao[]
-  regioes: string[]
   onActivate: () => void
   onReset: () => void
   modoEdicao: boolean
@@ -1832,9 +1763,9 @@ function Step4({
           </div>
           {/* ICP */}
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">ICP</p>
+            <p className="text-xs text-gray-400 mb-0.5">Público-alvo</p>
             <p className="font-medium text-gray-900">
-              {[form['icp-cargo-tipo'], form['icp-porte-alvo'], form['icp-segmento-alvo']].filter(Boolean).join(' · ') || '—'}
+              {form['icp-cargo-tipo'] || '—'}
             </p>
           </div>
           {/* Voz + Tom */}
@@ -1858,15 +1789,9 @@ function Step4({
           )}
         </div>
 
-        {/* Cobertura + Compliance */}
-        {(regioes.length > 0 || form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
+        {/* Compliance */}
+        {(form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
           <div className="grid grid-cols-2 gap-4 text-sm pt-2 border-t border-gray-200">
-            {regioes.length > 0 && (
-              <div className="col-span-2">
-                <p className="text-xs text-gray-400 mb-1">Cobertura geográfica</p>
-                <p className="text-xs font-medium text-gray-700 leading-relaxed">{regioes.join(', ')}</p>
-              </div>
-            )}
             {(form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
               <div className="col-span-2 flex flex-wrap gap-2">
                 {form['compliance-anatel'] === 'true' && (
@@ -1902,7 +1827,6 @@ function Step4({
           <span>✓ {perguntasValidas.length} perguntas de qualificação</span>
           {objecoesValidas.length > 0 && <span>✓ {objecoesValidas.length} objeção(ões) mapeada(s)</span>}
           {form['gatilhos-customizados'] && <span>✓ Sinais de compra configurados</span>}
-          {regioes.length === 0 && <span className="text-gray-400">🌎 Todo Brasil</span>}
         </div>
 
         {/* Badge herança CI */}
@@ -2372,7 +2296,6 @@ export default function OnboardingPage() {
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
-  const [regioes, setRegioes] = useState<string[]>([])
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '' }])
   const [scriptFile, setScriptFile] = useState<File | null>(null)
   const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso' }])
@@ -2487,7 +2410,7 @@ export default function OnboardingPage() {
       script_ligacao: form['script-ligacao'],
       metodologia: form['metodologia'],
       objecoes: objecoes.filter(o => o.objecao.trim()),
-      regioes_cobertura: regioes.length > 0 ? regioes : null,
+      regioes_cobertura: null,
       compliance_anatel: form['compliance-anatel'] === 'true',
       compliance_optout: form['compliance-optout'] === 'true',
       capacidade_transferencia: form['capacidade-transferencia'] === 'true',
@@ -2607,7 +2530,6 @@ export default function OnboardingPage() {
       tom: agente.tom || '',
     })
     setObjecoes(raw.objecoes && raw.objecoes.length > 0 ? raw.objecoes : INITIAL_OBJECOES)
-    setRegioes((raw as any).regioes_cobertura ?? [])
     setEditandoId(agente.id)
     setStep(0)
     setActivated(false)
@@ -2662,7 +2584,6 @@ export default function OnboardingPage() {
   function reset() {
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
-    setRegioes([])
     setMateriais([{ file: null, tipo: '' }])
     setScriptFile(null)
     setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso' }])
@@ -3023,8 +2944,6 @@ export default function OnboardingPage() {
               onChange={onChange}
               objecoes={objecoes}
               onObjecoesChange={setObjecoes}
-              regioes={regioes}
-              onRegioesChange={setRegioes}
             />
           )}
           {step === 3 && <StepMetodologia form={form} onChange={onChange} />}
@@ -3043,7 +2962,6 @@ export default function OnboardingPage() {
               activating={activating}
               activatingStep={activatingStep}
               objecoes={objecoes}
-              regioes={regioes}
               onActivate={handleActivate}
               onReset={reset}
               modoEdicao={!!editandoId}
