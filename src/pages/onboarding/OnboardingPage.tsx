@@ -585,69 +585,7 @@ function Step1({
   )
 }
 
-function Step2({
-  form,
-  onChange,
-  errors,
-}: {
-  form: FormData
-  onChange: (k: keyof FormData, v: string) => void
-  errors: Partial<Record<keyof FormData, string>>
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <Field label="Nome do produto/serviço" required error={errors['prod-nome']}>
-        <input
-          id="prod-nome"
-          className={inputCls}
-          value={form['prod-nome']}
-          onChange={e => onChange('prod-nome', e.target.value)}
-          placeholder="Ex: Plataforma de Gestão Comercial"
-        />
-      </Field>
-      <Field label="Descrição do produto">
-        <textarea
-          id="prod-descricao"
-          className={textareaCls}
-          rows={3}
-          value={form['prod-descricao']}
-          onChange={e => onChange('prod-descricao', e.target.value)}
-          placeholder="O que é, como funciona, principais funcionalidades..."
-        />
-      </Field>
-      <Field label="Resultados para clientes">
-        <textarea
-          id="prod-resultados"
-          className={textareaCls}
-          rows={2}
-          value={form['prod-resultados']}
-          onChange={e => onChange('prod-resultados', e.target.value)}
-          placeholder="Qual resultado o cliente obtém? Ex: reduz ciclo de vendas em 40%"
-        />
-      </Field>
-      <Field label="Concorrentes">
-        <textarea
-          id="prod-concorrentes"
-          className={textareaCls}
-          rows={2}
-          value={form['prod-concorrentes']}
-          onChange={e => onChange('prod-concorrentes', e.target.value)}
-          placeholder="Quem são seus principais concorrentes?"
-        />
-      </Field>
-      <Field label="Informações adicionais">
-        <textarea
-          id="prod-info-extra"
-          className={textareaCls}
-          rows={2}
-          value={form['prod-info-extra']}
-          onChange={e => onChange('prod-info-extra', e.target.value)}
-          placeholder="Diferenciais, preços, garantias, casos de sucesso..."
-        />
-      </Field>
-    </div>
-  )
-}
+
 
 type FiltroGenero = 'Todos' | 'Feminino' | 'Masculino'
 
