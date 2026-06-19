@@ -193,42 +193,38 @@ const STEPS = [
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex items-center justify-center gap-0 mb-8">
-      {STEPS.map((step, i) => {
-        const done = i < current
-        const active = i === current
-        return (
-          <React.Fragment key={step.label}>
-            <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center gap-4 mb-6">
+      {/* Círculos compactos */}
+      <div className="flex items-center gap-0">
+        {STEPS.map((s, i) => {
+          const done = i < current
+          const active = i === current
+          return (
+            <React.Fragment key={s.label}>
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
                   done
-                    ? 'bg-green-500 text-white'
+                    ? 'bg-brand-500 text-white shadow-sm'
                     : active
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-500'
+                    ? 'bg-brand text-white shadow-md ring-4 ring-brand-100'
+                    : 'bg-gray-100 text-gray-400'
                 }`}
               >
-                {done ? <Check size={16} strokeWidth={3} /> : i + 1}
+                {done ? <Check size={12} strokeWidth={3} /> : i + 1}
               </div>
-              <span
-                className={`mt-1.5 text-xs font-medium whitespace-nowrap ${
-                  active ? 'text-blue-600' : done ? 'text-green-600' : 'text-gray-400'
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div
-                className={`w-16 h-0.5 mx-1 mb-5 transition-colors ${
-                  i < current ? 'bg-green-400' : 'bg-gray-200'
-                }`}
-              />
-            )}
-          </React.Fragment>
-        )
-      })}
+              {i < STEPS.length - 1 && (
+                <div className={`w-8 h-0.5 transition-colors duration-300 ${i < current ? 'bg-brand-400' : 'bg-gray-200'}`} />
+              )}
+            </React.Fragment>
+          )
+        })}
+      </div>
+      {/* Label do step atual destacada */}
+      <div className="text-center">
+        <span className="text-xs font-semibold text-brand uppercase tracking-widest">
+          Etapa {current + 1} de {STEPS.length}
+        </span>
+      </div>
     </div>
   )
 }
@@ -236,9 +232,9 @@ function StepIndicator({ current }: { current: number }) {
 function ProgressBar({ step }: { step: number }) {
   const pct = ((step + 1) / STEPS.length) * 100
   return (
-    <div className="w-full bg-gray-100 rounded-full h-1.5 mb-8">
+    <div className="w-full bg-gray-100 rounded-full h-1 mb-7">
       <div
-        className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+        className="bg-brand h-1 rounded-full transition-all duration-500"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -514,21 +510,20 @@ function StepObjetivo({ form, onChange }: { form: FormData; onChange: (k: keyof 
       )}
 
       {/* Nota sobre campanhas */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-        <p className="text-xs font-semibold text-gray-700 mb-1.5">O objetivo define a configuração automática das campanhas</p>
-        <ul className="space-y-1">
-          {[
-            objetivo === 'agendar-reunioes' && 'Campanhas vão exibir campo de agenda e slot de horário para o vendedor receber a reunião',
-            objetivo === 'whatsapp' && 'Campanhas vão exibir o número de WhatsApp e o agente não precisará de integração com agenda',
-            objetivo === 'upselling' && 'Campanhas vão permitir importar base de clientes existentes com histórico de compra',
-            objetivo === 'cobranca' && 'Campanhas vão incluir campo de valor em dívida, data de vencimento e regras de desconto por contato',
-            objetivo === 'pesquisa' && 'Campanhas vão usar o roteiro de pesquisa definido no setup para estruturar a coleta de respostas',
-          ].filter(Boolean).map((t, i) => (
-            <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
-              <Check size={11} className="text-brand-500 shrink-0 mt-0.5" /> {t}
-            </li>
-          ))}
-        </ul>
+      <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-4 flex items-start gap-3">
+        <div className="w-8 h-8 rounded-lg bg-white border border-brand-100 flex items-center justify-center shrink-0 mt-0.5">
+          <Zap size={15} className="text-brand" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-brand-800 mb-1">Como isso afeta suas campanhas</p>
+          <p className="text-xs text-brand-700 leading-relaxed">
+            {objetivo === 'agendar-reunioes' && 'As campanhas vão exibir campo de agenda e slots de horário. O agente reserva a reunião diretamente com o vendedor durante a ligação.'}
+            {objetivo === 'whatsapp' && 'As campanhas não precisam de agenda. O agente qualifica o contato e o encaminha para o WhatsApp da equipe ao final da ligação.'}
+            {objetivo === 'upselling' && 'As campanhas permitem importar base de clientes com produto atual, valor de contrato e data de renovação — o agente usa esses dados na ligação.'}
+            {objetivo === 'cobranca' && 'As campanhas incluem campos de valor em dívida e data de vencimento por contato. O agente negocia dentro das regras de desconto definidas aqui.'}
+            {objetivo === 'pesquisa' && 'As campanhas usam o roteiro de perguntas definido no setup. As respostas são coletadas automaticamente e exportáveis em planilha.'}
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -2390,16 +2385,18 @@ export default function OnboardingPage() {
 
   function validate(): boolean {
     const newErrors: Partial<Record<keyof FormData, string>> = {}
-    if (step === 0 && !form['nome-agente'].trim()) {
+    // Step 0 = Objetivo — sem validação obrigatória
+    // Step 1 = Empresa e Produto
+    if (step === 1 && !form['nome-agente'].trim()) {
       newErrors['nome-agente'] = 'Nome do agente é obrigatório'
     }
-    if (step === 0 && !form['empresa-nome'].trim()) {
+    if (step === 1 && !form['empresa-nome'].trim()) {
       newErrors['empresa-nome'] = 'Nome da empresa é obrigatório'
     }
-    if (step === 0 && !form['empresa-site'].trim()) {
+    if (step === 1 && !form['empresa-site'].trim()) {
       newErrors['empresa-site'] = 'Site da empresa é obrigatório — necessário para a IA pesquisar'
     }
-    if (step === 0 && !form['prod-nome'].trim()) {
+    if (step === 1 && !form['prod-nome'].trim()) {
       newErrors['prod-nome'] = 'Nome do produto é obrigatório'
     }
     setErrors(newErrors)
@@ -2958,18 +2955,20 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-gray-50 flex items-start justify-center py-12 px-4">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <Bot size={24} className="text-blue-600" />
-            <span className="text-lg font-bold text-gray-900">{editandoId ? 'Editar Agente' : 'Novo Agente de IA'}</span>
+          <div className="inline-flex items-center gap-2 mb-2">
+            <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center">
+              <Bot size={20} className="text-brand" />
+            </div>
+            <span className="text-xl font-bold text-gray-900">{editandoId ? 'Editar Agente' : 'Novo Agente de IA'}</span>
           </div>
-          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : 'Configure seu agente de vendas autônomo em 5 passos'}</p>
+          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : `Configure seu agente de vendas autônomo em ${STEPS.length} etapas`}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <StepIndicator current={step} />
           <ProgressBar step={step} />
 
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">{stepTitles[step]}</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">{stepTitles[step]}</h2>
 
           {step === 0 && <StepObjetivo form={form} onChange={onChange} />}
           {step === 1 && <Step1 form={form} onChange={onChange} errors={errors} materiais={materiais} onMateriaisChange={setMateriais} />}
@@ -3013,21 +3012,21 @@ export default function OnboardingPage() {
           )}
 
           {!(step === 7 && activated) && (
-            <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
+            <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors"
               >
-                <ChevronLeft size={16} /> Anterior
+                <ChevronLeft size={15} /> {step === 0 ? 'Cancelar' : 'Anterior'}
               </button>
-              {step < STEPS.length - 1 ? (
+              {step < STEPS.length - 1 && (
                 <button
                   onClick={next}
-                  className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-brand rounded-xl hover:bg-brand-600 transition-colors shadow-sm"
                 >
-                  Próximo <ChevronRight size={16} />
+                  Próximo <ChevronRight size={15} />
                 </button>
-              ) : null}
+              )}
             </div>
           )}
         </div>
