@@ -125,7 +125,31 @@ const INITIAL_OBJECOES: Objecao[] = [
   { objecao: '', rebuttal: '' },
 ]
 
-const SEGMENTOS = ['Tech/SaaS', 'Indústria', 'Serviços B2B', 'Saúde', 'Educação', 'Financeiro', 'Outro']
+const SEGMENTOS = [
+  'Agronegócio / Pecuária',
+  'Automotivo / Concessionárias',
+  'Clínicas / Saúde',
+  'Construção Civil / Imóveis',
+  'Consultoria / Serviços B2B',
+  'Cosméticos / Estética / Beleza',
+  'Educação / Cursos',
+  'Energia Solar',
+  'Financeiro / Crédito / Consórcio',
+  'Indústria / Manufatura',
+  'Internet / Telecom',
+  'Jurídico / Advocacia',
+  'Logística / Transporte',
+  'Marketing / Publicidade',
+  'Odontologia',
+  'Planos de Saúde / Seguros',
+  'RH / Recrutamento',
+  'Segurança / Tecnologia de Acesso',
+  'Serviços Funerários',
+  'Tech / SaaS',
+  'Terceiro Setor / ONGs',
+  'Varejo / E-commerce',
+  'Outros',
+]
 const PORTES = ['1–10', '11–50', '51–200', '201–1000', '1000+']
 const CARGOS = ['Diretor', 'VP', 'CEO', 'Gerente', 'Coordenador', 'Outro']
 
@@ -764,11 +788,21 @@ function Step1({
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Segmento de atuação">
-            <select id="empresa-segmento" className={selectCls} value={form['empresa-segmento']}
+            <select id="empresa-segmento" className={selectCls}
+              value={SEGMENTOS.includes(form['empresa-segmento']) ? form['empresa-segmento'] : form['empresa-segmento'] ? 'Outros' : ''}
               onChange={e => onChange('empresa-segmento', e.target.value)}>
               <option value="">Selecione...</option>
               {SEGMENTOS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {(form['empresa-segmento'] === 'Outros' || (!SEGMENTOS.includes(form['empresa-segmento']) && form['empresa-segmento'])) && (
+              <input
+                className={`${inputCls} mt-2`}
+                placeholder="Digite o segmento..."
+                value={form['empresa-segmento'] === 'Outros' ? '' : form['empresa-segmento']}
+                onChange={e => onChange('empresa-segmento', e.target.value || 'Outros')}
+                autoFocus
+              />
+            )}
           </Field>
           <Field label="Porte da empresa">
             <select id="empresa-porte" className={selectCls} value={form['empresa-porte']}
