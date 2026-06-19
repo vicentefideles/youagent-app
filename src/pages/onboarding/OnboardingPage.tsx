@@ -384,11 +384,11 @@ const OBJETIVOS = [
   {
     id: 'whatsapp',
     icon: MessageCircle,
-    label: 'Encaminhar para WhatsApp',
-    descricao: 'O agente faz a qualificação inicial por voz e encaminha contatos interessados para o WhatsApp da equipe, com contexto da conversa já registrado.',
-    badges: ['API WhatsApp', 'Contexto transferido', 'Sem agenda necessária'],
+    label: 'WhatsApp Inteligente',
+    descricao: 'O agente responde mensagens de WhatsApp automaticamente, qualifica leads e, se o contato parar de responder, liga para retomar a conversa com contexto completo do histórico.',
+    badges: ['Bidirecional voz + chat', 'Retomada automática', 'Contexto compartilhado'],
     cor: 'emerald',
-    disponivel: true,
+    disponivel: false,
   },
   {
     id: 'upselling',
@@ -397,7 +397,7 @@ const OBJETIVOS = [
     descricao: 'O agente liga para sua base de clientes existentes com ofertas de upgrade, renovação ou produtos complementares — usando o histórico de compra para personalizar a abordagem.',
     badges: ['Base de clientes', 'Tom consultivo', 'Sem cold call'],
     cor: 'violet',
-    disponivel: true,
+    disponivel: false,
   },
   {
     id: 'cobranca',
