@@ -599,13 +599,23 @@ function Step1({
         if (porte) onChange('empresa-porte', porte)
       }
       if (d.cnae_fiscal_descricao) {
-        // tentar mapear CNAE para segmento
         const desc = d.cnae_fiscal_descricao.toLowerCase()
-        const seg = desc.includes('software') || desc.includes('tecnologia') ? 'Tech/SaaS'
-          : desc.includes('consult') ? 'Serviços B2B'
-          : desc.includes('saúde') || desc.includes('médic') ? 'Saúde'
-          : desc.includes('educação') || desc.includes('ensino') ? 'Educação'
-          : desc.includes('financ') || desc.includes('crédito') || desc.includes('seguro') ? 'Financeiro'
+        const seg = desc.includes('software') || desc.includes('tecnologia') || desc.includes('inform') ? 'Tech / SaaS'
+          : desc.includes('consult') || desc.includes('assessoria') ? 'Consultoria / Serviços B2B'
+          : desc.includes('saúde') || desc.includes('médic') || desc.includes('hospital') || desc.includes('clínic') ? 'Clínicas / Saúde'
+          : desc.includes('odonto') ? 'Odontologia'
+          : desc.includes('educação') || desc.includes('ensino') || desc.includes('curso') ? 'Educação / Cursos'
+          : desc.includes('financ') || desc.includes('crédito') || desc.includes('consórc') ? 'Financeiro / Crédito / Consórcio'
+          : desc.includes('seguro') || desc.includes('plano') ? 'Planos de Saúde / Seguros'
+          : desc.includes('construção') || desc.includes('imóvel') || desc.includes('incorpora') ? 'Construção Civil / Imóveis'
+          : desc.includes('indústria') || desc.includes('fabricação') || desc.includes('manufat') ? 'Indústria / Manufatura'
+          : desc.includes('varejo') || desc.includes('comércio varej') ? 'Varejo / E-commerce'
+          : desc.includes('transport') || desc.includes('logística') ? 'Logística / Transporte'
+          : desc.includes('telecom') || desc.includes('telefon') ? 'Internet / Telecom'
+          : desc.includes('agro') || desc.includes('pecuária') || desc.includes('agrícola') ? 'Agronegócio / Pecuária'
+          : desc.includes('publicidade') || desc.includes('marketing') ? 'Marketing / Publicidade'
+          : desc.includes('jurídic') || desc.includes('advocacia') ? 'Jurídico / Advocacia'
+          : desc.includes('estética') || desc.includes('cosmétic') || desc.includes('beleza') ? 'Cosméticos / Estética / Beleza'
           : ''
         if (seg) onChange('empresa-segmento', seg)
       }
