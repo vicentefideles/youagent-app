@@ -1264,31 +1264,16 @@ function TabConhecimento() {
     ? conhecimentoRaw
     : (conhecimentoRaw as any)?.items ?? []
 
-  const pendentesAprovacao = library.filter((b: any) => b.aprovado === false && b.tipo === 'documento')
-  const libraryAprovados   = library.filter((b: any) => b.aprovado !== false)
-
-  const [aprovando, setAprovando] = useState<string | null>(null)
-
-  async function aprovarMaterial(id: string, aprovado: boolean) {
-    setAprovando(id)
-    try {
-      await api.patch(`/inteligencia/conhecimento/${id}/aprovar`, { aprovado })
-      queryClient.invalidateQueries({ queryKey: ['inteligencia-conhecimento'] })
-    } catch { /* silencioso */ } finally {
-      setAprovando(null)
-    }
-  }
-
   // KPIs derivados dos dados reais
-  const totalMateriais = libraryAprovados.length
-  const totalInsights = libraryAprovados.reduce((s: number, b: any) => s + (b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0), 0)
-  const tiposUnicos = new Set(libraryAprovados.map((b: any) => b.tipo)).size
-  const ultimoUpdate = libraryAprovados.length > 0
-    ? new Date(libraryAprovados[0].criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  const totalMateriais = library.length
+  const totalInsights = library.reduce((s: number, b: any) => s + (b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0), 0)
+  const tiposUnicos = new Set(library.map((b: any) => b.tipo)).size
+  const ultimoUpdate = library.length > 0
+    ? new Date(library[0].criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
     : '—'
 
   // Últimos insights extraídos dos materiais reais
-  const ultimosInsights: string[] = libraryAprovados
+  const ultimosInsights: string[] = library
     .slice(0, 5)
     .flatMap((b: any) => (b.argumentos ?? []).slice(0, 1) as string[])
     .slice(0, 3)
@@ -1572,66 +1557,14 @@ function TabConhecimento() {
             ))}
           </div>
 
-          {/* ── Pendentes de aprovação (materiais do Setup do Agente) ── */}
-          {pendentesAprovacao.length > 0 && (
-            <div className="bg-white border border-amber-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Materiais aguardando aprovação
-                </h3>
-                <span className="ml-auto text-[11px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
-                  {pendentesAprovacao.length} pendente{pendentesAprovacao.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 mb-3">Estes arquivos foram enviados durante o setup do agente. Revise e aprove para que o agente comece a usar o conteúdo nas ligações.</p>
-              <div className="space-y-2">
-                {pendentesAprovacao.map((b: any) => (
-                  <div key={b.id} className="flex items-center gap-3 p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
-                    <div className="w-8 h-8 rounded flex items-center justify-center bg-white border border-amber-200 shrink-0">
-                      <span className="text-base">📄</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-gray-800 truncate">{b.titulo}</p>
-                      <p className="text-[11px] text-gray-400">
-                        {b.categoria || 'Documento'} · {b.conteudo_resumo ? `${b.conteudo_resumo.length} chars extraídos` : 'sem texto extraído'}
-                      </p>
-                      {b.conteudo_resumo && (
-                        <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{b.conteudo_resumo}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-1.5 shrink-0">
-                      <button
-                        onClick={() => aprovarMaterial(b.id, true)}
-                        disabled={aprovando === b.id}
-                        className="text-[11px] font-semibold bg-emerald-600 text-white px-3 py-1 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center gap-1"
-                      >
-                        {aprovando === b.id ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle size={11} />}
-                        Aprovar
-                      </button>
-                      <button
-                        onClick={() => remover(b.id)}
-                        disabled={aprovando === b.id}
-                        className="text-[11px] font-semibold text-red-500 border border-red-200 px-3 py-1 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1"
-                      >
-                        <Trash2 size={11} />
-                        Rejeitar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Biblioteca */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Biblioteca</h3>
-            {libraryAprovados.length === 0 ? (
+            {library.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-4">Nenhum material cadastrado ainda.<br /><span className="text-gray-300">Adicione o primeiro à esquerda.</span></p>
             ) : (
               <div className="space-y-2 max-h-[480px] overflow-y-auto">
-                {libraryAprovados.map((b: any) => {
+                {library.map((b: any) => {
                   const totalInsightsMat = (b.argumentos?.length ?? 0) + (b.tecnicas?.length ?? 0) + (b.objecoes?.length ?? 0)
                   const dataFormatada = b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
                   return (
