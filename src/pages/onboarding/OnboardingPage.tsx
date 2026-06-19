@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   Bot,
   Building2,
-  Package,
   Target,
   Zap,
   Clock,
@@ -163,8 +162,7 @@ const REGIOES_BR: Record<string, string[]> = {
 
 
 const STEPS = [
-  { label: 'Empresa', icon: Building2 },
-  { label: 'Produto', icon: Package },
+  { label: 'Empresa e Produto', icon: Building2 },
   { label: 'ICP', icon: Target },
   { label: 'Ativação', icon: Zap },
 ]
@@ -344,6 +342,8 @@ function Step1({
         objecoes_comuns?: string
         contexto_mercado?: string
         script_abertura?: string
+        descricao_produto?: string
+        resultados_clientes?: string
       }
       if (data.descricao) onChange('empresa-descricao', data.descricao)
       if (data.diferenciais) onChange('empresa-diferenciais', data.diferenciais)
@@ -358,6 +358,8 @@ function Step1({
       if (mercadoTexto) onChange('empresa-objecoes-comuns', mercadoTexto)
       if (data.contexto_mercado) onChange('empresa-contexto-mercado', data.contexto_mercado)
       if (data.script_abertura) onChange('script-abertura', data.script_abertura)
+      if ((data as { descricao_produto?: string }).descricao_produto) onChange('prod-descricao', (data as { descricao_produto?: string }).descricao_produto!)
+      if ((data as { resultados_clientes?: string }).resultados_clientes) onChange('prod-resultados', (data as { resultados_clientes?: string }).resultados_clientes!)
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { error?: string } } })?.response?.data
       const msg = axiosData?.error ?? (err instanceof Error ? err.message : 'Erro ao pesquisar')
@@ -517,6 +519,68 @@ function Step1({
         </button>
       </div>
       {pesquisaErro && <p className="col-span-2 text-xs text-red-500">{pesquisaErro}</p>}
+
+      {/* Divisor Produto */}
+      <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Produto ou serviço</h3>
+      </div>
+
+      {/* Nome do produto */}
+      <div className="col-span-2">
+        <Field label="Nome do produto/serviço" required error={errors['prod-nome']}>
+          <input
+            id="prod-nome"
+            className={inputCls}
+            value={form['prod-nome']}
+            onChange={e => onChange('prod-nome', e.target.value)}
+            placeholder="Ex: Plataforma de Gestão Comercial"
+          />
+        </Field>
+      </div>
+
+      {/* Descrição do produto */}
+      <div className="col-span-2">
+        <Field label="Descrição do produto">
+          <textarea
+            id="prod-descricao"
+            className={textareaCls}
+            rows={3}
+            value={form['prod-descricao']}
+            onChange={e => onChange('prod-descricao', e.target.value)}
+            placeholder="O que é, como funciona, principais funcionalidades..."
+          />
+        </Field>
+        <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar</p>
+      </div>
+
+      {/* Resultados para clientes */}
+      <div className="col-span-2">
+        <Field label="Resultados para clientes">
+          <textarea
+            id="prod-resultados"
+            className={textareaCls}
+            rows={2}
+            value={form['prod-resultados']}
+            onChange={e => onChange('prod-resultados', e.target.value)}
+            placeholder="Qual resultado o cliente obtém? Ex: reduz inadimplência em 30%, decisões de crédito mais seguras..."
+          />
+        </Field>
+        <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar</p>
+      </div>
+
+      {/* Cases de sucesso */}
+      <div className="col-span-2">
+        <Field label="Cases de sucesso e provas sociais">
+          <textarea
+            id="prod-info-extra"
+            className={textareaCls}
+            rows={2}
+            value={form['prod-info-extra']}
+            onChange={e => onChange('prod-info-extra', e.target.value)}
+            placeholder="Ex: +5.000 clientes, parceria oficial Serasa, case com redução de 40% na inadimplência..."
+          />
+        </Field>
+      </div>
     </div>
   )
 }
@@ -1823,7 +1887,7 @@ export default function OnboardingPage() {
     if (step === 0 && !form['empresa-nome'].trim()) {
       newErrors['empresa-nome'] = 'Nome da empresa é obrigatório'
     }
-    if (step === 1 && !form['prod-nome'].trim()) {
+    if (step === 0 && !form['prod-nome'].trim()) {
       newErrors['prod-nome'] = 'Nome do produto é obrigatório'
     }
     setErrors(newErrors)
@@ -2002,8 +2066,7 @@ export default function OnboardingPage() {
   }
 
   const stepTitles = [
-    'Dados da empresa',
-    'Produto ou serviço',
+    'Empresa e produto',
     'ICP & Script do agente',
     'Revisar e ativar',
   ]
@@ -2324,7 +2387,7 @@ export default function OnboardingPage() {
             <Bot size={24} className="text-blue-600" />
             <span className="text-lg font-bold text-gray-900">{editandoId ? 'Editar Agente' : 'Novo Agente de IA'}</span>
           </div>
-          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : 'Configure seu agente de vendas autônomo em 4 passos'}</p>
+          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : 'Configure seu agente de vendas autônomo em 3 passos'}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -2334,8 +2397,7 @@ export default function OnboardingPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-6">{stepTitles[step]}</h2>
 
           {step === 0 && <Step1 form={form} onChange={onChange} errors={errors} />}
-          {step === 1 && <Step2 form={form} onChange={onChange} errors={errors} />}
-          {step === 2 && (
+          {step === 1 && (
             <Step3
               form={form}
               onChange={onChange}
@@ -2345,7 +2407,7 @@ export default function OnboardingPage() {
               onRegioesChange={setRegioes}
             />
           )}
-          {step === 3 && (
+          {step === 2 && (
             <Step4
               form={form}
               activated={activated}
@@ -2365,7 +2427,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 3 && activated) && (
+          {!(step === 2 && activated) && (
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
