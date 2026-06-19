@@ -323,7 +323,7 @@ function Step1({
   async function pesquisarComIA() {
     if (pesquisando) return
     if (!form['empresa-site'].trim()) {
-      setErrors(prev => ({ ...prev, 'empresa-site': 'Informe o site da empresa para pesquisar' }))
+      setPesquisaErro('Informe o site da empresa antes de pesquisar')
       document.getElementById('empresa-site')?.focus()
       return
     }
