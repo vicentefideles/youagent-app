@@ -656,29 +656,71 @@ function Step1({
     }
   }
 
+  const aiPreencheu = !!(form['empresa-descricao'] || form['empresa-diferenciais'] || form['prod-descricao'])
+
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {/* Banner Pesquisar com IA — topo */}
-      <div className="col-span-2 flex items-center justify-between gap-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-gray-800">🔍 Deixa a IA preencher por você</span>
-          <span className="text-xs text-gray-500">Informe o site da empresa e clique em Pesquisar — nossa IA extrai dados reais, pesquisa concorrentes, objeções e preenche todos os campos automaticamente.</span>
+    <div className="flex flex-col gap-5">
+
+      {/* ── Banner IA ──────────────────────────────────────────────────────── */}
+      <div className={`rounded-2xl border p-4 transition-all ${
+        aiPreencheu
+          ? 'bg-emerald-50 border-emerald-200'
+          : 'bg-gradient-to-r from-brand-50 to-violet-50 border-brand-100'
+      }`}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+              aiPreencheu ? 'bg-emerald-100' : 'bg-white border border-brand-100'
+            }`}>
+              {aiPreencheu
+                ? <Check size={16} className="text-emerald-600" strokeWidth={3} />
+                : <Brain size={16} className="text-brand" />
+              }
+            </div>
+            <div>
+              <p className={`text-sm font-semibold ${aiPreencheu ? 'text-emerald-800' : 'text-gray-900'}`}>
+                {aiPreencheu ? 'IA preencheu os campos — revise e ajuste' : 'Deixa a IA preencher por você'}
+              </p>
+              <p className={`text-xs mt-0.5 leading-relaxed ${aiPreencheu ? 'text-emerald-700' : 'text-gray-500'}`}>
+                {aiPreencheu
+                  ? 'Os campos foram preenchidos automaticamente. Revise, complemente e corrija o que precisar antes de avançar.'
+                  : 'Informe o site e clique em Pesquisar — a IA extrai dados reais, pesquisa concorrentes, objeções e preenche tudo automaticamente.'
+                }
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={pesquisarComIA}
+            disabled={pesquisando}
+            className={`shrink-0 flex items-center gap-2 text-sm px-4 py-2.5 font-semibold rounded-xl transition-all shadow-sm disabled:opacity-60 whitespace-nowrap ${
+              aiPreencheu
+                ? 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                : 'bg-brand text-white hover:bg-brand-600'
+            }`}
+          >
+            {pesquisando
+              ? <><Loader2 size={14} className="animate-spin" /> Pesquisando...</>
+              : aiPreencheu
+              ? <><RefreshCw size={14} /> Repesquisar</>
+              : <><Brain size={14} /> Pesquisar com IA</>
+            }
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={pesquisarComIA}
-          disabled={pesquisando}
-          className="shrink-0 flex items-center gap-1.5 text-sm px-4 py-2 bg-brand hover:bg-brand-600 disabled:opacity-60 text-white font-medium rounded-lg transition-colors"
-        >
-          {pesquisando
-            ? <><Loader2 size={14} className="animate-spin" /> Pesquisando...</>
-            : <><Brain size={14} /> Pesquisar com IA</>
-          }
-        </button>
+        {pesquisaErro && (
+          <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5">
+            <AlertTriangle size={11} className="shrink-0" /> {pesquisaErro}
+          </p>
+        )}
       </div>
 
-      {/* Nome do agente */}
-      <div className="col-span-2">
+      {/* ── Seção: Identificação ────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-brand rounded-full" />
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Identificação</span>
+        </div>
+
         <Field label="Nome do agente" required error={errors['nome-agente']}>
           <input
             id="nome-agente"
@@ -688,68 +730,55 @@ function Step1({
             placeholder="Ex: Maria — Prospecção SP"
           />
         </Field>
-      </div>
 
-      {/* Nome da empresa + CNPJ */}
-      <Field label="Nome da empresa" required error={errors['empresa-nome']}>
-        <input
-          id="empresa-nome"
-          className={inputCls}
-          value={form['empresa-nome']}
-          onChange={e => onChange('empresa-nome', e.target.value)}
-          placeholder="Ex: Acme Tecnologia"
-        />
-      </Field>
-      <Field label="CNPJ da empresa">
-        <div className="flex gap-2">
-          <input
-            id="empresa-cnpj"
-            className={inputCls}
-            value={form['empresa-cnpj']}
-            onChange={e => onChange('empresa-cnpj', formatarCnpj(e.target.value))}
-            placeholder="00.000.000/0001-00"
-            maxLength={18}
-          />
-          <button
-            type="button"
-            onClick={buscarCNPJ}
-            disabled={buscandoCnpj}
-            title="Buscar dados pelo CNPJ"
-            className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-medium rounded-lg transition-colors whitespace-nowrap"
-          >
-            {buscandoCnpj ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-            {buscandoCnpj ? 'Buscando...' : 'Buscar'}
-          </button>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Nome da empresa" required error={errors['empresa-nome']}>
+            <input
+              id="empresa-nome"
+              className={inputCls}
+              value={form['empresa-nome']}
+              onChange={e => onChange('empresa-nome', e.target.value)}
+              placeholder="Ex: Acme Tecnologia"
+            />
+          </Field>
+          <Field label="CNPJ da empresa">
+            <div className="flex gap-2">
+              <input
+                id="empresa-cnpj"
+                className={inputCls}
+                value={form['empresa-cnpj']}
+                onChange={e => onChange('empresa-cnpj', formatarCnpj(e.target.value))}
+                placeholder="00.000.000/0001-00"
+                maxLength={18}
+              />
+              <button type="button" onClick={buscarCNPJ} disabled={buscandoCnpj}
+                className="shrink-0 flex items-center gap-1 text-xs px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 disabled:opacity-50 text-gray-600 font-medium rounded-xl transition-colors whitespace-nowrap"
+              >
+                {buscandoCnpj ? <Loader2 size={11} className="animate-spin" /> : <Search size={11} />}
+                {buscandoCnpj ? '...' : 'Buscar'}
+              </button>
+            </div>
+            {cnpjErro && <p className="text-xs text-red-500 mt-1">{cnpjErro}</p>}
+          </Field>
         </div>
-        {cnpjErro && <p className="text-xs text-red-500 mt-1">{cnpjErro}</p>}
-      </Field>
 
-      {/* Segmento + Porte */}
-      <Field label="Segmento de atuação">
-        <select
-          id="empresa-segmento"
-          className={selectCls}
-          value={form['empresa-segmento']}
-          onChange={e => onChange('empresa-segmento', e.target.value)}
-        >
-          <option value="">Selecione...</option>
-          {SEGMENTOS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </Field>
-      <Field label="Porte da empresa">
-        <select
-          id="empresa-porte"
-          className={selectCls}
-          value={form['empresa-porte']}
-          onChange={e => onChange('empresa-porte', e.target.value)}
-        >
-          <option value="">Selecione...</option>
-          {PORTES.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Segmento de atuação">
+            <select id="empresa-segmento" className={selectCls} value={form['empresa-segmento']}
+              onChange={e => onChange('empresa-segmento', e.target.value)}>
+              <option value="">Selecione...</option>
+              {SEGMENTOS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Porte da empresa">
+            <select id="empresa-porte" className={selectCls} value={form['empresa-porte']}
+              onChange={e => onChange('empresa-porte', e.target.value)}>
+              <option value="">Selecione...</option>
+              {PORTES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+        </div>
 
-      {/* Site */}
-      <div className="col-span-2">
         <Field label="Site da empresa" required error={errors['empresa-site']}>
           <input
             id="empresa-site"
@@ -761,117 +790,89 @@ function Step1({
         </Field>
       </div>
 
-      {/* Descrição — o que faz e para quem */}
-      <div className="col-span-2">
+      {/* ── Seção: Sobre a empresa ──────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-brand rounded-full" />
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sobre a empresa</span>
+          {aiPreencheu && <span className="text-[10px] bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">preenchido pela IA</span>}
+        </div>
+
         <Field label="O que sua empresa faz e para quem">
-          <textarea
-            id="empresa-descricao"
-            className={textareaCls}
-            rows={3}
+          <textarea id="empresa-descricao" className={textareaCls} rows={3}
             value={form['empresa-descricao']}
             onChange={e => onChange('empresa-descricao', e.target.value)}
-            placeholder="Ex: Somos uma plataforma B2B de automação de vendas que ajuda empresas de tecnologia com 5 a 100 funcionários a aumentarem o número de reuniões comerciais sem contratar mais SDRs..."
+            placeholder="Ex: Plataforma B2B de automação de vendas para empresas de tecnologia com 5–100 funcionários que querem aumentar reuniões comerciais sem contratar mais SDRs..."
           />
         </Field>
-        <p className="text-xs text-gray-400 mt-1">Seja específico — o agente vai usar isso na abertura da ligação</p>
-      </div>
 
-      {/* Diferenciais competitivos */}
-      <div className="col-span-2">
         <Field label="Principais diferenciais competitivos">
-          <textarea
-            id="empresa-diferenciais"
-            className={textareaCls}
-            rows={2}
+          <textarea id="empresa-diferenciais" className={textareaCls} rows={2}
             value={form['empresa-diferenciais']}
             onChange={e => onChange('empresa-diferenciais', e.target.value)}
-            placeholder="Ex: Único sistema com IA de voz em PT-BR nativo, integração direta com Google Meet, custo 70% menor que um SDR humano..."
+            placeholder="Ex: IA de voz nativa em PT-BR, integração com Google Meet, custo 70% menor que SDR humano..."
           />
         </Field>
-        <p className="text-xs text-gray-400 mt-1">O que você tem que os concorrentes não têm</p>
-      </div>
 
-      {/* Concorrentes e objeções do mercado */}
-      <div className="col-span-2">
-        <Field label="Concorrentes e objeções do mercado">
-          <textarea
-            id="empresa-objecoes-comuns"
-            className={textareaCls}
-            rows={3}
+        <Field label="Concorrentes e como responder quando citados">
+          <textarea id="empresa-objecoes-comuns" className={textareaCls} rows={3}
             value={form['empresa-objecoes-comuns']}
             onChange={e => onChange('empresa-objecoes-comuns', e.target.value)}
-            placeholder="Ex: Concorrentes: Salesforce, RD Station, Moskit&#10;&#10;Objeções: 'Já temos CRM' → Respondemos que o ETZ complementa o CRM existente sem substituí-lo..."
+            placeholder={`Concorrentes: Salesforce, RD Station, Moskit\n\nObjeções: "Já temos CRM" → O ETZ complementa o CRM sem substituir, focando em prospecção ativa...`}
           />
         </Field>
-        <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar — você pode editar antes de ativar o agente</p>
       </div>
 
-      {pesquisaErro && <p className="col-span-2 text-xs text-red-500">{pesquisaErro}</p>}
+      {/* ── Seção: Produto ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-brand rounded-full" />
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Produto ou serviço</span>
+        </div>
 
-      {/* Divisor Produto */}
-      <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Produto ou serviço</h3>
-      </div>
-
-      {/* Nome do produto */}
-      <div className="col-span-2">
         <Field label="Nome do produto/serviço" required error={errors['prod-nome']}>
-          <input
-            id="prod-nome"
-            className={inputCls}
+          <input id="prod-nome" className={inputCls}
             value={form['prod-nome']}
             onChange={e => onChange('prod-nome', e.target.value)}
             placeholder="Ex: Plataforma de Gestão Comercial"
           />
         </Field>
-      </div>
 
-      {/* Descrição do produto */}
-      <div className="col-span-2">
         <Field label="Descrição do produto">
-          <textarea
-            id="prod-descricao"
-            className={textareaCls}
-            rows={3}
+          <textarea id="prod-descricao" className={textareaCls} rows={3}
             value={form['prod-descricao']}
             onChange={e => onChange('prod-descricao', e.target.value)}
             placeholder="O que é, como funciona, principais funcionalidades..."
           />
         </Field>
-        <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar</p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Resultados para clientes">
+            <textarea id="prod-resultados" className={textareaCls} rows={3}
+              value={form['prod-resultados']}
+              onChange={e => onChange('prod-resultados', e.target.value)}
+              placeholder="Qual resultado o cliente obtém? Ex: reduz 30% inadimplência..."
+            />
+          </Field>
+          <Field label="Cases de sucesso e provas sociais">
+            <textarea id="prod-info-extra" className={textareaCls} rows={3}
+              value={form['prod-info-extra']}
+              onChange={e => onChange('prod-info-extra', e.target.value)}
+              placeholder="+5.000 clientes, parceria Serasa, case -40% inadimplência..."
+            />
+          </Field>
+        </div>
       </div>
 
-      {/* Resultados para clientes */}
-      <div className="col-span-2">
-        <Field label="Resultados para clientes">
-          <textarea
-            id="prod-resultados"
-            className={textareaCls}
-            rows={2}
-            value={form['prod-resultados']}
-            onChange={e => onChange('prod-resultados', e.target.value)}
-            placeholder="Qual resultado o cliente obtém? Ex: reduz inadimplência em 30%, decisões de crédito mais seguras..."
-          />
-        </Field>
-        <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar</p>
+      {/* ── Materiais ───────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-brand rounded-full" />
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materiais de apoio</span>
+        </div>
+        <MateriaisUpload materiais={materiais} onMateriaisChange={onMateriaisChange} />
       </div>
 
-      {/* Cases de sucesso */}
-      <div className="col-span-2">
-        <Field label="Cases de sucesso e provas sociais">
-          <textarea
-            id="prod-info-extra"
-            className={textareaCls}
-            rows={2}
-            value={form['prod-info-extra']}
-            onChange={e => onChange('prod-info-extra', e.target.value)}
-            placeholder="Ex: +5.000 clientes, parceria oficial Serasa, case com redução de 40% na inadimplência..."
-          />
-        </Field>
-      </div>
-
-      {/* Upload de materiais */}
-      <MateriaisUpload materiais={materiais} onMateriaisChange={onMateriaisChange} />
     </div>
   )
 }
