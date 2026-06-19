@@ -30,11 +30,18 @@ import {
   Plus,
   FileText,
   Upload,
+  MessageCircle,
+  TrendingUp,
+  DollarSign,
+  ClipboardList,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FormData {
+  // Step 0 — Objetivo
+  'objetivo': string
+  'whatsapp-numero': string
   // Step 1
   'nome-agente': string
   'empresa-nome': string
@@ -77,6 +84,8 @@ interface Objecao {
 }
 
 const INITIAL_FORM: FormData = {
+  'objetivo': 'agendar-reunioes',
+  'whatsapp-numero': '',
   'nome-agente': '',
   'empresa-nome': '',
   'empresa-cnpj': '',
@@ -170,6 +179,7 @@ const REGIOES_BR: Record<string, string[]> = {
 
 
 const STEPS = [
+  { label: 'Objetivo', icon: Target },
   { label: 'Empresa e Produto', icon: Building2 },
   { label: 'ICP & Script', icon: Target },
   { label: 'Metodologia', icon: BarChart2 },
@@ -357,6 +367,169 @@ function MateriaisUpload({ materiais, onMateriaisChange }: { materiais: Material
         <Plus size={14} />
         Adicionar outro material
       </button>
+    </div>
+  )
+}
+
+const OBJETIVOS = [
+  {
+    id: 'agendar-reunioes',
+    icon: CalendarCheck,
+    label: 'Agendar Reuniões',
+    descricao: 'O agente qualifica prospects e agenda reuniões diretamente na agenda do time comercial, com confirmação em tempo real durante a própria ligação.',
+    badges: ['Agenda integrada', 'Transferência ao vivo', 'Qualificação de leads'],
+    cor: 'brand',
+    disponivel: true,
+  },
+  {
+    id: 'whatsapp',
+    icon: MessageCircle,
+    label: 'Encaminhar para WhatsApp',
+    descricao: 'O agente faz a qualificação inicial por voz e encaminha contatos interessados para o WhatsApp da equipe, com contexto da conversa já registrado.',
+    badges: ['API WhatsApp', 'Contexto transferido', 'Sem agenda necessária'],
+    cor: 'emerald',
+    disponivel: true,
+  },
+  {
+    id: 'upselling',
+    icon: TrendingUp,
+    label: 'Upselling para Clientes',
+    descricao: 'O agente liga para sua base de clientes existentes com ofertas de upgrade, renovação ou produtos complementares — usando o histórico de compra para personalizar a abordagem.',
+    badges: ['Base de clientes', 'Tom consultivo', 'Sem cold call'],
+    cor: 'violet',
+    disponivel: true,
+  },
+  {
+    id: 'cobranca',
+    icon: DollarSign,
+    label: 'Cobrança de Clientes',
+    descricao: 'O agente entra em contato com inadimplentes, negocia condições de pagamento dentro de regras pré-definidas e envia boletos ou contratos automaticamente.',
+    badges: ['Régua de desconto', 'Boleto automático', 'Contrato de negociação'],
+    cor: 'amber',
+    disponivel: false,
+  },
+  {
+    id: 'pesquisa',
+    icon: ClipboardList,
+    label: 'Pesquisa de Mercado',
+    descricao: 'O agente aplica roteiros de pesquisa estruturados, coleta respostas e organiza os dados automaticamente — ideal para NPS, validação de produto ou inteligência competitiva.',
+    badges: ['Roteiro personalizado', 'Coleta estruturada', 'Relatório automático'],
+    cor: 'slate',
+    disponivel: false,
+  },
+]
+
+const COR_MAP: Record<string, { ring: string; bg: string; text: string; badge: string }> = {
+  brand:   { ring: 'ring-brand-400',   bg: 'bg-brand-50',   text: 'text-brand-700',   badge: 'bg-brand-100 text-brand-700' },
+  emerald: { ring: 'ring-emerald-400', bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
+  violet:  { ring: 'ring-violet-400',  bg: 'bg-violet-50',  text: 'text-violet-700',  badge: 'bg-violet-100 text-violet-700' },
+  amber:   { ring: 'ring-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700',   badge: 'bg-amber-100 text-amber-700' },
+  slate:   { ring: 'ring-slate-400',   bg: 'bg-slate-50',   text: 'text-slate-600',   badge: 'bg-slate-100 text-slate-600' },
+}
+
+function StepObjetivo({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  const objetivo = form['objetivo'] || 'agendar-reunioes'
+  const isWhatsApp = objetivo === 'whatsapp'
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-900">Qual é o objetivo principal deste agente?</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          O objetivo define como o agente conduz as ligações — o flow de conversa, o tom e o que acontece ao final de cada chamada.
+          Você pode criar agentes com objetivos diferentes para campanhas distintas.
+        </p>
+      </div>
+
+      {/* Cards */}
+      <div className="flex flex-col gap-3">
+        {OBJETIVOS.map(obj => {
+          const ativo = objetivo === obj.id
+          const cor = COR_MAP[obj.cor]
+          const Icon = obj.icon
+          return (
+            <button
+              key={obj.id}
+              type="button"
+              disabled={!obj.disponivel}
+              onClick={() => obj.disponivel && onChange('objetivo', obj.id)}
+              className={[
+                'w-full text-left rounded-xl border-2 px-4 py-3.5 transition-all duration-150 relative',
+                obj.disponivel ? 'cursor-pointer' : 'cursor-default opacity-60',
+                ativo
+                  ? `border-transparent ring-2 ${cor.ring} ${cor.bg}`
+                  : 'border-gray-200 bg-white hover:border-gray-300',
+              ].join(' ')}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${ativo ? cor.bg : 'bg-gray-100'}`}>
+                  <Icon size={18} className={ativo ? cor.text : 'text-gray-500'} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-sm font-semibold ${ativo ? cor.text : 'text-gray-800'}`}>{obj.label}</span>
+                    {!obj.disponivel && (
+                      <span className="text-[10px] font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full uppercase tracking-wide">Em breve</span>
+                    )}
+                    {ativo && obj.disponivel && (
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${cor.badge}`}>Selecionado</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{obj.descricao}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {obj.badges.map(b => (
+                      <span key={b} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${ativo ? cor.badge : 'bg-gray-100 text-gray-500'}`}>{b}</span>
+                    ))}
+                  </div>
+                </div>
+                {ativo && obj.disponivel && (
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-1 ${cor.text.replace('text-', 'bg-').replace('-700', '-500')}`}>
+                    <Check size={11} className="text-white" />
+                  </div>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Campo WhatsApp — aparece só quando selecionado */}
+      {isWhatsApp && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <MessageCircle size={15} className="text-emerald-600" />
+            <p className="text-sm font-semibold text-emerald-800">Número do WhatsApp da equipe</p>
+          </div>
+          <input
+            value={form['whatsapp-numero']}
+            onChange={e => onChange('whatsapp-numero', e.target.value)}
+            placeholder="+55 11 99999-9999"
+            className="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300 bg-white"
+          />
+          <p className="text-xs text-emerald-700">
+            Ao final de cada ligação qualificada, o agente informa ao contato que a equipe vai continuar o atendimento pelo WhatsApp e registra o contato para follow-up.
+          </p>
+        </div>
+      )}
+
+      {/* Nota sobre campanhas */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+        <p className="text-xs font-semibold text-gray-700 mb-1.5">O objetivo define a configuração automática das campanhas</p>
+        <ul className="space-y-1">
+          {[
+            objetivo === 'agendar-reunioes' && 'Campanhas vão exibir campo de agenda e slot de horário para o vendedor receber a reunião',
+            objetivo === 'whatsapp' && 'Campanhas vão exibir o número de WhatsApp e o agente não precisará de integração com agenda',
+            objetivo === 'upselling' && 'Campanhas vão permitir importar base de clientes existentes com histórico de compra',
+            objetivo === 'cobranca' && 'Campanhas vão incluir campo de valor em dívida, data de vencimento e regras de desconto por contato',
+            objetivo === 'pesquisa' && 'Campanhas vão usar o roteiro de pesquisa definido no setup para estruturar a coleta de respostas',
+          ].filter(Boolean).map((t, i) => (
+            <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
+              <Check size={11} className="text-brand-500 shrink-0 mt-0.5" /> {t}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }
@@ -2252,6 +2425,8 @@ export default function OnboardingPage() {
       cnpj: form['empresa-cnpj'],
       segmento: form['empresa-segmento'],
       site: form['empresa-site'],
+      objetivo: form['objetivo'],
+      whatsapp_numero: form['whatsapp-numero'] || undefined,
       descricao_empresa: form['empresa-descricao'],
       diferenciais_empresa: form['empresa-diferenciais'],
       objecoes_comuns: form['empresa-objecoes-comuns'],
@@ -2461,6 +2636,7 @@ export default function OnboardingPage() {
   }
 
   const stepTitles = [
+    'Objetivo do agente',
     'Empresa e produto',
     'ICP & Script do agente',
     'Metodologia de vendas',
@@ -2795,8 +2971,9 @@ export default function OnboardingPage() {
 
           <h2 className="text-lg font-semibold text-gray-900 mb-6">{stepTitles[step]}</h2>
 
-          {step === 0 && <Step1 form={form} onChange={onChange} errors={errors} materiais={materiais} onMateriaisChange={setMateriais} />}
-          {step === 1 && (
+          {step === 0 && <StepObjetivo form={form} onChange={onChange} />}
+          {step === 1 && <Step1 form={form} onChange={onChange} errors={errors} materiais={materiais} onMateriaisChange={setMateriais} />}
+          {step === 2 && (
             <Step3
               form={form}
               onChange={onChange}
@@ -2806,16 +2983,16 @@ export default function OnboardingPage() {
               onRegioesChange={setRegioes}
             />
           )}
-          {step === 2 && <StepMetodologia form={form} onChange={onChange} />}
-          {step === 3 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
-          {step === 4 && (
+          {step === 3 && <StepMetodologia form={form} onChange={onChange} />}
+          {step === 4 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
+          {step === 5 && (
             <StepLigacoesReferencia
               ligacoesSucesso={ligSucesso} onSucessoChange={setLigSucesso}
               ligacoesInsucesso={ligInsucesso} onInsucessoChange={setLigInsucesso}
             />
           )}
-          {step === 5 && <StepVozTom form={form} onChange={onChange} />}
-          {step === 6 && (
+          {step === 6 && <StepVozTom form={form} onChange={onChange} />}
+          {step === 7 && (
             <Step4
               form={form}
               activated={activated}
@@ -2835,7 +3012,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 6 && activated) && (
+          {!(step === 7 && activated) && (
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
