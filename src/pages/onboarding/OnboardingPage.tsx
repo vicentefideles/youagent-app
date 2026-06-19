@@ -463,7 +463,7 @@ function Step1({
 
       {/* Site */}
       <div className="col-span-2">
-        <Field label="Site da empresa">
+        <Field label="Site da empresa" required error={errors['empresa-site']}>
           <input
             id="empresa-site"
             className={inputCls}
@@ -1825,6 +1825,9 @@ export default function OnboardingPage() {
     }
     if (step === 0 && !form['empresa-nome'].trim()) {
       newErrors['empresa-nome'] = 'Nome da empresa é obrigatório'
+    }
+    if (step === 0 && !form['empresa-site'].trim()) {
+      newErrors['empresa-site'] = 'Site da empresa é obrigatório — necessário para a IA pesquisar'
     }
     if (step === 0 && !form['prod-nome'].trim()) {
       newErrors['prod-nome'] = 'Nome do produto é obrigatório'
