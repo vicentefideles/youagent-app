@@ -344,7 +344,9 @@ function Step1({
         script_abertura?: string
         descricao_produto?: string
         resultados_clientes?: string
+        nome_produto?: string
       }
+      if (data.nome_produto) onChange('prod-nome', data.nome_produto)
       if (data.descricao) onChange('empresa-descricao', data.descricao)
       if (data.diferenciais) onChange('empresa-diferenciais', data.diferenciais)
       if (data.concorrentes) onChange('prod-concorrentes', data.concorrentes)
