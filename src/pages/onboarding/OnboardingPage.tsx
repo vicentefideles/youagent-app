@@ -350,6 +350,7 @@ function Step1({
         descricao_produto?: string
         resultados_clientes?: string
         nome_produto?: string
+        cases_sucesso?: string
       }
       if (data.nome_produto) onChange('prod-nome', data.nome_produto)
       if (data.descricao) onChange('empresa-descricao', data.descricao)
@@ -367,6 +368,7 @@ function Step1({
       if (data.script_abertura) onChange('script-abertura', data.script_abertura)
       if ((data as { descricao_produto?: string }).descricao_produto) onChange('prod-descricao', (data as { descricao_produto?: string }).descricao_produto!)
       if ((data as { resultados_clientes?: string }).resultados_clientes) onChange('prod-resultados', (data as { resultados_clientes?: string }).resultados_clientes!)
+      if (data.cases_sucesso) onChange('prod-info-extra', data.cases_sucesso)
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { error?: string } } })?.response?.data
       const msg = axiosData?.error ?? (err instanceof Error ? err.message : 'Erro ao pesquisar')
