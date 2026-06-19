@@ -371,6 +371,25 @@ function Step1({
 
   return (
     <div className="grid grid-cols-2 gap-4">
+      {/* Banner Pesquisar com IA — topo */}
+      <div className="col-span-2 flex items-center justify-between gap-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-gray-800">🔍 Deixa a IA preencher por você</span>
+          <span className="text-xs text-gray-500">Informe o site da empresa e clique em Pesquisar — nossa IA extrai dados reais, pesquisa concorrentes, objeções e preenche todos os campos automaticamente.</span>
+        </div>
+        <button
+          type="button"
+          onClick={pesquisarComIA}
+          disabled={pesquisando}
+          className="shrink-0 flex items-center gap-1.5 text-sm px-4 py-2 bg-brand hover:bg-brand-600 disabled:opacity-60 text-white font-medium rounded-lg transition-colors"
+        >
+          {pesquisando
+            ? <><Loader2 size={14} className="animate-spin" /> Pesquisando...</>
+            : <><Brain size={14} /> Pesquisar com IA</>
+          }
+        </button>
+      </div>
+
       {/* Nome do agente */}
       <div className="col-span-2">
         <Field label="Nome do agente" required error={errors['nome-agente']}>
@@ -500,24 +519,6 @@ function Step1({
         <p className="text-xs text-gray-400 mt-1">Nossa IA preenche automaticamente ao pesquisar — você pode editar antes de ativar o agente</p>
       </div>
 
-      {/* Banner Pesquisar com IA */}
-      <div className="col-span-2 flex items-center justify-between gap-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-gray-800">🔍 Deixa a IA pesquisar seu mercado</span>
-          <span className="text-xs text-gray-500">Informando empresa e site, nossa IA pesquisa concorrentes, perfil do decisor, objeções e argumentos do seu setor — e preenche os campos automaticamente.</span>
-        </div>
-        <button
-          type="button"
-          onClick={pesquisarComIA}
-          disabled={pesquisando}
-          className="shrink-0 flex items-center gap-1.5 text-sm px-4 py-2 bg-brand hover:bg-brand-600 disabled:opacity-60 text-white font-medium rounded-lg transition-colors"
-        >
-          {pesquisando
-            ? <><Loader2 size={14} className="animate-spin" /> Pesquisando...</>
-            : <><Brain size={14} /> Pesquisar com IA</>
-          }
-        </button>
-      </div>
       {pesquisaErro && <p className="col-span-2 text-xs text-red-500">{pesquisaErro}</p>}
 
       {/* Divisor Produto */}
