@@ -27,7 +27,7 @@ import {
   PhoneForwarded,
   CalendarCheck,
   Paperclip,
-  FileText,
+  Plus,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -261,94 +261,96 @@ const textareaCls =
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
-function MateriaisUpload({ files, onFilesChange }: { files: File[]; onFilesChange: (f: File[]) => void }) {
-  const inputRef = React.useRef<HTMLInputElement>(null)
-  const [dragOver, setDragOver] = useState(false)
+interface Material {
+  file: File | null
+  tipo: string
+}
 
-  const TIPOS_ACEITOS = [
-    'application/pdf',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ]
+function MateriaisUpload({ materiais, onMateriaisChange }: { materiais: Material[]; onMateriaisChange: (m: Material[]) => void }) {
+  const inputRefs = React.useRef<(HTMLInputElement | null)[]>([])
+
+  const TIPOS = ['Apresentação', 'eBook', 'Case de Sucesso', 'Comparativo', 'Manual', 'One-Pager', 'Outro']
   const MAX_MB = 25
+  const TIPOS_ACEITOS = '.pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt'
 
-  function validarArquivo(file: File): string | null {
-    if (!TIPOS_ACEITOS.includes(file.type)) return 'Tipo não suportado. Use PDF, PowerPoint ou Word.'
-    if (file.size > MAX_MB * 1024 * 1024) return `Arquivo muito grande. Máximo ${MAX_MB}MB.`
-    return null
+  function adicionarLinha() {
+    onMateriaisChange([...materiais, { file: null, tipo: '' }])
   }
 
-  function adicionarArquivos(novos: FileList | null) {
-    if (!novos) return
-    const validos: File[] = []
-    Array.from(novos).forEach(f => {
-      const erro = validarArquivo(f)
-      if (!erro && !files.some(ex => ex.name === f.name)) validos.push(f)
-    })
-    onFilesChange([...files, ...validos])
+  function removerLinha(i: number) {
+    if (materiais.length === 1) {
+      onMateriaisChange([{ file: null, tipo: '' }])
+    } else {
+      onMateriaisChange(materiais.filter((_, idx) => idx !== i))
+    }
   }
 
-  function remover(nome: string) {
-    onFilesChange(files.filter(f => f.name !== nome))
+  function onFileChange(i: number, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > MAX_MB * 1024 * 1024) { alert(`Arquivo muito grande. Máximo ${MAX_MB}MB.`); return }
+    const next = materiais.map((m, idx) => idx === i ? { ...m, file } : m)
+    onMateriaisChange(next)
   }
 
-  function formatarTamanho(bytes: number) {
-    return bytes > 1024 * 1024
-      ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
-      : `${(bytes / 1024).toFixed(0)}KB`
+  function onTipoChange(i: number, tipo: string) {
+    const next = materiais.map((m, idx) => idx === i ? { ...m, tipo } : m)
+    onMateriaisChange(next)
   }
 
   return (
     <div className="col-span-2 flex flex-col gap-3">
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-1">Materiais do produto para o agente estudar</p>
-        <p className="text-xs text-gray-400">
-          Faça upload de PDFs, apresentações ou documentos sobre o produto. O agente usa esse conteúdo para ficar especialista no que você vende.
-        </p>
+        <p className="text-sm font-semibold text-brand uppercase tracking-wide mb-1">Materiais da empresa <span className="text-gray-400 font-normal normal-case">(quanto mais, melhor)</span></p>
+        <p className="text-xs text-gray-500 mb-3">Suba qualquer material que ajude o agente a entender melhor sua empresa, produto e mercado. Apresentações, ebooks, cases de sucesso, comparativos com concorrentes — tudo é útil para o treinamento.</p>
       </div>
-      <div
-        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={e => { e.preventDefault(); setDragOver(false); adicionarArquivos(e.dataTransfer.files) }}
-        onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl px-6 py-8 flex flex-col items-center gap-2 cursor-pointer transition-colors ${
-          dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50'
-        }`}
+      <div className="flex flex-col gap-2">
+        {materiais.map((m, i) => (
+          <div key={i} className="flex items-center gap-2 border border-dashed border-gray-200 rounded-lg px-3 py-2">
+            <input
+              ref={el => { inputRefs.current[i] = el }}
+              type="file"
+              accept={TIPOS_ACEITOS}
+              className="hidden"
+              onChange={e => onFileChange(i, e)}
+            />
+            <button
+              type="button"
+              onClick={() => inputRefs.current[i]?.click()}
+              className="flex items-center gap-2 flex-1 text-left min-w-0"
+            >
+              <Paperclip size={14} className="text-gray-400 shrink-0" />
+              <span className={`text-sm truncate ${m.file ? 'text-gray-800' : 'text-gray-400'}`}>
+                {m.file ? m.file.name : 'Clique para enviar material'}
+              </span>
+              {m.file && <span className="text-xs text-gray-400 shrink-0">{(m.file.size / 1024 / 1024).toFixed(1)}MB</span>}
+            </button>
+            <select
+              value={m.tipo}
+              onChange={e => onTipoChange(i, e.target.value)}
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 bg-white shrink-0"
+            >
+              <option value="">Tipo do material</option>
+              {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => removerLinha(i)}
+              className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={adicionarLinha}
+        className="self-start text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
       >
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.ppt,.pptx,.doc,.docx"
-          className="hidden"
-          onChange={e => adicionarArquivos(e.target.files)}
-        />
-        <Paperclip size={28} className="text-gray-400" />
-        <p className="text-sm font-medium text-gray-700">Arraste arquivos aqui ou clique para selecionar</p>
-        <p className="text-xs text-gray-400">PDF, PowerPoint, Word — máximo 25MB por arquivo</p>
-      </div>
-      {files.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {files.map(f => (
-            <div key={f.name} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText size={14} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700 truncate">{f.name}</span>
-                <span className="text-xs text-gray-400 shrink-0">{formatarTamanho(f.size)}</span>
-              </div>
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); remover(f.name) }}
-                className="text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+        <Plus size={14} />
+        Adicionar outro material
+      </button>
     </div>
   )
 }
@@ -363,8 +365,8 @@ function Step1({
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
   errors: Partial<Record<keyof FormData, string>>
-  materiais: File[]
-  onMateriaisChange: (f: File[]) => void
+  materiais: Material[]
+  onMateriaisChange: (m: Material[]) => void
 }) {
   const [pesquisando, setPesquisando] = useState(false)
   const [pesquisaErro, setPesquisaErro] = useState<string | null>(null)
@@ -695,7 +697,7 @@ function Step1({
       </div>
 
       {/* Upload de materiais */}
-      <MateriaisUpload files={materiais} onFilesChange={onMateriaisChange} />
+      <MateriaisUpload materiais={materiais} onMateriaisChange={onMateriaisChange} />
     </div>
   )
 }
@@ -1892,7 +1894,7 @@ export default function OnboardingPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const [regioes, setRegioes] = useState<string[]>([])
-  const [materiais, setMateriais] = useState<File[]>([])
+  const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '' }])
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -2019,10 +2021,14 @@ export default function OnboardingPage() {
       setActivatingStep(2)
 
       // Upload de materiais (silencioso — não bloqueia ativação se falhar)
-      if (materiais.length > 0 && agenteId) {
+      const comArquivo = materiais.filter(m => m.file !== null)
+      if (comArquivo.length > 0 && agenteId) {
         try {
           const fd = new FormData()
-          materiais.forEach(f => fd.append('files', f))
+          comArquivo.forEach(m => {
+            fd.append('files', m.file!)
+            fd.append('tipos', m.tipo || 'Outro')
+          })
           const token = localStorage.getItem('youagent_jwt')
           await fetch(
             `${import.meta.env.VITE_API_URL || 'https://app.etztech.com'}/api/v1/agentes/${agenteId}/materiais`,
@@ -2146,7 +2152,7 @@ export default function OnboardingPage() {
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
     setRegioes([])
-    setMateriais([])
+    setMateriais([{ file: null, tipo: '' }])
     setEditandoId(null)
     setStep(0)
     setActivated(false)
