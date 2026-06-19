@@ -26,6 +26,8 @@ import {
   Shield,
   PhoneForwarded,
   CalendarCheck,
+  Paperclip,
+  FileText,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -259,14 +261,110 @@ const textareaCls =
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
+function MateriaisUpload({ files, onFilesChange }: { files: File[]; onFilesChange: (f: File[]) => void }) {
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
+
+  const TIPOS_ACEITOS = [
+    'application/pdf',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ]
+  const MAX_MB = 25
+
+  function validarArquivo(file: File): string | null {
+    if (!TIPOS_ACEITOS.includes(file.type)) return 'Tipo não suportado. Use PDF, PowerPoint ou Word.'
+    if (file.size > MAX_MB * 1024 * 1024) return `Arquivo muito grande. Máximo ${MAX_MB}MB.`
+    return null
+  }
+
+  function adicionarArquivos(novos: FileList | null) {
+    if (!novos) return
+    const validos: File[] = []
+    Array.from(novos).forEach(f => {
+      const erro = validarArquivo(f)
+      if (!erro && !files.some(ex => ex.name === f.name)) validos.push(f)
+    })
+    onFilesChange([...files, ...validos])
+  }
+
+  function remover(nome: string) {
+    onFilesChange(files.filter(f => f.name !== nome))
+  }
+
+  function formatarTamanho(bytes: number) {
+    return bytes > 1024 * 1024
+      ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
+      : `${(bytes / 1024).toFixed(0)}KB`
+  }
+
+  return (
+    <div className="col-span-2 flex flex-col gap-3">
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Materiais do produto para o agente estudar</p>
+        <p className="text-xs text-gray-400">
+          Faça upload de PDFs, apresentações ou documentos sobre o produto. O agente usa esse conteúdo para ficar especialista no que você vende.
+        </p>
+      </div>
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); adicionarArquivos(e.dataTransfer.files) }}
+        onClick={() => inputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl px-6 py-8 flex flex-col items-center gap-2 cursor-pointer transition-colors ${
+          dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50'
+        }`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".pdf,.ppt,.pptx,.doc,.docx"
+          className="hidden"
+          onChange={e => adicionarArquivos(e.target.files)}
+        />
+        <Paperclip size={28} className="text-gray-400" />
+        <p className="text-sm font-medium text-gray-700">Arraste arquivos aqui ou clique para selecionar</p>
+        <p className="text-xs text-gray-400">PDF, PowerPoint, Word — máximo 25MB por arquivo</p>
+      </div>
+      {files.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {files.map(f => (
+            <div key={f.name} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={14} className="text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-700 truncate">{f.name}</span>
+                <span className="text-xs text-gray-400 shrink-0">{formatarTamanho(f.size)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); remover(f.name) }}
+                className="text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Step1({
   form,
   onChange,
   errors,
+  materiais,
+  onMateriaisChange,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
   errors: Partial<Record<keyof FormData, string>>
+  materiais: File[]
+  onMateriaisChange: (f: File[]) => void
 }) {
   const [pesquisando, setPesquisando] = useState(false)
   const [pesquisaErro, setPesquisaErro] = useState<string | null>(null)
@@ -595,6 +693,9 @@ function Step1({
           />
         </Field>
       </div>
+
+      {/* Upload de materiais */}
+      <MateriaisUpload files={materiais} onFilesChange={onMateriaisChange} />
     </div>
   )
 }
@@ -1791,6 +1892,7 @@ export default function OnboardingPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const [regioes, setRegioes] = useState<string[]>([])
+  const [materiais, setMateriais] = useState<File[]>([])
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -1907,12 +2009,34 @@ export default function OnboardingPage() {
     }
     try {
       setActivatingStep(1)
+      let agenteId: string = editandoId || ''
       if (editandoId) {
         await agentesApi.update(editandoId, payload)
       } else {
-        await agentesApi.create(payload)
+        const res = await agentesApi.create(payload)
+        agenteId = (res.data as { id?: string })?.id || ''
       }
       setActivatingStep(2)
+
+      // Upload de materiais (silencioso — não bloqueia ativação se falhar)
+      if (materiais.length > 0 && agenteId) {
+        try {
+          const fd = new FormData()
+          materiais.forEach(f => fd.append('files', f))
+          const token = localStorage.getItem('youagent_jwt')
+          await fetch(
+            `${import.meta.env.VITE_API_URL || 'https://app.etztech.com'}/api/v1/agentes/${agenteId}/materiais`,
+            {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: fd,
+            }
+          )
+        } catch {
+          // silently ignore — materiais são opcionais
+        }
+      }
+
       await new Promise(r => setTimeout(r, 600))
       setActivatingStep(3)
       await new Promise(r => setTimeout(r, 400))
@@ -2021,6 +2145,8 @@ export default function OnboardingPage() {
   function reset() {
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
+    setRegioes([])
+    setMateriais([])
     setEditandoId(null)
     setStep(0)
     setActivated(false)
@@ -2364,7 +2490,7 @@ export default function OnboardingPage() {
 
           <h2 className="text-lg font-semibold text-gray-900 mb-6">{stepTitles[step]}</h2>
 
-          {step === 0 && <Step1 form={form} onChange={onChange} errors={errors} />}
+          {step === 0 && <Step1 form={form} onChange={onChange} errors={errors} materiais={materiais} onMateriaisChange={setMateriais} />}
           {step === 1 && (
             <Step3
               form={form}
