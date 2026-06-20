@@ -1456,170 +1456,255 @@ function Step3({ form, onChange }: {
   )
 }
 
-function StepScriptLigacao({ form, onChange, scriptFile, onScriptFileChange }: {
-  form: FormData
-  onChange: (k: keyof FormData, v: string) => void
-  scriptFile: File | null
-  onScriptFileChange: (f: File | null) => void
+type ScriptSlot = {
+  id: string
+  fileName: string | null
+  texto: string
+  analise: string | null
+  extraindo: boolean
+  erro: string | null
+}
+
+function ScriptSlotCard({
+  slot,
+  index,
+  total,
+  onTextoChange,
+  onFileSelect,
+  onRemoverArquivo,
+  onRemoverSlot,
+}: {
+  slot: ScriptSlot
+  index: number
+  total: number
+  onTextoChange: (id: string, texto: string) => void
+  onFileSelect: (id: string, file: File) => void
+  onRemoverArquivo: (id: string) => void
+  onRemoverSlot: (id: string) => void
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null)
-  const [extraindo, setExtraindo] = React.useState(false)
-  const [resumoIA, setResumoIA] = React.useState<string | null>(null)
-  const [erroExtracao, setErroExtracao] = React.useState<string | null>(null)
-
-  async function handleFileSelect(file: File) {
-    onScriptFileChange(file)
-    setResumoIA(null)
-    setErroExtracao(null)
-    setExtraindo(true)
-    try {
-      const { data } = await agentesApi.extrairScript(file)
-      if (data.texto) {
-        onChange('script-ligacao', data.texto)
-        setResumoIA(data.resumo || null)
-      } else {
-        setErroExtracao('O sistema não conseguiu extrair texto deste arquivo. Verifique se é PDF, Word ou TXT válido.')
-      }
-    } catch {
-      setErroExtracao('Erro ao processar o arquivo. Tente novamente ou cole o texto manualmente.')
-    } finally {
-      setExtraindo(false)
-    }
-  }
-
-  function handleRemover() {
-    onScriptFileChange(null)
-    onChange('script-ligacao', '')
-    setResumoIA(null)
-    setErroExtracao(null)
-  }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0 mt-0.5">
-          <FileText size={18} className="text-brand-600" />
-        </div>
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Script de ligação</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Envie seu script de vendas ou cole o texto abaixo. O sistema vai ler o conteúdo e usar cada detalhe para tornar o agente mais preciso — argumentos, objeções, fluxo e vocabulário do seu mercado.
-          </p>
-        </div>
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      {/* Header do slot */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+          Script {index + 1}
+        </span>
+        {total > 1 && (
+          <button
+            type="button"
+            onClick={() => onRemoverSlot(slot.id)}
+            className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
+          >
+            <X size={12} /> Remover este script
+          </button>
+        )}
       </div>
 
-      {/* Zona de upload */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-brand uppercase tracking-wide">
-          Enviar arquivo do script <span className="text-gray-400 font-normal normal-case">(PDF, Word ou TXT)</span>
-        </p>
+      <div className="p-4 flex flex-col gap-3">
+        {/* Zona de upload — só aparece se não tem arquivo */}
         <input
           ref={inputRef}
           type="file"
           accept=".pdf,.doc,.docx,.txt"
           className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f) }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) { onFileSelect(slot.id, f); e.target.value = '' } }}
         />
 
-        {!scriptFile && !extraindo && (
+        {!slot.fileName && !slot.extraindo && (
           <div
             onClick={() => inputRef.current?.click()}
-            className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-200 rounded-xl p-10 cursor-pointer hover:border-brand-300 hover:bg-brand-50 transition-colors"
+            className="flex items-center gap-3 border border-dashed border-gray-300 rounded-lg px-4 py-3 cursor-pointer hover:border-brand-300 hover:bg-brand-50 transition-colors"
           >
-            <Upload size={32} className="text-gray-400" />
-            <div className="text-center">
-              <p className="text-sm font-semibold text-gray-700">Clique para enviar o arquivo</p>
-              <p className="text-xs text-gray-400 mt-0.5">PDF, Word (.docx) ou TXT — máximo 25MB</p>
+            <Upload size={16} className="text-gray-400 shrink-0" />
+            <div>
+              <p className="text-sm text-gray-600 font-medium">Enviar arquivo (opcional)</p>
+              <p className="text-xs text-gray-400">PDF, Word ou TXT — máx. 25MB</p>
             </div>
           </div>
         )}
 
-        {extraindo && (
-          <div className="flex flex-col items-center justify-center gap-3 border-2 border-brand-200 rounded-xl p-10 bg-brand-50">
-            <div className="w-8 h-8 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
-            <div className="text-center">
-              <p className="text-sm font-semibold text-brand-700">Lendo o arquivo...</p>
-              <p className="text-xs text-brand-500 mt-0.5">O sistema está extraindo o conteúdo e identificando o que vai para o agente</p>
+        {slot.extraindo && (
+          <div className="flex items-center gap-3 bg-brand-50 border border-brand-200 rounded-lg px-4 py-3">
+            <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-brand-700">Lendo e analisando o arquivo...</p>
+              <p className="text-xs text-brand-500">Identificando abertura, perguntas, objeções e técnicas</p>
             </div>
           </div>
         )}
 
-        {/* Card de confirmação — aparece após extração bem-sucedida */}
-        {scriptFile && !extraindo && !erroExtracao && form['script-ligacao'] && (
-          <div className="border border-emerald-200 rounded-xl bg-emerald-50 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100">
-              <div className="flex items-center gap-2">
-                <Check size={16} className="text-emerald-600" />
-                <p className="text-sm font-semibold text-emerald-800">Script lido com sucesso</p>
-                <span className="text-xs text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5">
-                  {scriptFile.name}
-                </span>
-                <span className="text-xs text-emerald-500">
-                  {form['script-ligacao'].length.toLocaleString('pt-BR')} caracteres extraídos
-                </span>
+        {/* Card de análise precisa — após extração */}
+        {slot.fileName && !slot.extraindo && !slot.erro && slot.texto && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-emerald-100">
+              <div className="flex items-center gap-2 min-w-0">
+                <Check size={13} className="text-emerald-600 shrink-0" />
+                <span className="text-xs font-semibold text-emerald-800 truncate">{slot.fileName}</span>
+                <span className="text-xs text-emerald-500 shrink-0">{slot.texto.length.toLocaleString('pt-BR')} caracteres</span>
               </div>
               <button
                 type="button"
-                onClick={handleRemover}
-                className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 shrink-0"
+                onClick={() => onRemoverArquivo(slot.id)}
+                className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 shrink-0 ml-2"
               >
-                <X size={12} /> Remover
+                <X size={11} /> Remover arquivo
               </button>
             </div>
-            {resumoIA && (
-              <div className="px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <Brain size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-emerald-700 mb-1">O que o sistema identificou no script:</p>
-                    <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{resumoIA}</p>
-                  </div>
+            {slot.analise && (
+              <div className="px-3 py-2.5 flex items-start gap-2">
+                <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 mb-1">Análise do sistema:</p>
+                  <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{slot.analise}</p>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {erroExtracao && (
-          <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+        {slot.erro && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+            <AlertTriangle size={13} className="text-red-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs text-red-700 font-medium">{erroExtracao}</p>
-              <button type="button" onClick={() => { onScriptFileChange(null); setErroExtracao(null) }} className="text-xs text-red-500 underline mt-1">Tentar outro arquivo</button>
+              <p className="text-xs text-red-700 font-medium">{slot.erro}</p>
+              <button type="button" onClick={() => onRemoverArquivo(slot.id)} className="text-xs text-red-500 underline mt-0.5">Tentar outro arquivo</button>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Divisor */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-xs text-gray-400 font-medium">ou escreva/cole o script manualmente</span>
-        <div className="flex-1 h-px bg-gray-200" />
-      </div>
-
-      {/* Textarea manual */}
-      <div className="flex flex-col gap-2">
+        {/* Textarea — sempre visível, pré-preenchido se arquivo extraído */}
         <textarea
-          rows={scriptFile && form['script-ligacao'] ? 6 : 12}
-          value={form['script-ligacao']}
-          onChange={e => onChange('script-ligacao', e.target.value)}
-          placeholder={`Cole o texto do script de vendas da sua empresa...
+          rows={slot.fileName && slot.texto ? 5 : 9}
+          value={slot.texto}
+          onChange={e => onTextoChange(slot.id, e.target.value)}
+          placeholder={`Cole o texto do script aqui ou envie um arquivo acima...
 
-Exemplo:
-"Olá [Nome], tudo bem? Aqui é [Agente] da [Empresa]. Estou ligando porque vimos que vocês [contexto]. Você tem 2 minutinhos?
-
-[Se sim] Perfeito! Então deixa eu te fazer uma pergunta rápida: vocês hoje..."`}
-          className="border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300"
+Ex: "Olá [Nome], aqui é [Agente] da [Empresa]. Ligando porque vocês [contexto]. Tem 2 minutos?"`}
+          className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300 w-full"
         />
-        {form['script-ligacao'] && !scriptFile && (
-          <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-            <Check size={12} />
-            {form['script-ligacao'].length.toLocaleString('pt-BR')} caracteres — o agente vai estudar esse conteúdo
-          </div>
-        )}
       </div>
+    </div>
+  )
+}
+
+function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+  onScriptFilesChange: (files: File[]) => void
+}) {
+  const [slots, setSlots] = React.useState<ScriptSlot[]>([
+    { id: '1', fileName: null, texto: form['script-ligacao'] || '', analise: null, extraindo: false, erro: null }
+  ])
+
+  // Sincroniza todos os textos dos slots para form['script-ligacao']
+  function syncForm(updatedSlots: ScriptSlot[]) {
+    const textos = updatedSlots.map((s, i) =>
+      updatedSlots.length > 1 && s.texto.trim()
+        ? `=== SCRIPT ${i + 1}${s.fileName ? ` (${s.fileName})` : ''} ===\n${s.texto.trim()}`
+        : s.texto.trim()
+    ).filter(Boolean)
+    onChange('script-ligacao', textos.join('\n\n'))
+
+    // Arquivos para upload pós-ativação
+    onScriptFilesChange(updatedSlots.map(s => s.fileName).filter(Boolean) as unknown as File[])
+  }
+
+  function updateSlot(id: string, patch: Partial<ScriptSlot>) {
+    setSlots(prev => {
+      const next = prev.map(s => s.id === id ? { ...s, ...patch } : s)
+      syncForm(next)
+      return next
+    })
+  }
+
+  async function handleFileSelect(id: string, file: File) {
+    updateSlot(id, { fileName: file.name, extraindo: true, erro: null, analise: null })
+    try {
+      const { data } = await agentesApi.extrairScript(file)
+      if (data.texto) {
+        updateSlot(id, { texto: data.texto, analise: data.resumo || null, extraindo: false })
+      } else {
+        updateSlot(id, { extraindo: false, erro: 'Não foi possível extrair texto. Verifique se é PDF, Word ou TXT válido.', fileName: null })
+      }
+    } catch {
+      updateSlot(id, { extraindo: false, erro: 'Erro ao processar o arquivo. Cole o texto manualmente.', fileName: null })
+    }
+  }
+
+  function handleTextoChange(id: string, texto: string) {
+    updateSlot(id, { texto })
+  }
+
+  function handleRemoverArquivo(id: string) {
+    updateSlot(id, { fileName: null, analise: null, erro: null, texto: '' })
+  }
+
+  function handleRemoverSlot(id: string) {
+    setSlots(prev => {
+      const next = prev.filter(s => s.id !== id)
+      syncForm(next)
+      return next
+    })
+  }
+
+  function adicionarScript() {
+    setSlots(prev => [...prev, {
+      id: Date.now().toString(),
+      fileName: null, texto: '', analise: null, extraindo: false, erro: null
+    }])
+  }
+
+  const totalCaracteres = slots.reduce((acc, s) => acc + s.texto.length, 0)
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0 mt-0.5">
+          <FileText size={18} className="text-brand-600" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Roteiros de ligação</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Adicione um ou mais scripts. Quanto mais material, mais preciso o agente — o sistema lê cada arquivo, identifica abertura, perguntas, objeções e técnicas, e injeta tudo no prompt final.
+          </p>
+        </div>
+      </div>
+
+      {/* Slots */}
+      {slots.map((slot, index) => (
+        <ScriptSlotCard
+          key={slot.id}
+          slot={slot}
+          index={index}
+          total={slots.length}
+          onTextoChange={handleTextoChange}
+          onFileSelect={handleFileSelect}
+          onRemoverArquivo={handleRemoverArquivo}
+          onRemoverSlot={handleRemoverSlot}
+        />
+      ))}
+
+      {/* Adicionar mais */}
+      <button
+        type="button"
+        onClick={adicionarScript}
+        className="flex items-center justify-center gap-2 border-2 border-dashed border-brand-200 rounded-xl py-3 text-sm font-medium text-brand-600 hover:bg-brand-50 hover:border-brand-300 transition-colors"
+      >
+        <Plus size={16} /> Adicionar outro script
+      </button>
+
+      {/* Rodapé — total */}
+      {totalCaracteres > 0 && (
+        <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          <Check size={12} />
+          <span>
+            <span className="font-semibold">{totalCaracteres.toLocaleString('pt-BR')} caracteres</span> de roteiro identificados — tudo vai para o prompt final do agente
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -2617,7 +2702,7 @@ export default function OnboardingPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '' }])
-  const [scriptFile, setScriptFile] = useState<File | null>(null)
+  const [scriptFiles, setScriptFiles] = useState<File[]>([])
   const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso' }])
   const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'insucesso' }])
   const [activatingStep, setActivatingStep] = useState(0)
@@ -2751,11 +2836,10 @@ export default function OnboardingPage() {
       }
       setActivatingStep(2)
 
-      // Upload de materiais + script (silencioso — não bloqueia ativação se falhar)
+      // Upload de materiais + scripts (silencioso — não bloqueia ativação se falhar)
       const comArquivo = materiais.filter(m => m.file !== null)
-      const todosArquivos = scriptFile
-        ? [...comArquivo, { file: scriptFile, tipo: 'Script de Ligação' }]
-        : comArquivo
+      const scriptsMaterial = scriptFiles.map((f, i) => ({ file: f, tipo: scriptFiles.length > 1 ? `Script de Ligação ${i + 1}` : 'Script de Ligação' }))
+      const todosArquivos = [...comArquivo, ...scriptsMaterial]
       if (todosArquivos.length > 0 && agenteId) {
         try {
           const fd = new FormData()
@@ -2909,7 +2993,7 @@ export default function OnboardingPage() {
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
     setMateriais([{ file: null, tipo: '' }])
-    setScriptFile(null)
+    setScriptFiles([])
     setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso' }])
     setLigInsucesso([{ file: null, observacao: '', resultado: 'insucesso' }])
     setEditandoId(null)
@@ -3279,7 +3363,7 @@ export default function OnboardingPage() {
           {step === 5 && <StepGatilhosFechamento form={form} onChange={onChange} />}
           {step === 6 && <StepPublicoAlvo form={form} onChange={onChange} />}
           {step === 7 && <StepMetodologia form={form} onChange={onChange} />}
-          {step === 8 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
+          {step === 8 && <StepScriptLigacao form={form} onChange={onChange} onScriptFilesChange={setScriptFiles} />}
           {step === 9 && (
             <StepLigacoesReferencia
               ligacoesSucesso={ligSucesso} onSucessoChange={setLigSucesso}
