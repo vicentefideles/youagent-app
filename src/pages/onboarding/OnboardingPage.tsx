@@ -197,10 +197,42 @@ const TONS_CARDS = [
 ]
 
 const METODOLOGIAS = [
-  { id: 'consultivo', label: 'Consultivo', descricao: 'Faz perguntas, descobre necessidades' },
-  { id: 'spin', label: 'SPIN Selling', descricao: 'Situação → Problema → Implicação → Necessidade' },
-  { id: 'bant', label: 'BANT', descricao: 'Budget, Authority, Need, Timeline' },
-  { id: 'direto', label: 'Direto', descricao: 'Apresenta proposta rapidamente' },
+  {
+    id: 'consultivo',
+    label: 'Consultivo',
+    tagline: 'Descobre antes de propor',
+    descricao: 'O agente faz perguntas estratégicas para entender o contexto e as dores do prospect antes de apresentar qualquer solução. Cria rapport genuíno e aumenta a taxa de aceitação da reunião.',
+    melhorPara: 'Produtos de alto valor, ciclo longo, múltiplos decisores',
+    exemplo: '"Quero entender melhor como vocês fazem hoje antes de sugerir qualquer coisa."',
+    recomendado: true,
+  },
+  {
+    id: 'spin',
+    label: 'SPIN Selling',
+    tagline: 'Cria urgência sem pressão',
+    descricao: 'O agente conduz uma sequência lógica: Situação → Problema → Implicação → Necessidade. Faz o prospect perceber a dor por conta própria e enxergar a reunião como solução natural.',
+    melhorPara: 'Prospects que ainda não percebem o problema claramente',
+    exemplo: '"E quando isso acontece, qual o impacto no resultado do time?"',
+    recomendado: true,
+  },
+  {
+    id: 'bant',
+    label: 'BANT',
+    tagline: 'Qualifica rápido, não perde tempo',
+    descricao: 'O agente verifica Budget, Authority, Need e Timeline logo no início. Descarta rapidamente quem não tem perfil e foca o tempo nos prospects com potencial real de fechar.',
+    melhorPara: 'Alto volume de ligações, ticket médio definido, mercado amplo',
+    exemplo: '"Você é o responsável por essa decisão ou tem mais alguém envolvido?"',
+    recomendado: false,
+  },
+  {
+    id: 'direto',
+    label: 'Direto',
+    tagline: 'Proposta rápida, decisão rápida',
+    descricao: 'O agente vai direto ao ponto: apresenta o valor em 1-2 frases e pede a reunião. Sem longas qualificações. Funciona quando o prospect já conhece a categoria do produto.',
+    melhorPara: 'Produtos simples, mercado maduro, alta cadência de ligações',
+    exemplo: '"Temos uma solução que reduz X — vale 20 minutos para te mostrar?"',
+    recomendado: false,
+  },
 ]
 
 
@@ -1663,28 +1695,70 @@ function StepCenarioDores({ form, onChange }: {
 }
 
 function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  const selecionada = METODOLOGIAS.find(m => m.id === form.metodologia)
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Metodologia de vendas</p>
-        <div className="grid grid-cols-2 gap-2">
-          {METODOLOGIAS.map(m => (
+    <div className="flex flex-col gap-5">
+      {/* Contexto */}
+      <div className="p-4 rounded-xl border border-brand/20 bg-brand/5 flex items-start gap-3">
+        <Brain size={17} className="text-brand mt-0.5 shrink-0" />
+        <p className="text-xs text-gray-600 leading-relaxed">
+          A metodologia define <strong>como o agente conduz a conversa</strong> — a ordem das perguntas, o ritmo e o momento de propor a reunião. Ela é incorporada ao prompt final e influencia cada ligação.
+        </p>
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-1 gap-3">
+        {METODOLOGIAS.map(m => {
+          const ativo = form.metodologia === m.id
+          return (
             <button
               key={m.id}
               type="button"
               onClick={() => onChange('metodologia', m.id)}
-              className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
-                form.metodologia === m.id
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+              className={`text-left p-4 rounded-xl border-2 transition-all ${
+                ativo
+                  ? 'border-brand bg-brand/5 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
-              <p className="font-semibold text-gray-900 text-sm">{m.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{m.descricao}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`font-bold text-sm ${ativo ? 'text-brand' : 'text-gray-900'}`}>{m.label}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ativo ? 'bg-brand text-white' : 'bg-gray-100 text-gray-500'}`}>{m.tagline}</span>
+                    {m.recomendado && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Recomendado</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed mb-2">{m.descricao}</p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[11px] text-gray-400"><span className="font-medium text-gray-500">Melhor para:</span> {m.melhorPara}</p>
+                    <p className="text-[11px] text-gray-400 italic"><span className="font-medium not-italic text-gray-500">Exemplo de fala:</span> {m.exemplo}</p>
+                  </div>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                  ativo ? 'border-brand bg-brand' : 'border-gray-300'
+                }`}>
+                  {ativo && <Check size={11} strokeWidth={3} className="text-white" />}
+                </div>
+              </div>
             </button>
-          ))}
-        </div>
+          )
+        })}
       </div>
+
+      {/* Resumo da seleção */}
+      {selecionada && (
+        <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+          <p className="text-xs text-gray-500">
+            <span className="font-semibold text-gray-700">Metodologia selecionada: {selecionada.label}</span>
+            {' '}— o agente vai {selecionada.id === 'consultivo' ? 'descobrir necessidades com perguntas antes de propor a reunião' :
+              selecionada.id === 'spin' ? 'guiar o prospect pela sequência Situação → Problema → Implicação → Necessidade' :
+              selecionada.id === 'bant' ? 'qualificar Budget, Authority, Need e Timeline logo nos primeiros minutos' :
+              'apresentar a proposta de valor diretamente e pedir a reunião sem longas qualificações'}.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
