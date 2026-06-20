@@ -23,7 +23,6 @@ import {
   AlertTriangle,
   Play,
   Shield,
-  PhoneForwarded,
   CalendarCheck,
   Paperclip,
   Plus,
@@ -71,8 +70,7 @@ interface FormData {
   'metodologia': string
   'compliance-anatel': string
   'compliance-optout': string
-  'capacidade-transferencia': string
-  'capacidade-agendamento': string
+
   voz: string
   tom: string
   'prompt_gerado': string
@@ -114,8 +112,7 @@ const INITIAL_FORM: FormData = {
   'metodologia': '',
   'compliance-anatel': 'true',
   'compliance-optout': 'true',
-  'capacidade-transferencia': 'false',
-  'capacidade-agendamento': 'true',
+
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
   'prompt_gerado': '',
@@ -1314,80 +1311,6 @@ function Step3({ form, onChange }: {
         <p className="text-xs text-gray-400 mt-1">Quando o agente detectar essas palavras ou contextos, ele vai priorizar a qualificação e transferência.</p>
       </div>
 
-      {/* Capacidades do agente */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Zap size={15} className="text-brand" />
-          <p className="text-sm font-medium text-gray-700">Capacidades do agente</p>
-        </div>
-        <p className="text-xs text-gray-400 mb-3">
-          Defina o que o agente pode fazer ao qualificar um lead. As capacidades ativas são usadas em todas as campanhas deste agente.
-        </p>
-        <div className="flex flex-col gap-2">
-          {/* Transferência ao vivo */}
-          <div className={`flex items-start justify-between p-3 border rounded-xl transition-colors ${
-            form['capacidade-transferencia'] === 'true' ? 'border-brand-200 bg-brand-50' : 'border-gray-200 bg-gray-50'
-          }`}>
-            <div className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                form['capacidade-transferencia'] === 'true' ? 'bg-brand-100' : 'bg-gray-200'
-              }`}>
-                <PhoneForwarded size={14} className={form['capacidade-transferencia'] === 'true' ? 'text-brand' : 'text-gray-400'} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-800">Transferência ao vivo</p>
-                <p className="text-xs text-gray-500 mt-0.5">Quando identificar interesse real, transfere a ligação para um vendedor disponível fechar na hora.</p>
-                {form['capacidade-transferencia'] === 'true' && (
-                  <p className="text-xs text-brand-600 mt-1 font-medium">Vendedores e regiões configurados na campanha.</p>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onChange('capacidade-transferencia', form['capacidade-transferencia'] === 'true' ? 'false' : 'true')}
-              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ml-3 mt-0.5 ${
-                form['capacidade-transferencia'] === 'true' ? 'bg-brand' : 'bg-gray-300'
-              }`}
-            >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                form['capacidade-transferencia'] === 'true' ? 'translate-x-5' : 'translate-x-1'
-              }`} />
-            </button>
-          </div>
-
-          {/* Agendamento de reuniões */}
-          <div className={`flex items-start justify-between p-3 border rounded-xl transition-colors ${
-            form['capacidade-agendamento'] === 'true' ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50'
-          }`}>
-            <div className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                form['capacidade-agendamento'] === 'true' ? 'bg-emerald-100' : 'bg-gray-200'
-              }`}>
-                <CalendarCheck size={14} className={form['capacidade-agendamento'] === 'true' ? 'text-emerald-600' : 'text-gray-400'} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-800">Agendamento de reuniões</p>
-                <p className="text-xs text-gray-500 mt-0.5">Quando o lead não estiver pronto para comprar agora, agenda uma reunião diretamente no calendário.</p>
-                {form['capacidade-agendamento'] === 'true' && (
-                  <p className="text-xs text-emerald-600 mt-1 font-medium">Modalidade (online/presencial) e calendário configurados na campanha.</p>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onChange('capacidade-agendamento', form['capacidade-agendamento'] === 'true' ? 'false' : 'true')}
-              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ml-3 mt-0.5 ${
-                form['capacidade-agendamento'] === 'true' ? 'bg-emerald-500' : 'bg-gray-300'
-              }`}
-            >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                form['capacidade-agendamento'] === 'true' ? 'translate-x-5' : 'translate-x-1'
-              }`} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Compliance LGPD */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -1890,8 +1813,6 @@ function Step4({
         script_abertura: form['script-abertura'],
         voz: vozNome,
         tom: form['tom'],
-        capacidade_transferencia: form['capacidade-transferencia'] === 'true',
-        capacidade_agendamento: form['capacidade-agendamento'] === 'true',
       })
       onChange('prompt_gerado', (res.data as { prompt: string }).prompt || '')
     } catch {
@@ -2607,8 +2528,6 @@ export default function OnboardingPage() {
       regioes_cobertura: null,
       compliance_anatel: form['compliance-anatel'] === 'true',
       compliance_optout: form['compliance-optout'] === 'true',
-      capacidade_transferencia: form['capacidade-transferencia'] === 'true',
-      capacidade_agendamento: form['capacidade-agendamento'] === 'true',
       voz_id: form['voz'],
       tom: form['tom'],
       system_prompt_override: form['prompt_gerado'] || undefined,
@@ -2719,8 +2638,7 @@ export default function OnboardingPage() {
       'metodologia': raw.metodologia || '',
       'compliance-anatel': (raw as any).compliance_anatel === false ? 'false' : 'true',
       'compliance-optout': (raw as any).compliance_optout === false ? 'false' : 'true',
-      'capacidade-transferencia': (raw as any).capacidade_transferencia === true ? 'true' : 'false',
-      'capacidade-agendamento': (raw as any).capacidade_agendamento === false ? 'false' : 'true',
+
       voz: agente.voz || INITIAL_FORM.voz,
       tom: agente.tom || '',
     })
