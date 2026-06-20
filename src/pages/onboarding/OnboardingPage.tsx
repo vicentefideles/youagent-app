@@ -1213,6 +1213,7 @@ function StepQualificacao({
         concorrentes: form['prod-concorrentes'],
         descricao_produto: form['prod-descricao'],
         info_adicional: form['prod-info-extra'],
+        materiais_conteudo: form['materiais-conteudo'],
       })
       const data = res.data as { perguntas?: string[]; objecoes?: Objecao[]; sinais?: string }
       if (data.perguntas?.length) {
@@ -1359,6 +1360,7 @@ function StepGatilhosFechamento({ form, onChange }: {
         descricao_produto: form['prod-descricao'],
         cenario_dores: form['cenario-dores'],
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
+        materiais_conteudo: form['materiais-conteudo'],
       })
       const data = res.data as { gatilhos: string }
       if (data.gatilhos) onChange('gatilhos-fechamento', data.gatilhos)
@@ -1505,6 +1507,7 @@ function Step3({ form, onChange }: {
         concorrentes: form['prod-concorrentes'],
         descricao_produto: form['prod-descricao'],
         info_adicional: form['prod-info-extra'],
+        materiais_conteudo: form['materiais-conteudo'],
       })
       const data = res.data as { sinais?: string }
       if (data.sinais) onChange('gatilhos-customizados', data.sinais)
@@ -1848,6 +1851,7 @@ function StepCenarioDores({ form, onChange }: {
         cargos_alvo: form['icp-cargo-tipo'],
         sinais: form['gatilhos-customizados'],
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
+        materiais_conteudo: form['materiais-conteudo'],
       })
       const data = res.data as { cenario: string }
       if (data.cenario) onChange('cenario-dores', data.cenario)
