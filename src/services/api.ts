@@ -50,6 +50,14 @@ export const agentesApi = {
   delete:           (id: string)            => api.delete(`/agentes/${id}`),
   ciPendencias:     (desde?: string)        => api.get(`/agentes/ci-pendencias${desde ? `?desde=${encodeURIComponent(desde)}` : ''}`),
   sincronizarTodos: ()                      => api.post('/agentes/sincronizar-todos', {}),
+  extrairScript:    (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post('/agentes/extrair-script', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    })
+  },
 }
 
 // Campanhas
