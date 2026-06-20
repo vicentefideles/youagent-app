@@ -69,6 +69,7 @@ interface FormData {
   'metodologia': string
   'compliance-anatel': string
   'compliance-optout': string
+  'materiais-conteudo': string
 
   voz: string
   tom: string
@@ -112,6 +113,7 @@ const INITIAL_FORM: FormData = {
   'metodologia': '',
   'compliance-anatel': 'true',
   'compliance-optout': 'true',
+  'materiais-conteudo': '',
 
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
@@ -338,85 +340,167 @@ const textareaCls =
 interface Material {
   file: File | null
   tipo: string
+  texto: string
+  analise: string | null
+  extraindo: boolean
+  erro: string | null
 }
 
-function MateriaisUpload({ materiais, onMateriaisChange }: { materiais: Material[]; onMateriaisChange: (m: Material[]) => void }) {
+function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
+  materiais: Material[]
+  onMateriaisChange: (m: Material[]) => void
+  onConteudoChange: (conteudo: string) => void
+}) {
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([])
 
   const TIPOS = ['Apresentação', 'eBook', 'Case de Sucesso', 'Comparativo', 'Manual', 'One-Pager', 'Outro']
   const MAX_MB = 25
   const TIPOS_ACEITOS = '.pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt'
 
+  function syncConteudo(lista: Material[]) {
+    const partes = lista
+      .filter(m => m.texto.trim())
+      .map((m, i) => {
+        const label = m.tipo ? `${m.tipo}${lista.length > 1 ? ` (material ${i + 1})` : ''}` : `Material ${i + 1}`
+        return `=== ${label.toUpperCase()} ===\n${m.texto.trim()}`
+      })
+    onConteudoChange(partes.join('\n\n'))
+  }
+
+  function updateItem(i: number, patch: Partial<Material>) {
+    const next = materiais.map((m, idx) => idx === i ? { ...m, ...patch } : m)
+    onMateriaisChange(next)
+    syncConteudo(next)
+  }
+
   function adicionarLinha() {
-    onMateriaisChange([...materiais, { file: null, tipo: '' }])
+    onMateriaisChange([...materiais, { file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   }
 
   function removerLinha(i: number) {
     if (materiais.length === 1) {
-      onMateriaisChange([{ file: null, tipo: '' }])
+      const reset = [{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }]
+      onMateriaisChange(reset)
+      onConteudoChange('')
     } else {
-      onMateriaisChange(materiais.filter((_, idx) => idx !== i))
+      const next = materiais.filter((_, idx) => idx !== i)
+      onMateriaisChange(next)
+      syncConteudo(next)
     }
   }
 
-  function onFileChange(i: number, e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileChange(i: number, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
     if (file.size > MAX_MB * 1024 * 1024) { alert(`Arquivo muito grande. Máximo ${MAX_MB}MB.`); return }
-    const next = materiais.map((m, idx) => idx === i ? { ...m, file } : m)
-    onMateriaisChange(next)
+
+    const tipoAtual = materiais[i].tipo
+    updateItem(i, { file, extraindo: true, erro: null, analise: null, texto: '' })
+
+    try {
+      const { data } = await agentesApi.extrairScript(file, tipoAtual || 'material')
+      if (data.texto) {
+        const next = materiais.map((m, idx) =>
+          idx === i ? { ...m, file, extraindo: false, texto: data.texto, analise: data.resumo || null, erro: null } : m
+        )
+        onMateriaisChange(next)
+        syncConteudo(next)
+      } else {
+        updateItem(i, { extraindo: false, erro: 'Não foi possível extrair texto. Use PDF, Word ou TXT.', file: null })
+      }
+    } catch {
+      updateItem(i, { extraindo: false, erro: 'Erro ao processar o arquivo. Tente outro formato.', file: null })
+    }
   }
 
   function onTipoChange(i: number, tipo: string) {
-    const next = materiais.map((m, idx) => idx === i ? { ...m, tipo } : m)
-    onMateriaisChange(next)
+    updateItem(i, { tipo })
   }
 
   return (
     <div className="col-span-2 flex flex-col gap-3">
       <div>
-        <p className="text-sm font-semibold text-brand uppercase tracking-wide mb-1">Materiais da empresa <span className="text-gray-400 font-normal normal-case">(quanto mais, melhor)</span></p>
-        <p className="text-xs text-gray-500 mb-3">Suba qualquer material que ajude o agente a entender melhor sua empresa, produto e mercado. Apresentações, ebooks, cases de sucesso, comparativos com concorrentes — tudo é útil para o treinamento.</p>
+        <p className="text-sm font-semibold text-brand uppercase tracking-wide mb-1">
+          Materiais da empresa <span className="text-gray-400 font-normal normal-case">(quanto mais, melhor)</span>
+        </p>
+        <p className="text-xs text-gray-500 mb-3">
+          Apresentações, ebooks, cases de sucesso, comparativos — o sistema lê cada arquivo, identifica proposta de valor, diferenciais e provas sociais, e injeta tudo no prompt final do agente.
+        </p>
       </div>
-      <div className="flex flex-col gap-2">
+
+      <div className="flex flex-col gap-3">
         {materiais.map((m, i) => (
-          <div key={i} className="flex items-center gap-2 border border-dashed border-gray-200 rounded-lg px-3 py-2">
-            <input
-              ref={el => { inputRefs.current[i] = el }}
-              type="file"
-              accept={TIPOS_ACEITOS}
-              className="hidden"
-              onChange={e => onFileChange(i, e)}
-            />
-            <button
-              type="button"
-              onClick={() => inputRefs.current[i]?.click()}
-              className="flex items-center gap-2 flex-1 text-left min-w-0"
-            >
-              <Paperclip size={14} className="text-gray-400 shrink-0" />
-              <span className={`text-sm truncate ${m.file ? 'text-gray-800' : 'text-gray-400'}`}>
-                {m.file ? m.file.name : 'Clique para enviar material'}
-              </span>
-              {m.file && <span className="text-xs text-gray-400 shrink-0">{(m.file.size / 1024 / 1024).toFixed(1)}MB</span>}
-            </button>
-            <select
-              value={m.tipo}
-              onChange={e => onTipoChange(i, e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 bg-white shrink-0"
-            >
-              <option value="">Tipo do material</option>
-              {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <button
-              type="button"
-              onClick={() => removerLinha(i)}
-              className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
-            >
-              <X size={14} />
-            </button>
+          <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
+            {/* Linha de controles */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+              <input
+                ref={el => { inputRefs.current[i] = el }}
+                type="file"
+                accept={TIPOS_ACEITOS}
+                className="hidden"
+                onChange={e => onFileChange(i, e)}
+              />
+              <button
+                type="button"
+                onClick={() => inputRefs.current[i]?.click()}
+                className="flex items-center gap-2 flex-1 text-left min-w-0"
+                disabled={m.extraindo}
+              >
+                {m.extraindo ? (
+                  <div className="w-3.5 h-3.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                ) : (
+                  <Paperclip size={14} className={`shrink-0 ${m.file ? 'text-brand-500' : 'text-gray-400'}`} />
+                )}
+                <span className={`text-sm truncate ${m.file ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
+                  {m.extraindo ? 'Lendo e analisando o arquivo...' : m.file ? m.file.name : 'Clique para enviar material'}
+                </span>
+                {m.file && !m.extraindo && (
+                  <span className="text-xs text-gray-400 shrink-0">{(m.file.size / 1024 / 1024).toFixed(1)}MB</span>
+                )}
+              </button>
+              <select
+                value={m.tipo}
+                onChange={e => onTipoChange(i, e.target.value)}
+                className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white shrink-0"
+              >
+                <option value="">Tipo do material</option>
+                {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => removerLinha(i)}
+                className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Card de análise precisa */}
+            {m.file && !m.extraindo && !m.erro && m.analise && (
+              <div className="px-3 py-2.5 bg-emerald-50 border-b border-emerald-100 flex items-start gap-2">
+                <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 mb-0.5">
+                    O que o sistema identificou · {m.texto.length.toLocaleString('pt-BR')} caracteres extraídos
+                  </p>
+                  <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{m.analise}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Erro */}
+            {m.erro && (
+              <div className="px-3 py-2 bg-red-50 flex items-center gap-2">
+                <AlertTriangle size={13} className="text-red-500 shrink-0" />
+                <p className="text-xs text-red-700 flex-1">{m.erro}</p>
+                <button type="button" onClick={() => updateItem(i, { erro: null, file: null })} className="text-xs text-red-500 underline shrink-0">Tentar novamente</button>
+              </div>
+            )}
           </div>
         ))}
       </div>
+
       <button
         type="button"
         onClick={adicionarLinha}
@@ -952,7 +1036,7 @@ function Step1({
           <div className="w-1 h-4 bg-brand rounded-full" />
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materiais de apoio</span>
         </div>
-        <MateriaisUpload materiais={materiais} onMateriaisChange={onMateriaisChange} />
+        <MateriaisUpload materiais={materiais} onMateriaisChange={onMateriaisChange} onConteudoChange={v => onChange('materiais-conteudo', v)} />
       </div>
 
     </div>
@@ -2099,6 +2183,7 @@ function Step4({
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
         objecoes_mapeadas: objecoes.filter(o => o.objecao.trim()),
         metodologia: form['metodologia'],
+        materiais_empresa: form['materiais-conteudo'],
         script_ligacao: form['script-ligacao'],
         script_abertura: form['script-abertura'],
         voz: vozNome,
@@ -2701,7 +2786,7 @@ export default function OnboardingPage() {
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
-  const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '' }])
+  const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
   const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso' }])
   const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'insucesso' }])
@@ -2992,7 +3077,7 @@ export default function OnboardingPage() {
   function reset() {
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
-    setMateriais([{ file: null, tipo: '' }])
+    setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
     setScriptFiles([])
     setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso' }])
     setLigInsucesso([{ file: null, observacao: '', resultado: 'insucesso' }])
