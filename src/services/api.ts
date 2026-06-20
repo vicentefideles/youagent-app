@@ -289,6 +289,8 @@ export const claudeApi = {
     api.post('/claude/analisar-lista', data),
   gerarPrompt: (data: Record<string, unknown>) =>
     api.post('/claude/gerar-prompt', data, { timeout: 60000 }),
+  sugerirQualificacao: (data: Record<string, unknown>) =>
+    api.post('/claude/sugerir-qualificacao', data, { timeout: 30000 }),
   gerarCross: (data: { gatilho: string; exemplos: string[] }) =>
     api.post('/claude/gerar-cross', data),
   scoreInteligencia: () => api.get('/claude/score-inteligencia'),

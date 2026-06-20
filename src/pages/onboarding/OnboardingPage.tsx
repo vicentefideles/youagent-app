@@ -105,9 +105,9 @@ const INITIAL_FORM: FormData = {
   'icp-porte-alvo': '',
   'icp-segmento-alvo': '',
   'gatilhos-customizados': '',
-  'wiz-qualif-q1': 'Vocês já usam alguma ferramenta de prospecção ativa?',
-  'wiz-qualif-q2': 'Qual o volume mensal de reuniões da equipe hoje?',
-  'wiz-qualif-q3': 'Você é o responsável pela decisão de novas ferramentas?',
+  'wiz-qualif-q1': '',
+  'wiz-qualif-q2': '',
+  'wiz-qualif-q3': '',
   'script-abertura': '',
   'script-ligacao': '',
   'metodologia': '',
@@ -206,7 +206,9 @@ const METODOLOGIAS = [
 const STEPS = [
   { label: 'Objetivo', icon: Target },
   { label: 'Empresa e Produto', icon: Building2 },
-  { label: 'ICP & Público-alvo', icon: Target },
+  { label: 'Qualificação & Objeções', icon: Brain },
+  { label: 'ICP & Sinais', icon: Target },
+  { label: 'Público-alvo', icon: Target },
   { label: 'Metodologia', icon: BarChart2 },
   { label: 'Roteiro & Materiais', icon: FileText },
   { label: 'Ligações de Referência', icon: Mic },
@@ -1031,7 +1033,8 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
   )
 }
 
-function Step3({
+// ─── Step 2 — Qualificação & Objeções (IA sugere baseado no Step 1) ──────────
+function StepQualificacao({
   form,
   onChange,
   objecoes,
@@ -1042,47 +1045,168 @@ function Step3({
   objecoes: Objecao[]
   onObjecoesChange: (o: Objecao[]) => void
 }) {
+  const [gerando, setGerando] = useState(false)
+  const [erroGeracao, setErroGeracao] = useState('')
+  const jaGerou = form['wiz-qualif-q1'] || objecoes.some(o => o.objecao)
+
+  useEffect(() => {
+    if (!jaGerou) sugerir()
+  }, [])
+
+  async function sugerir() {
+    setGerando(true)
+    setErroGeracao('')
+    try {
+      const res = await claudeApi.sugerirQualificacao({
+        empresa: form['empresa-nome'],
+        produto: form['prod-nome'],
+        segmento: form['empresa-segmento'],
+        descricao_empresa: form['empresa-descricao'],
+        diferenciais: form['empresa-diferenciais'],
+        objecoes_comuns: form['empresa-objecoes-comuns'],
+        resultados_clientes: form['prod-resultados'],
+        concorrentes: form['prod-concorrentes'],
+      })
+      const data = res.data as { perguntas?: string[]; objecoes?: Objecao[] }
+      if (data.perguntas?.length) {
+        onChange('wiz-qualif-q1', data.perguntas[0] || '')
+        onChange('wiz-qualif-q2', data.perguntas[1] || '')
+        onChange('wiz-qualif-q3', data.perguntas[2] || '')
+      }
+      if (data.objecoes?.length) {
+        onObjecoesChange(data.objecoes.slice(0, 5))
+      }
+    } catch {
+      setErroGeracao('Não foi possível gerar sugestões. Preencha manualmente.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  function updateObjecao(i: number, field: keyof Objecao, value: string) {
+    onObjecoesChange(objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o))
+  }
+  function addObjecao() {
+    if (objecoes.length < 5) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '' }])
+  }
+  function removeObjecao(i: number) {
+    if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Banner IA */}
+      <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5">
+        <div className="flex items-start gap-3">
+          <Brain size={18} className="text-brand mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {gerando ? 'Gerando sugestões...' : jaGerou ? 'Sugestões geradas pela IA' : 'Preparando sugestões...'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {gerando
+                ? 'Analisando as informações da sua empresa e produto...'
+                : 'Com base nas informações da etapa anterior, a IA sugeriu perguntas e objeções. Edite livremente.'}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={sugerir}
+          disabled={gerando}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+        >
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {gerando ? 'Gerando...' : 'Regerar'}
+        </button>
+      </div>
+
+      {erroGeracao && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{erroGeracao}</p>
+      )}
+
+      {/* Perguntas de qualificação */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Perguntas de qualificação</p>
+        <p className="text-xs text-gray-400 mb-3">O agente fará uma pergunta por vez, aguardando a resposta antes de avançar.</p>
+        <div className="flex flex-col gap-2">
+          {(['wiz-qualif-q1', 'wiz-qualif-q2', 'wiz-qualif-q3'] as const).map((k, i) => (
+            <div key={k} className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-brand w-5 shrink-0">{i + 1}.</span>
+              <input
+                id={k}
+                className={inputCls}
+                value={form[k]}
+                onChange={e => onChange(k, e.target.value)}
+                placeholder={gerando ? 'Aguardando geração...' : `Pergunta ${i + 1}`}
+                disabled={gerando}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Objeções */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Objeções e respostas</p>
+            <p className="text-xs text-gray-400 mt-0.5">Como o agente responde quando o contato hesitar.</p>
+          </div>
+          {objecoes.length < 5 && (
+            <button type="button" onClick={addObjecao}
+              className="text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
+              + Adicionar objeção
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col gap-3">
+          {objecoes.map((obj, i) => (
+            <div key={i} className="border border-gray-200 rounded-xl p-3 flex flex-col gap-2 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500">Objeção {i + 1}</span>
+                {objecoes.length > 1 && (
+                  <button type="button" onClick={() => removeObjecao(i)}
+                    className="text-xs text-red-400 hover:text-red-600">✕</button>
+                )}
+              </div>
+              <input className={inputCls} placeholder='Ex: "Não tenho orçamento agora"'
+                value={obj.objecao} onChange={e => updateObjecao(i, 'objecao', e.target.value)} disabled={gerando} />
+              <textarea className={textareaCls} rows={2} placeholder="Como o agente responde a essa objeção..."
+                value={obj.rebuttal} onChange={e => updateObjecao(i, 'rebuttal', e.target.value)} disabled={gerando} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 4 — Público-alvo (checkboxes de cargo) ─────────────────────────────
+function StepPublicoAlvo({ form, onChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+}) {
   function toggleCargo(cargo: string) {
     const atual = form['icp-cargo-tipo'] ? form['icp-cargo-tipo'].split(', ').filter(Boolean) : []
     const next = atual.includes(cargo) ? atual.filter(c => c !== cargo) : [...atual, cargo]
     onChange('icp-cargo-tipo', next.join(', '))
   }
-
-  function updateObjecao(i: number, field: keyof Objecao, value: string) {
-    const next = objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o)
-    onObjecoesChange(next)
-  }
-
-  function addObjecao() {
-    if (objecoes.length < 5) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '' }])
-  }
-
-  function removeObjecao(i: number) {
-    if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
-  }
-
   const cargosSelecionados = form['icp-cargo-tipo'] ? form['icp-cargo-tipo'].split(', ').filter(Boolean) : []
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* ICP — Público-alvo */}
+    <div className="flex flex-col gap-5">
       <div>
         <p className="text-sm font-medium text-gray-700 mb-1">Selecione o público-alvo</p>
-        <p className="text-xs text-gray-400 mb-3">Quem são os decisores que o agente vai abordar? Selecione todos que se aplicam.</p>
-        <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+        <p className="text-xs text-gray-400 mb-4">Quem são os decisores que o agente vai abordar? Selecione todos que se aplicam.</p>
+        <div className="grid grid-cols-3 gap-x-6 gap-y-3">
           {CARGOS_ICP.map(cargo => {
             const selecionado = cargosSelecionados.includes(cargo)
             return (
-              <button
-                key={cargo}
-                type="button"
-                onClick={() => toggleCargo(cargo)}
-                className="flex items-center gap-2.5 text-left group"
-              >
+              <button key={cargo} type="button" onClick={() => toggleCargo(cargo)}
+                className="flex items-center gap-2.5 text-left group">
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  selecionado
-                    ? 'border-brand bg-brand'
-                    : 'border-gray-300 bg-white group-hover:border-brand/50'
+                  selecionado ? 'border-brand bg-brand' : 'border-gray-300 bg-white group-hover:border-brand/50'
                 }`}>
                   {selecionado && <Check size={11} className="text-white" />}
                 </div>
@@ -1094,99 +1218,34 @@ function Step3({
           })}
         </div>
         {cargosSelecionados.length > 0 && (
-          <p className="text-xs text-brand font-medium mt-3">
+          <p className="text-xs text-brand font-medium mt-4">
             {cargosSelecionados.length} perfil(is) selecionado(s)
           </p>
         )}
       </div>
+    </div>
+  )
+}
 
-      {/* Script de abertura */}
-      <Field label="Script de abertura">
-        <textarea
-          id="script-abertura"
-          className={textareaCls}
-          rows={4}
-          value={form['script-abertura']}
-          onChange={e => onChange('script-abertura', e.target.value)}
-          placeholder="Como o agente se apresenta e inicia a conversa? Use [nome], [empresa], [produto] como variáveis."
-        />
-        <p className="text-xs text-gray-400 mt-1">Variáveis: [nome], [empresa], [produto], [cargo]</p>
-      </Field>
-
+// ─── Step 3 — ICP & Sinais ────────────────────────────────────────────────────
+function Step3({ form, onChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-6">
       {/* Sinais de compra */}
       <Field label="Sinais de compra customizados">
         <textarea
           id="gatilhos-customizados"
           className={textareaCls}
-          rows={2}
+          rows={3}
           value={form['gatilhos-customizados']}
           onChange={e => onChange('gatilhos-customizados', e.target.value)}
-          placeholder="Ex: menciona expansão, novo produto, insatisfação com fornecedor atual..."
+          placeholder="Ex: menciona expansão, novo produto, insatisfação com fornecedor atual, crescimento de equipe..."
         />
+        <p className="text-xs text-gray-400 mt-1">Quando o agente detectar essas palavras ou contextos, ele vai priorizar a qualificação e transferência.</p>
       </Field>
-
-      {/* Perguntas de qualificação */}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Perguntas de qualificação</p>
-        <div className="flex flex-col gap-2">
-          {(['wiz-qualif-q1', 'wiz-qualif-q2', 'wiz-qualif-q3'] as const).map((k, i) => (
-            <div key={k} className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 w-4 shrink-0">{i + 1}.</span>
-              <input
-                id={k}
-                className={inputCls}
-                value={form[k]}
-                onChange={e => onChange(k, e.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Objeções + Rebuttals */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-gray-700">Objeções e respostas</p>
-          {objecoes.length < 5 && (
-            <button
-              type="button"
-              onClick={addObjecao}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-            >
-              + Adicionar objeção
-            </button>
-          )}
-        </div>
-        <div className="flex flex-col gap-3">
-          {objecoes.map((obj, i) => (
-            <div key={i} className="border border-gray-200 rounded-xl p-3 flex flex-col gap-2 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-500">Objeção {i + 1}</span>
-                {objecoes.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeObjecao(i)}
-                    className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                  >✕</button>
-                )}
-              </div>
-              <input
-                className={inputCls}
-                placeholder='Ex: "Não tenho orçamento agora"'
-                value={obj.objecao}
-                onChange={e => updateObjecao(i, 'objecao', e.target.value)}
-              />
-              <textarea
-                className={textareaCls}
-                rows={2}
-                placeholder="Como o agente responde a essa objeção..."
-                value={obj.rebuttal}
-                onChange={e => updateObjecao(i, 'rebuttal', e.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Capacidades do agente */}
       <div>
@@ -2581,12 +2640,14 @@ export default function OnboardingPage() {
   const stepTitles = [
     'Objetivo do agente',
     'Empresa e produto',
-    'ICP & Script do agente',
+    'Qualificação & Objeções',
+    'ICP & Sinais de compra',
+    'Público-alvo',
     'Metodologia de vendas',
-    'Script de ligação',
-    'Ligações reais de referência',
+    'Roteiro & Materiais',
+    'Ligações de Referência',
     'Voz e tom do agente',
-    'Ativação do agente',
+    'Revisão & Ativação',
   ]
 
   // ── Tela: grid de agentes ──────────────────────────────────────────────────
@@ -2919,23 +2980,25 @@ export default function OnboardingPage() {
           {step === 0 && <StepObjetivo form={form} onChange={onChange} />}
           {step === 1 && <Step1 form={form} onChange={onChange} errors={errors} materiais={materiais} onMateriaisChange={setMateriais} />}
           {step === 2 && (
-            <Step3
+            <StepQualificacao
               form={form}
               onChange={onChange}
               objecoes={objecoes}
               onObjecoesChange={setObjecoes}
             />
           )}
-          {step === 3 && <StepMetodologia form={form} onChange={onChange} />}
-          {step === 4 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
-          {step === 5 && (
+          {step === 3 && <Step3 form={form} onChange={onChange} />}
+          {step === 4 && <StepPublicoAlvo form={form} onChange={onChange} />}
+          {step === 5 && <StepMetodologia form={form} onChange={onChange} />}
+          {step === 6 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
+          {step === 7 && (
             <StepLigacoesReferencia
               ligacoesSucesso={ligSucesso} onSucessoChange={setLigSucesso}
               ligacoesInsucesso={ligInsucesso} onInsucessoChange={setLigInsucesso}
             />
           )}
-          {step === 6 && <StepVozTom form={form} onChange={onChange} />}
-          {step === 7 && (
+          {step === 8 && <StepVozTom form={form} onChange={onChange} />}
+          {step === 9 && (
             <Step4
               form={form}
               onChange={onChange}
@@ -2955,7 +3018,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 7 && activated) && (
+          {!(step === 9 && activated) && (
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
