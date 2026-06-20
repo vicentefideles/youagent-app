@@ -22,7 +22,6 @@ import {
   Search,
   AlertTriangle,
   Play,
-  Shield,
   CalendarCheck,
   Paperclip,
   Plus,
@@ -1451,38 +1450,6 @@ function Step3({ form, onChange }: {
           disabled={gerandoSinais}
         />
         <p className="text-xs text-gray-400 mt-1">Quando o agente detectar essas palavras ou contextos, ele vai priorizar a qualificação e transferência.</p>
-      </div>
-
-      {/* Compliance LGPD */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Shield size={15} className="text-gray-500" />
-          <p className="text-sm font-medium text-gray-700">Compliance e LGPD</p>
-        </div>
-        <div className="flex flex-col gap-2">
-          {[
-            { key: 'compliance-anatel' as keyof FormData, label: 'Seguir horários Anatel', descricao: 'Ligar apenas entre 8h e 21h, sem domingos' },
-            { key: 'compliance-optout' as keyof FormData, label: 'Registrar opt-out automático', descricao: 'Quando contato pedir para não ser ligado, bloquear automaticamente' },
-          ].map(item => (
-            <div key={item.key} className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
-              <div>
-                <p className="text-sm font-medium text-gray-800">{item.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{item.descricao}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onChange(item.key, form[item.key] === 'true' ? 'false' : 'true')}
-                className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
-                  form[item.key] === 'true' ? 'bg-green-500' : 'bg-gray-300'
-                }`}
-              >
-                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                  form[item.key] === 'true' ? 'translate-x-5' : 'translate-x-1'
-                }`} />
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
 
     </div>
