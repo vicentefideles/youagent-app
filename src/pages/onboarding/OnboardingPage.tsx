@@ -76,6 +76,7 @@ interface FormData {
   voz: string
   tom: string
   'prompt_gerado': string
+  'cenario-dores': string
 }
 
 interface Objecao {
@@ -118,6 +119,7 @@ const INITIAL_FORM: FormData = {
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
   'prompt_gerado': '',
+  'cenario-dores': '',
 }
 
 const INITIAL_OBJECOES: Objecao[] = [
@@ -209,6 +211,7 @@ const STEPS = [
   { label: 'Qualificação & Objeções', icon: Brain },
   { label: 'ICP & Sinais', icon: Target },
   { label: 'Público-alvo', icon: Target },
+  { label: 'Cenário & Dores', icon: Brain },
   { label: 'Metodologia', icon: BarChart2 },
   { label: 'Roteiro & Materiais', icon: FileText },
   { label: 'Ligações de Referência', icon: Mic },
@@ -1478,6 +1481,95 @@ Exemplo:
   )
 }
 
+// ─── Step 5 — Cenário & Dores ─────────────────────────────────────────────────
+function StepCenarioDores({ form, onChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+}) {
+  const [gerando, setGerando] = useState(false)
+  const [erroGeracao, setErroGeracao] = useState('')
+  const jaGerou = !!form['cenario-dores']
+
+  useEffect(() => {
+    if (!jaGerou) sugerir()
+  }, [])
+
+  async function sugerir() {
+    setGerando(true)
+    setErroGeracao('')
+    try {
+      const res = await claudeApi.sugerirCenarioDores({
+        empresa: form['empresa-nome'],
+        produto: form['prod-nome'],
+        segmento: form['empresa-segmento'],
+        descricao_empresa: form['empresa-descricao'],
+        diferenciais: form['empresa-diferenciais'],
+        resultados_clientes: form['prod-resultados'],
+        concorrentes: form['prod-concorrentes'],
+        descricao_produto: form['prod-descricao'],
+        cargos_alvo: form['icp-cargo-tipo'],
+        sinais: form['gatilhos-customizados'],
+        perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
+      })
+      const data = res.data as { cenario: string }
+      if (data.cenario) onChange('cenario-dores', data.cenario)
+    } catch {
+      setErroGeracao('Não foi possível gerar o cenário. Descreva manualmente.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Banner IA */}
+      <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5">
+        <div className="flex items-start gap-3">
+          <Brain size={18} className="text-brand mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {gerando ? 'Analisando o cenário...' : jaGerou ? 'Contexto gerado pela IA' : 'Preparando contexto...'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {gerando
+                ? 'Mapeando as dores do seu público com base nas etapas anteriores...'
+                : 'Descreve as dores reais do seu mercado. O agente usa esse contexto para criar empatia e rapport na ligação.'}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={sugerir}
+          disabled={gerando}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+        >
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {gerando ? 'Gerando...' : 'Regerar'}
+        </button>
+      </div>
+
+      {erroGeracao && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{erroGeracao}</p>
+      )}
+
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Contexto e dores do mercado</p>
+        <p className="text-xs text-gray-400 mb-3">
+          O agente usa esse texto para criar conexão com o prospect — mostrando que entende a realidade do negócio dele antes de apresentar a solução.
+        </p>
+        <textarea
+          className={`${textareaCls} font-mono text-xs leading-relaxed`}
+          rows={10}
+          value={form['cenario-dores']}
+          onChange={e => onChange('cenario-dores', e.target.value)}
+          placeholder={gerando ? 'Aguardando geração...' : 'Descreva o cenário e as dores do público-alvo...'}
+          disabled={gerando}
+        />
+      </div>
+    </div>
+  )
+}
+
 function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
   return (
     <div className="flex flex-col gap-6">
@@ -2648,6 +2740,7 @@ export default function OnboardingPage() {
     'Qualificação & Objeções',
     'ICP & Sinais de compra',
     'Público-alvo',
+    'Cenário & Dores',
     'Metodologia de vendas',
     'Roteiro & Materiais',
     'Ligações de Referência',
@@ -2994,16 +3087,17 @@ export default function OnboardingPage() {
           )}
           {step === 3 && <Step3 form={form} onChange={onChange} />}
           {step === 4 && <StepPublicoAlvo form={form} onChange={onChange} />}
-          {step === 5 && <StepMetodologia form={form} onChange={onChange} />}
-          {step === 6 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
-          {step === 7 && (
+          {step === 5 && <StepCenarioDores form={form} onChange={onChange} />}
+          {step === 6 && <StepMetodologia form={form} onChange={onChange} />}
+          {step === 7 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
+          {step === 8 && (
             <StepLigacoesReferencia
               ligacoesSucesso={ligSucesso} onSucessoChange={setLigSucesso}
               ligacoesInsucesso={ligInsucesso} onInsucessoChange={setLigInsucesso}
             />
           )}
-          {step === 8 && <StepVozTom form={form} onChange={onChange} />}
-          {step === 9 && (
+          {step === 9 && <StepVozTom form={form} onChange={onChange} />}
+          {step === 10 && (
             <Step4
               form={form}
               onChange={onChange}
@@ -3023,7 +3117,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 9 && activated) && (
+          {!(step === 10 && activated) && (
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
