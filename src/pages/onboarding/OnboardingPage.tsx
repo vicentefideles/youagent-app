@@ -75,6 +75,7 @@ interface FormData {
   'capacidade-agendamento': string
   voz: string
   tom: string
+  'prompt_gerado': string
 }
 
 interface Objecao {
@@ -116,6 +117,7 @@ const INITIAL_FORM: FormData = {
   'capacidade-agendamento': 'true',
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
+  'prompt_gerado': '',
 }
 
 const INITIAL_OBJECOES: Objecao[] = [
@@ -204,12 +206,12 @@ const METODOLOGIAS = [
 const STEPS = [
   { label: 'Objetivo', icon: Target },
   { label: 'Empresa e Produto', icon: Building2 },
-  { label: 'ICP & Script', icon: Target },
+  { label: 'ICP & Público-alvo', icon: Target },
   { label: 'Metodologia', icon: BarChart2 },
-  { label: 'Script de Ligação', icon: FileText },
-  { label: 'Ligações Reais', icon: Mic },
+  { label: 'Roteiro & Materiais', icon: FileText },
+  { label: 'Ligações de Referência', icon: Mic },
   { label: 'Voz e Tom', icon: Mic },
-  { label: 'Ativação', icon: Zap },
+  { label: 'Revisão & Ativação', icon: Zap },
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -1611,36 +1613,10 @@ function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof Fo
   )
 }
 
-function calcularIcpScore(form: FormData): number {
-  let score = 0
-  // Cargo: 30 pontos
-  const cargosAltos = ['ceo', 'diretor', 'sócio', 'owner', 'presidente', 'vp', 'c-level']
-  const cargoLower = (form['icp-cargo-tipo'] ?? '').toLowerCase()
-  if (cargosAltos.some(c => cargoLower.includes(c))) score += 30
-  else if (cargoLower.includes('gerente') || cargoLower.includes('coordenador')) score += 20
-  else if (cargoLower.length > 0) score += 10
-
-  // Segmento: 25 pontos
-  if (form['empresa-segmento']) score += 20
-
-  // Porte: 20 pontos
-  const porte = form['empresa-porte'] ?? ''
-  if (porte.includes('grande') || porte.includes('enterprise')) score += 20
-  else if (porte.includes('médio') || porte.includes('medio')) score += 15
-  else if (porte.includes('pequeno') || porte.includes('startup')) score += 10
-  else if (porte.length > 0) score += 8
-
-  // Produto preenchido: 12 pontos
-  if (form['prod-nome']) score += 12
-
-  // Qualificação: 8 pontos
-  if (form['wiz-qualif-q1'] || form['wiz-qualif-q2']) score += 8
-
-  return Math.min(score, 95)
-}
 
 function Step4({
   form,
+  onChange,
   activated,
   activating,
   activatingStep,
@@ -1650,6 +1626,7 @@ function Step4({
   modoEdicao,
 }: {
   form: FormData
+  onChange: (k: keyof FormData, v: string) => void
   activated: boolean
   activating?: boolean
   activatingStep?: number
@@ -1659,16 +1636,60 @@ function Step4({
   modoEdicao: boolean
 }) {
   const navigate = useNavigate()
-  const icpScore = calcularIcpScore(form)
+  const [gerando, setGerando] = useState(false)
+  const [erroGeracao, setErroGeracao] = useState('')
   const vozNome = VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz
-  const metLabel = METODOLOGIAS.find(m => m.id === form.metodologia)?.label
-  const objecoesValidas = objecoes.filter(o => o.objecao.trim())
-  const perguntasValidas = [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean)
+
+  // Gera automaticamente ao montar, se ainda não gerou
+  useEffect(() => {
+    if (!form['prompt_gerado'] && !gerando) {
+      gerarPrompt()
+    }
+  }, [])
+
+  async function gerarPrompt() {
+    setGerando(true)
+    setErroGeracao('')
+    try {
+      const res = await claudeApi.gerarPrompt({
+        objetivo: form['objetivo'],
+        nome_agente: form['nome-agente'],
+        empresa: form['empresa-nome'],
+        segmento: form['empresa-segmento'],
+        porte: form['empresa-porte'],
+        site: form['empresa-site'],
+        descricao_empresa: form['empresa-descricao'],
+        diferenciais: form['empresa-diferenciais'],
+        objecoes_comuns: form['empresa-objecoes-comuns'],
+        contexto_mercado: form['empresa-contexto-mercado'],
+        produto: form['prod-nome'],
+        descricao_produto: form['prod-descricao'],
+        resultados_clientes: form['prod-resultados'],
+        concorrentes: form['prod-concorrentes'],
+        icp_cargos: form['icp-cargo-tipo'],
+        gatilhos: form['gatilhos-customizados'],
+        perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
+        objecoes_mapeadas: objecoes.filter(o => o.objecao.trim()),
+        metodologia: form['metodologia'],
+        script_ligacao: form['script-ligacao'],
+        script_abertura: form['script-abertura'],
+        voz: vozNome,
+        tom: form['tom'],
+        capacidade_transferencia: form['capacidade-transferencia'] === 'true',
+        capacidade_agendamento: form['capacidade-agendamento'] === 'true',
+      })
+      onChange('prompt_gerado', (res.data as { prompt: string }).prompt || '')
+    } catch {
+      setErroGeracao('Não foi possível gerar o prompt. Verifique sua conexão e tente novamente.')
+    } finally {
+      setGerando(false)
+    }
+  }
 
   const LOADING_STEPS = [
     modoEdicao ? 'Atualizando agente no Telnyx...' : 'Criando agente no Telnyx...',
     'Injetando inteligência herdada do CI...',
-    'Configurando script e objeções...',
+    'Configurando prompt e capacidades...',
     modoEdicao ? 'Agente atualizado! ✓' : 'Agente em treinamento! ✓',
   ]
 
@@ -1714,7 +1735,7 @@ function Step4({
           </h2>
           <p className="text-sm text-gray-500 mt-2 max-w-md">
             {modoEdicao
-              ? 'As configurações foram salvas e o sistema do Telnyx foi atualizado.'
+              ? 'As configurações foram salvas. O prompt atualizado já está ativo no Telnyx.'
               : 'O agente está em treinamento. Certifique-o no Simulador antes de ativar para produção.'
             }
           </p>
@@ -1739,119 +1760,77 @@ function Step4({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-gray-50 rounded-xl p-5 flex flex-col gap-4">
-        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Resumo da configuração</h3>
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          {/* Agente */}
-          <div className="col-span-2 pb-3 border-b border-gray-200">
-            <p className="text-xs text-gray-400 mb-0.5">Nome do agente</p>
-            <p className="font-semibold text-gray-900 text-base">{form['nome-agente'] || '—'}</p>
-          </div>
-          {/* Empresa */}
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Empresa</p>
-            <p className="font-medium text-gray-900">{form['empresa-nome'] || '—'}</p>
-            {form['empresa-segmento'] && (
-              <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{form['empresa-segmento']}</span>
-            )}
-          </div>
-          {/* Produto */}
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Produto</p>
-            <p className="font-medium text-gray-900">{form['prod-nome'] || '—'}</p>
-          </div>
-          {/* ICP */}
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Público-alvo</p>
-            <p className="font-medium text-gray-900">
-              {form['icp-cargo-tipo'] || '—'}
-            </p>
-          </div>
-          {/* Voz + Tom */}
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Voz · Tom</p>
-            <p className="font-medium text-gray-900">{[vozNome, form.tom].filter(Boolean).join(' · ') || '—'}</p>
-          </div>
-          {/* Metodologia */}
-          {metLabel && (
-            <div>
-              <p className="text-xs text-gray-400 mb-0.5">Metodologia</p>
-              <p className="font-medium text-gray-900">{metLabel}</p>
-            </div>
-          )}
-          {/* Script */}
-          {form['script-abertura'] && (
-            <div className="col-span-2">
-              <p className="text-xs text-gray-400 mb-0.5">Script de abertura</p>
-              <p className="font-medium text-gray-900 text-xs leading-relaxed line-clamp-2">{form['script-abertura']}</p>
-            </div>
-          )}
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Brain size={18} className="text-brand" />
+          <h3 className="text-base font-semibold text-gray-900">Prompt gerado pela IA</h3>
         </div>
-
-        {/* Compliance */}
-        {(form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
-          <div className="grid grid-cols-2 gap-4 text-sm pt-2 border-t border-gray-200">
-            {(form['compliance-anatel'] === 'true' || form['compliance-optout'] === 'true') && (
-              <div className="col-span-2 flex flex-wrap gap-2">
-                {form['compliance-anatel'] === 'true' && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">✓ Anatel 8h–21h</span>
-                )}
-                {form['compliance-optout'] === 'true' && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">✓ Opt-out automático</span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Capacidades */}
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-          {form['capacidade-transferencia'] === 'true' && (
-            <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-brand-100 text-brand-700 font-medium">
-              <PhoneForwarded size={10} /> Transferência ao vivo
-            </span>
-          )}
-          {form['capacidade-agendamento'] === 'true' && (
-            <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">
-              <CalendarCheck size={10} /> Agendamento de reuniões
-            </span>
-          )}
-          {form['capacidade-transferencia'] !== 'true' && form['capacidade-agendamento'] !== 'true' && (
-            <span className="text-xs text-gray-400 italic">Nenhuma capacidade ativa — o agente só qualificará leads.</span>
-          )}
-        </div>
-
-        {/* Perguntas + Objeções */}
-        <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1 border-t border-gray-200">
-          <span>✓ {perguntasValidas.length} perguntas de qualificação</span>
-          {objecoesValidas.length > 0 && <span>✓ {objecoesValidas.length} objeção(ões) mapeada(s)</span>}
-          {form['gatilhos-customizados'] && <span>✓ Sinais de compra configurados</span>}
-        </div>
-
-        {/* Badge herança CI */}
-        <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
-          <Brain size={14} className="text-purple-600 shrink-0" />
-          <p className="text-xs text-purple-700">Este agente herdará os argumentos aprovados e padrões de ICP do Centro de Inteligência.</p>
-        </div>
-
-        <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
-          <span className="text-xs text-gray-500">Score ICP estimado</span>
-          <div className="flex items-center gap-2">
-            <div className="w-24 bg-gray-200 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all ${icpScore >= 60 ? 'bg-green-500' : icpScore >= 30 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                style={{ width: `${icpScore}%` }}
-              />
-            </div>
-            <span className="text-sm font-semibold text-blue-600">{icpScore}/100</span>
-          </div>
-        </div>
+        <p className="text-sm text-gray-500">
+          O sistema leu todas as informações que você preencheu e montou o prompt completo do agente.
+          Revise, edite se necessário, e ative.
+        </p>
       </div>
 
+      {/* Área do prompt */}
+      {gerando ? (
+        <div className="border border-brand/30 bg-brand/5 rounded-xl p-8 flex flex-col items-center gap-4 text-center">
+          <Loader2 size={32} className="text-brand animate-spin" />
+          <div>
+            <p className="font-medium text-gray-800">Gerando prompt expert...</p>
+            <p className="text-sm text-gray-500 mt-1">
+              A IA está lendo todas as etapas e montando as instruções perfeitas para o seu agente.
+            </p>
+          </div>
+        </div>
+      ) : erroGeracao ? (
+        <div className="border border-red-200 bg-red-50 rounded-xl p-5 flex flex-col gap-3">
+          <p className="text-sm text-red-600">{erroGeracao}</p>
+          <button
+            type="button"
+            onClick={gerarPrompt}
+            className="self-start flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-100 transition-colors"
+          >
+            <RefreshCw size={14} /> Tentar novamente
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Prompt do agente — editável</p>
+            <button
+              type="button"
+              onClick={gerarPrompt}
+              className="flex items-center gap-1.5 text-xs text-brand hover:text-brand-600 font-medium transition-colors"
+            >
+              <RefreshCw size={12} /> Regerar
+            </button>
+          </div>
+          <textarea
+            className="w-full border border-gray-200 rounded-xl p-4 text-xs font-mono text-gray-700 leading-relaxed resize-none focus:outline-none focus:border-brand/50 focus:ring-2 focus:ring-brand/10 transition-all bg-gray-50"
+            rows={20}
+            value={form['prompt_gerado']}
+            onChange={e => onChange('prompt_gerado', e.target.value)}
+            placeholder="O prompt será gerado automaticamente..."
+          />
+          <p className="text-xs text-gray-400">
+            Edite livremente — este é exatamente o texto que o agente vai receber na Telnyx.
+          </p>
+        </div>
+      )}
+
+      {/* Badge CI */}
+      <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+        <Brain size={14} className="text-purple-600 shrink-0" />
+        <p className="text-xs text-purple-700">Este agente herdará os argumentos aprovados e padrões de ICP do Centro de Inteligência ao ser ativado.</p>
+      </div>
+
+      {/* Botão ativar */}
       <button
         onClick={onActivate}
-        className="flex items-center justify-center gap-2 w-full py-3.5 bg-green-600 text-white font-semibold text-base rounded-xl hover:bg-green-700 transition-colors"
+        disabled={gerando || !form['prompt_gerado']}
+        className="flex items-center justify-center gap-2 w-full py-3.5 bg-green-600 text-white font-semibold text-base rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Bot size={20} />
         {modoEdicao ? 'Salvar alterações' : 'Ativar Agente'}
@@ -2417,6 +2396,7 @@ export default function OnboardingPage() {
       capacidade_agendamento: form['capacidade-agendamento'] === 'true',
       voz_id: form['voz'],
       tom: form['tom'],
+      system_prompt_override: form['prompt_gerado'] || undefined,
       status: 'inativo',
     }
     try {
@@ -2958,6 +2938,7 @@ export default function OnboardingPage() {
           {step === 7 && (
             <Step4
               form={form}
+              onChange={onChange}
               activated={activated}
               activating={activating}
               activatingStep={activatingStep}
