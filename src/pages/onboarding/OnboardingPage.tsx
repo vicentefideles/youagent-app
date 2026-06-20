@@ -210,8 +210,8 @@ const STEPS = [
   { label: 'Empresa e Produto', icon: Building2 },
   { label: 'Qualificação & Objeções', icon: Brain },
   { label: 'ICP & Sinais', icon: Target },
-  { label: 'Público-alvo', icon: Target },
   { label: 'Cenário & Dores', icon: Brain },
+  { label: 'Público-alvo', icon: Target },
   { label: 'Metodologia', icon: BarChart2 },
   { label: 'Roteiro & Materiais', icon: FileText },
   { label: 'Ligações de Referência', icon: Mic },
@@ -1240,20 +1240,79 @@ function Step3({ form, onChange }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
 }) {
+  const [gerandoSinais, setGerandoSinais] = useState(false)
+  const jaGerouSinais = !!form['gatilhos-customizados']
+
+  async function regerarSinais() {
+    setGerandoSinais(true)
+    try {
+      const res = await claudeApi.sugerirQualificacao({
+        empresa: form['empresa-nome'],
+        produto: form['prod-nome'],
+        segmento: form['empresa-segmento'],
+        descricao_empresa: form['empresa-descricao'],
+        diferenciais: form['empresa-diferenciais'],
+        objecoes_comuns: form['empresa-objecoes-comuns'],
+        resultados_clientes: form['prod-resultados'],
+        concorrentes: form['prod-concorrentes'],
+        descricao_produto: form['prod-descricao'],
+        info_adicional: form['prod-info-extra'],
+      })
+      const data = res.data as { sinais?: string }
+      if (data.sinais) onChange('gatilhos-customizados', data.sinais)
+    } catch {
+      // silently fail — field stays editable
+    } finally {
+      setGerandoSinais(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!jaGerouSinais) regerarSinais()
+  }, [])
+
   return (
     <div className="flex flex-col gap-6">
       {/* Sinais de compra */}
-      <Field label="Sinais de compra customizados">
+      <div>
+        {/* Banner IA */}
+        <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5 mb-4">
+          <div className="flex items-start gap-3">
+            <Brain size={18} className="text-brand mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-gray-900">
+                {gerandoSinais ? 'Gerando sinais...' : jaGerouSinais ? 'Sinais gerados pela IA' : 'Preparando sinais...'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {gerandoSinais
+                  ? 'Analisando seu produto e segmento para mapear os sinais de compra...'
+                  : 'O agente monitora esses sinais em tempo real durante a ligação para detectar o momento certo de qualificar.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={regerarSinais}
+            disabled={gerandoSinais}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+          >
+            {gerandoSinais ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {gerandoSinais ? 'Gerando...' : 'Regerar'}
+          </button>
+        </div>
+
+        <p className="text-sm font-medium text-gray-700 mb-1">Sinais de compra customizados</p>
         <textarea
           id="gatilhos-customizados"
           className={textareaCls}
           rows={3}
           value={form['gatilhos-customizados']}
           onChange={e => onChange('gatilhos-customizados', e.target.value)}
-          placeholder="Ex: menciona expansão, novo produto, insatisfação com fornecedor atual, crescimento de equipe..."
+          placeholder={gerandoSinais ? 'Aguardando geração...' : 'Ex: menciona expansão, novo produto, insatisfação com fornecedor atual...'}
+          disabled={gerandoSinais}
         />
         <p className="text-xs text-gray-400 mt-1">Quando o agente detectar essas palavras ou contextos, ele vai priorizar a qualificação e transferência.</p>
-      </Field>
+      </div>
 
       {/* Capacidades do agente */}
       <div>
@@ -2739,8 +2798,8 @@ export default function OnboardingPage() {
     'Empresa e produto',
     'Qualificação & Objeções',
     'ICP & Sinais de compra',
-    'Público-alvo',
     'Cenário & Dores',
+    'Público-alvo',
     'Metodologia de vendas',
     'Roteiro & Materiais',
     'Ligações de Referência',
@@ -3086,8 +3145,8 @@ export default function OnboardingPage() {
             />
           )}
           {step === 3 && <Step3 form={form} onChange={onChange} />}
-          {step === 4 && <StepPublicoAlvo form={form} onChange={onChange} />}
-          {step === 5 && <StepCenarioDores form={form} onChange={onChange} />}
+          {step === 4 && <StepCenarioDores form={form} onChange={onChange} />}
+          {step === 5 && <StepPublicoAlvo form={form} onChange={onChange} />}
           {step === 6 && <StepMetodologia form={form} onChange={onChange} />}
           {step === 7 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
           {step === 8 && (
