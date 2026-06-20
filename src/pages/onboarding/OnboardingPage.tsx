@@ -1066,6 +1066,8 @@ function StepQualificacao({
         objecoes_comuns: form['empresa-objecoes-comuns'],
         resultados_clientes: form['prod-resultados'],
         concorrentes: form['prod-concorrentes'],
+        descricao_produto: form['prod-descricao'],
+        info_adicional: form['prod-info-extra'],
       })
       const data = res.data as { perguntas?: string[]; objecoes?: Objecao[] }
       if (data.perguntas?.length) {
