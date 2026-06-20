@@ -476,16 +476,42 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
               </button>
             </div>
 
-            {/* Card de análise precisa */}
-            {m.file && !m.extraindo && !m.erro && m.analise && (
-              <div className="px-3 py-2.5 bg-emerald-50 border-b border-emerald-100 flex items-start gap-2">
-                <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-emerald-700 mb-0.5">
-                    O que o sistema identificou · {m.texto.length.toLocaleString('pt-BR')} caracteres extraídos
-                  </p>
-                  <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{m.analise}</p>
+            {/* Card de análise + textarea do conteúdo extraído */}
+            {m.file && !m.extraindo && !m.erro && m.texto && (
+              <div>
+                {m.analise && (
+                  <div className="px-3 py-2.5 bg-emerald-50 border-b border-emerald-100 flex items-start gap-2">
+                    <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-emerald-700 mb-0.5">
+                        O que o sistema identificou · {m.texto.length.toLocaleString('pt-BR')} caracteres extraídos
+                      </p>
+                      <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{m.analise}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="p-3">
+                  <p className="text-xs text-gray-500 mb-1.5">Conteúdo extraído — você pode editar antes de continuar:</p>
+                  <textarea
+                    rows={6}
+                    value={m.texto}
+                    onChange={e => updateItem(i, { texto: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none"
+                  />
                 </div>
+              </div>
+            )}
+
+            {/* Sem arquivo — campo de texto manual */}
+            {!m.file && !m.extraindo && (
+              <div className="p-3">
+                <textarea
+                  rows={4}
+                  value={m.texto}
+                  onChange={e => updateItem(i, { texto: e.target.value })}
+                  placeholder="Ou cole o conteúdo do material diretamente aqui..."
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none placeholder:text-gray-300"
+                />
               </div>
             )}
 
