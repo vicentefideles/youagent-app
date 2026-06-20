@@ -1916,6 +1916,8 @@ function Step4({
         concorrentes: form['prod-concorrentes'],
         icp_cargos: form['icp-cargo-tipo'],
         gatilhos: form['gatilhos-customizados'],
+        gatilhos_fechamento: form['gatilhos-fechamento'],
+        cenario_dores: form['cenario-dores'],
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
         objecoes_mapeadas: objecoes.filter(o => o.objecao.trim()),
         metodologia: form['metodologia'],
