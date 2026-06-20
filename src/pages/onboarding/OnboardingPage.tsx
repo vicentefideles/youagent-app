@@ -75,6 +75,7 @@ interface FormData {
   tom: string
   'prompt_gerado': string
   'cenario-dores': string
+  'gatilhos-fechamento': string
 }
 
 interface Objecao {
@@ -117,6 +118,7 @@ const INITIAL_FORM: FormData = {
   tom: '',
   'prompt_gerado': '',
   'cenario-dores': '',
+  'gatilhos-fechamento': '',
 }
 
 const INITIAL_OBJECOES: Objecao[] = [
@@ -208,6 +210,7 @@ const STEPS = [
   { label: 'Qualificação & Objeções', icon: Brain },
   { label: 'ICP & Sinais', icon: Target },
   { label: 'Cenário & Dores', icon: Brain },
+  { label: 'Gatilhos de Fechamento', icon: Zap },
   { label: 'Público-alvo', icon: Target },
   { label: 'Metodologia', icon: BarChart2 },
   { label: 'Roteiro & Materiais', icon: FileText },
@@ -1182,6 +1185,112 @@ function StepQualificacao({
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 5 — Gatilhos de Fechamento ─────────────────────────────────────────
+function StepGatilhosFechamento({ form, onChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+}) {
+  const [gerando, setGerando] = useState(false)
+  const [erroGeracao, setErroGeracao] = useState('')
+  const jaGerou = !!form['gatilhos-fechamento']
+
+  useEffect(() => {
+    if (!jaGerou) sugerir()
+  }, [])
+
+  async function sugerir() {
+    setGerando(true)
+    setErroGeracao('')
+    try {
+      const res = await claudeApi.sugerirGatilhosFechamento({
+        empresa: form['empresa-nome'],
+        produto: form['prod-nome'],
+        segmento: form['empresa-segmento'],
+        descricao_empresa: form['empresa-descricao'],
+        diferenciais: form['empresa-diferenciais'],
+        resultados_clientes: form['prod-resultados'],
+        descricao_produto: form['prod-descricao'],
+        cenario_dores: form['cenario-dores'],
+        perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
+      })
+      const data = res.data as { gatilhos: string }
+      if (data.gatilhos) onChange('gatilhos-fechamento', data.gatilhos)
+    } catch {
+      setErroGeracao('Não foi possível gerar sugestões. Descreva manualmente.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Card informativo — contexto do produto */}
+      <div className="p-4 rounded-xl border border-amber-200 bg-amber-50">
+        <div className="flex items-start gap-3">
+          <Zap size={17} className="text-amber-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Como funciona a transferência ao vivo</p>
+            <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+              A função principal do agente ETZ é <strong>agendar reuniões</strong> para os vendedores da sua empresa. Porém, quando o prospect demonstra intenção de fechar ou comprar <strong>agora mesmo</strong> durante a ligação, o agente identifica esse momento e transfere a chamada diretamente para um vendedor disponível — sem precisar agendar uma reunião futura.
+            </p>
+            <p className="text-xs text-amber-700 font-medium mt-2">
+              Defina abaixo os sinais exatos que indicam esse momento de fechamento imediato para o seu negócio.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Banner IA */}
+      <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5">
+        <div className="flex items-start gap-3">
+          <Brain size={18} className="text-brand mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {gerando ? 'Gerando gatilhos...' : jaGerou ? 'Gatilhos gerados pela IA' : 'Preparando gatilhos...'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {gerando
+                ? 'Analisando seu segmento para mapear os sinais de fechamento imediato...'
+                : 'Sugestões baseadas no seu produto e público. Edite para refletir o que seus prospects realmente dizem quando estão prontos para fechar.'}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={sugerir}
+          disabled={gerando}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+        >
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {gerando ? 'Gerando...' : 'Regerar'}
+        </button>
+      </div>
+
+      {erroGeracao && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{erroGeracao}</p>
+      )}
+
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Sinais de fechamento imediato</p>
+        <p className="text-xs text-gray-400 mb-3">
+          Frases, perguntas ou contextos que o prospect usa quando quer fechar ou comprar agora — e não em uma reunião futura.
+        </p>
+        <textarea
+          className={textareaCls}
+          rows={5}
+          value={form['gatilhos-fechamento']}
+          onChange={e => onChange('gatilhos-fechamento', e.target.value)}
+          placeholder={gerando ? 'Aguardando geração...' : 'Ex: "quanto fica para começar essa semana?", "pode me mandar o contrato agora?"...'}
+          disabled={gerando}
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          Separe os gatilhos por vírgula ou coloque um por linha. Quanto mais específico para o seu segmento, mais preciso o agente será.
+        </p>
       </div>
     </div>
   )
@@ -2520,6 +2629,8 @@ export default function OnboardingPage() {
       icp_segmento: form['icp-segmento-alvo'],
       icp_porte: form['icp-porte-alvo'],
       gatilhos_customizados: form['gatilhos-customizados'],
+      gatilhos_fechamento: form['gatilhos-fechamento'],
+      cenario_dores: form['cenario-dores'],
       perguntas_qualificacao: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
       script_abertura: form['script-abertura'],
       script_ligacao: form['script-ligacao'],
@@ -2610,6 +2721,8 @@ export default function OnboardingPage() {
       info_adicional?: string; gatilhos_customizados?: string; perguntas_qualificacao?: string[]
       script_abertura?: string; metodologia?: string; proposito?: string
       objecoes?: Objecao[]
+      gatilhos_fechamento?: string
+      cenario_dores?: string
     }
     const pergs = raw.perguntas_qualificacao ?? []
     setForm({
@@ -2631,6 +2744,8 @@ export default function OnboardingPage() {
       'icp-segmento-alvo': agente.icp_segmento || '',
       'icp-porte-alvo': agente.icp_porte || '',
       'gatilhos-customizados': raw.gatilhos_customizados || '',
+      'gatilhos-fechamento': raw.gatilhos_fechamento || '',
+      'cenario-dores': raw.cenario_dores || '',
       'wiz-qualif-q1': pergs[0] ?? INITIAL_FORM['wiz-qualif-q1'],
       'wiz-qualif-q2': pergs[1] ?? INITIAL_FORM['wiz-qualif-q2'],
       'wiz-qualif-q3': pergs[2] ?? INITIAL_FORM['wiz-qualif-q3'],
@@ -2717,6 +2832,7 @@ export default function OnboardingPage() {
     'Qualificação & Objeções',
     'ICP & Sinais de compra',
     'Cenário & Dores',
+    'Gatilhos de Fechamento',
     'Público-alvo',
     'Metodologia de vendas',
     'Roteiro & Materiais',
@@ -3064,17 +3180,18 @@ export default function OnboardingPage() {
           )}
           {step === 3 && <Step3 form={form} onChange={onChange} />}
           {step === 4 && <StepCenarioDores form={form} onChange={onChange} />}
-          {step === 5 && <StepPublicoAlvo form={form} onChange={onChange} />}
-          {step === 6 && <StepMetodologia form={form} onChange={onChange} />}
-          {step === 7 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
-          {step === 8 && (
+          {step === 5 && <StepGatilhosFechamento form={form} onChange={onChange} />}
+          {step === 6 && <StepPublicoAlvo form={form} onChange={onChange} />}
+          {step === 7 && <StepMetodologia form={form} onChange={onChange} />}
+          {step === 8 && <StepScriptLigacao form={form} onChange={onChange} scriptFile={scriptFile} onScriptFileChange={setScriptFile} />}
+          {step === 9 && (
             <StepLigacoesReferencia
               ligacoesSucesso={ligSucesso} onSucessoChange={setLigSucesso}
               ligacoesInsucesso={ligInsucesso} onInsucessoChange={setLigInsucesso}
             />
           )}
-          {step === 9 && <StepVozTom form={form} onChange={onChange} />}
-          {step === 10 && (
+          {step === 10 && <StepVozTom form={form} onChange={onChange} />}
+          {step === 11 && (
             <Step4
               form={form}
               onChange={onChange}
@@ -3094,7 +3211,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 10 && activated) && (
+          {!(step === 11 && activated) && (
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
