@@ -1069,7 +1069,7 @@ function StepQualificacao({
         descricao_produto: form['prod-descricao'],
         info_adicional: form['prod-info-extra'],
       })
-      const data = res.data as { perguntas?: string[]; objecoes?: Objecao[] }
+      const data = res.data as { perguntas?: string[]; objecoes?: Objecao[]; sinais?: string }
       if (data.perguntas?.length) {
         onChange('wiz-qualif-q1', data.perguntas[0] || '')
         onChange('wiz-qualif-q2', data.perguntas[1] || '')
@@ -1077,6 +1077,9 @@ function StepQualificacao({
       }
       if (data.objecoes?.length) {
         onObjecoesChange(data.objecoes.slice(0, 5))
+      }
+      if (data.sinais) {
+        onChange('gatilhos-customizados', data.sinais)
       }
     } catch {
       setErroGeracao('Não foi possível gerar sugestões. Preencha manualmente.')
