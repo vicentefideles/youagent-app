@@ -223,8 +223,14 @@ const STEPS = [
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex flex-col items-center gap-4 mb-6">
-      {/* Círculos compactos */}
+    <div className="flex flex-col items-center gap-3 mb-6">
+      {/* Label do step atual */}
+      <div className="text-center">
+        <span className="text-xs font-semibold text-brand uppercase tracking-widest">
+          Etapa {current + 1} de {STEPS.length} — {STEPS[current]?.label}
+        </span>
+      </div>
+      {/* Círculos compactos para 12 etapas */}
       <div className="flex items-center gap-0">
         {STEPS.map((s, i) => {
           const done = i < current
@@ -232,28 +238,23 @@ function StepIndicator({ current }: { current: number }) {
           return (
             <React.Fragment key={s.label}>
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
+                title={s.label}
+                className={`w-6 h-6 rounded-full flex items-center justify-center font-bold transition-all duration-200 ${
                   done
-                    ? 'bg-brand-500 text-white shadow-sm'
+                    ? 'bg-brand-500 text-white'
                     : active
-                    ? 'bg-brand text-white shadow-md ring-4 ring-brand-100'
+                    ? 'bg-brand text-white shadow-md ring-2 ring-brand-100'
                     : 'bg-gray-100 text-gray-400'
-                }`}
+                } ${active ? 'text-[11px]' : 'text-[10px]'}`}
               >
-                {done ? <Check size={12} strokeWidth={3} /> : i + 1}
+                {done ? <Check size={10} strokeWidth={3} /> : i + 1}
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`w-8 h-0.5 transition-colors duration-300 ${i < current ? 'bg-brand-400' : 'bg-gray-200'}`} />
+                <div className={`w-4 h-0.5 transition-colors duration-300 ${i < current ? 'bg-brand-400' : 'bg-gray-200'}`} />
               )}
             </React.Fragment>
           )
         })}
-      </div>
-      {/* Label do step atual destacada */}
-      <div className="text-center">
-        <span className="text-xs font-semibold text-brand uppercase tracking-widest">
-          Etapa {current + 1} de {STEPS.length}
-        </span>
       </div>
     </div>
   )
@@ -1649,7 +1650,7 @@ function StepCenarioDores({ form, onChange }: {
           O agente usa esse texto para criar conexão com o prospect — mostrando que entende a realidade do negócio dele antes de apresentar a solução.
         </p>
         <textarea
-          className={`${textareaCls} font-mono text-xs leading-relaxed`}
+          className={textareaCls}
           rows={10}
           value={form['cenario-dores']}
           onChange={e => onChange('cenario-dores', e.target.value)}
