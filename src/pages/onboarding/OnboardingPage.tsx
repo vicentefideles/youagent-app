@@ -767,22 +767,6 @@ function Step1({
           : desc.includes('estética') || desc.includes('cosmétic') || desc.includes('beleza') ? 'Cosméticos / Estética / Beleza'
           : ''
         if (seg) onChange('empresa-segmento', seg)
-
-        // Gerar descrição automática com base no CNAE (pré-preenche; cliente pode editar)
-        if (!form['empresa-descricao']) {
-          const atividadePrincipal = d.cnae_fiscal_descricao
-            .split(' ')
-            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-            .join(' ')
-          const cnaesSecundarios: Array<{ descricao: string }> = d.cnaes_secundarios || []
-          const atividadesExtra = cnaesSecundarios
-            .slice(0, 2)
-            .map((c) => c.descricao.toLowerCase())
-            .join(', ')
-          const cidade = d.municipio ? `, localizada em ${d.municipio}/${d.uf}` : ''
-          const complemento = atividadesExtra ? `, com atividades complementares em ${atividadesExtra}` : ''
-          onChange('empresa-descricao', `${atividadePrincipal}${complemento}${cidade}.`)
-        }
       }
       if (d.municipio && d.uf) {
         if (d.email) onChange('empresa-site', d.email.startsWith('http') ? d.email : '')
