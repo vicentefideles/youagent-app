@@ -401,8 +401,10 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
     try {
       const { data } = await agentesApi.extrairScript(file, tipoAtual || 'material')
       if (data.texto) {
+        // Para materiais: usa texto_filtrado (sem ruído) se disponível; fallback para texto bruto
+        const textoParaUsar = (data as { texto_filtrado?: string }).texto_filtrado || data.texto
         const next = materiais.map((m, idx) =>
-          idx === i ? { ...m, file, extraindo: false, texto: data.texto, analise: data.resumo || null, erro: null } : m
+          idx === i ? { ...m, file, extraindo: false, texto: textoParaUsar, analise: data.resumo || null, erro: null } : m
         )
         onMateriaisChange(next)
         syncConteudo(next)
@@ -480,14 +482,11 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
             {m.file && !m.extraindo && !m.erro && m.texto && (
               <div>
                 {m.analise && (
-                  <div className="px-3 py-2.5 bg-emerald-50 border-b border-emerald-100 flex items-start gap-2">
-                    <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-semibold text-emerald-700 mb-0.5">
-                        O que o sistema identificou · {m.texto.length.toLocaleString('pt-BR')} caracteres extraídos
-                      </p>
-                      <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{m.analise}</p>
-                    </div>
+                  <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
+                    <Brain size={13} className="text-emerald-600 shrink-0" />
+                    <p className="text-xs font-semibold text-emerald-700">
+                      IA filtrou o conteúdo — dados de contato, datas e cabeçalhos foram removidos. Revise e edite se necessário:
+                    </p>
                   </div>
                 )}
                 <div className="p-3">
