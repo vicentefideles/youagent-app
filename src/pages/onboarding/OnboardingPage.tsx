@@ -718,6 +718,7 @@ function Step1({
   const [pesquisaErro, setPesquisaErro] = useState<string | null>(null)
   const [buscandoCnpj, setBuscandoCnpj] = useState(false)
   const [cnpjErro, setCnpjErro] = useState<string | null>(null)
+  const [iaPesquisouSite, setIaPesquisouSite] = useState(false)
 
   function formatarCnpj(v: string) {
     const n = v.replace(/\D/g, '').slice(0, 14)
@@ -844,6 +845,7 @@ function Step1({
       if ((data as { descricao_produto?: string }).descricao_produto) onChange('prod-descricao', (data as { descricao_produto?: string }).descricao_produto!)
       if ((data as { resultados_clientes?: string }).resultados_clientes) onChange('prod-resultados', (data as { resultados_clientes?: string }).resultados_clientes!)
       if (data.cases_sucesso) onChange('prod-info-extra', data.cases_sucesso)
+      setIaPesquisouSite(true)
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { error?: string } } })?.response?.data
       const msg = axiosData?.error ?? (err instanceof Error ? err.message : 'Erro ao pesquisar')
@@ -853,7 +855,7 @@ function Step1({
     }
   }
 
-  const aiPreencheu = !!(form['empresa-descricao'] || form['empresa-diferenciais'] || form['prod-descricao'])
+  const aiPreencheu = iaPesquisouSite
 
   return (
     <div className="flex flex-col gap-5">
