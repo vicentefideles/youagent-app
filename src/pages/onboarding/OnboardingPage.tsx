@@ -1194,10 +1194,6 @@ function StepQualificacao({
   const [erroGeracao, setErroGeracao] = useState('')
   const jaGerou = form['wiz-qualif-q1'] || objecoes.some(o => o.objecao)
 
-  useEffect(() => {
-    if (!jaGerou) sugerir()
-  }, [])
-
   async function sugerir() {
     setGerando(true)
     setErroGeracao('')
@@ -1247,17 +1243,19 @@ function StepQualificacao({
   return (
     <div className="flex flex-col gap-6">
       {/* Banner IA */}
-      <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5">
+      <div className={`flex items-start justify-between gap-4 p-4 rounded-xl border ${jaGerou ? 'border-brand/20 bg-brand/5' : 'border-brand/30 bg-brand/5'}`}>
         <div className="flex items-start gap-3">
           <Brain size={18} className="text-brand mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-gray-900">
-              {gerando ? 'Gerando sugestões...' : jaGerou ? 'Sugestões geradas pela IA' : 'Preparando sugestões...'}
+              {gerando ? 'Gerando sugestões...' : jaGerou ? 'Sugestões geradas pela IA' : 'Gerar sugestões com IA'}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
               {gerando
                 ? 'Analisando as informações da sua empresa e produto...'
-                : 'Com base nas informações da etapa anterior, a IA sugeriu perguntas e objeções. Edite livremente.'}
+                : jaGerou
+                ? 'Com base nas informações da etapa anterior, a IA sugeriu perguntas e objeções. Edite livremente.'
+                : 'Clique em "Gerar com IA" para a IA sugerir perguntas e objeções com base no que você preencheu. Quanto mais completa a etapa anterior, mais preciso o resultado.'}
             </p>
           </div>
         </div>
@@ -1265,10 +1263,10 @@ function StepQualificacao({
           type="button"
           onClick={sugerir}
           disabled={gerando}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 shrink-0 ${jaGerou ? 'text-brand border border-brand/30 hover:bg-brand/10' : 'text-white bg-brand hover:bg-brand/90 border border-brand'}`}
         >
-          {gerando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {gerando ? 'Gerando...' : 'Regerar'}
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : jaGerou ? <RefreshCw size={12} /> : <Brain size={12} />}
+          {gerando ? 'Gerando...' : jaGerou ? 'Regerar' : 'Gerar com IA'}
         </button>
       </div>
 
@@ -1342,10 +1340,6 @@ function StepGatilhosFechamento({ form, onChange }: {
   const [erroGeracao, setErroGeracao] = useState('')
   const jaGerou = !!form['gatilhos-fechamento']
 
-  useEffect(() => {
-    if (!jaGerou) sugerir()
-  }, [])
-
   async function sugerir() {
     setGerando(true)
     setErroGeracao('')
@@ -1390,17 +1384,19 @@ function StepGatilhosFechamento({ form, onChange }: {
       </div>
 
       {/* Banner IA */}
-      <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5">
+      <div className={`flex items-start justify-between gap-4 p-4 rounded-xl border ${jaGerou ? 'border-brand/20 bg-brand/5' : 'border-brand/30 bg-brand/5'}`}>
         <div className="flex items-start gap-3">
           <Brain size={18} className="text-brand mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-gray-900">
-              {gerando ? 'Gerando gatilhos...' : jaGerou ? 'Gatilhos gerados pela IA' : 'Preparando gatilhos...'}
+              {gerando ? 'Gerando gatilhos...' : jaGerou ? 'Gatilhos gerados pela IA' : 'Gerar gatilhos com IA'}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
               {gerando
                 ? 'Analisando seu segmento para mapear os sinais de fechamento imediato...'
-                : 'Sugestões baseadas no seu produto e público. Edite para refletir o que seus prospects realmente dizem quando estão prontos para fechar.'}
+                : jaGerou
+                ? 'Sugestões baseadas no seu produto e público. Edite para refletir o que seus prospects realmente dizem quando estão prontos para fechar.'
+                : 'Clique em "Gerar com IA" para mapear os sinais de fechamento com base no que você preencheu nas etapas anteriores.'}
             </p>
           </div>
         </div>
@@ -1408,10 +1404,10 @@ function StepGatilhosFechamento({ form, onChange }: {
           type="button"
           onClick={sugerir}
           disabled={gerando}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 shrink-0 ${jaGerou ? 'text-brand border border-brand/30 hover:bg-brand/10' : 'text-white bg-brand hover:bg-brand/90 border border-brand'}`}
         >
-          {gerando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {gerando ? 'Gerando...' : 'Regerar'}
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : jaGerou ? <RefreshCw size={12} /> : <Brain size={12} />}
+          {gerando ? 'Gerando...' : jaGerou ? 'Regerar' : 'Gerar com IA'}
         </button>
       </div>
 
@@ -1518,26 +1514,25 @@ function Step3({ form, onChange }: {
     }
   }
 
-  useEffect(() => {
-    if (!jaGerouSinais) regerarSinais()
-  }, [])
 
   return (
     <div className="flex flex-col gap-6">
       {/* Sinais de compra */}
       <div>
         {/* Banner IA */}
-        <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5 mb-4">
+        <div className={`flex items-start justify-between gap-4 p-4 rounded-xl border mb-4 ${jaGerouSinais ? 'border-brand/20 bg-brand/5' : 'border-brand/30 bg-brand/5'}`}>
           <div className="flex items-start gap-3">
             <Brain size={18} className="text-brand mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-gray-900">
-                {gerandoSinais ? 'Gerando sinais...' : jaGerouSinais ? 'Sinais gerados pela IA' : 'Preparando sinais...'}
+                {gerandoSinais ? 'Gerando sinais...' : jaGerouSinais ? 'Sinais gerados pela IA' : 'Gerar sinais de compra com IA'}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
                 {gerandoSinais
                   ? 'Analisando seu produto e segmento para mapear os sinais de compra...'
-                  : 'O agente monitora esses sinais em tempo real durante a ligação para detectar o momento certo de qualificar.'}
+                  : jaGerouSinais
+                  ? 'O agente monitora esses sinais em tempo real durante a ligação para detectar o momento certo de qualificar.'
+                  : 'Clique em "Gerar com IA" para mapear os sinais de compra do seu segmento com base nas etapas anteriores.'}
               </p>
             </div>
           </div>
@@ -1545,10 +1540,10 @@ function Step3({ form, onChange }: {
             type="button"
             onClick={regerarSinais}
             disabled={gerandoSinais}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 shrink-0 ${jaGerouSinais ? 'text-brand border border-brand/30 hover:bg-brand/10' : 'text-white bg-brand hover:bg-brand/90 border border-brand'}`}
           >
-            {gerandoSinais ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            {gerandoSinais ? 'Gerando...' : 'Regerar'}
+            {gerandoSinais ? <Loader2 size={12} className="animate-spin" /> : jaGerouSinais ? <RefreshCw size={12} /> : <Brain size={12} />}
+            {gerandoSinais ? 'Gerando...' : jaGerouSinais ? 'Regerar' : 'Gerar com IA'}
           </button>
         </div>
 
@@ -1831,10 +1826,6 @@ function StepCenarioDores({ form, onChange }: {
   const [erroGeracao, setErroGeracao] = useState('')
   const jaGerou = !!form['cenario-dores']
 
-  useEffect(() => {
-    if (!jaGerou) sugerir()
-  }, [])
-
   async function sugerir() {
     setGerando(true)
     setErroGeracao('')
@@ -1865,17 +1856,19 @@ function StepCenarioDores({ form, onChange }: {
   return (
     <div className="flex flex-col gap-5">
       {/* Banner IA */}
-      <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-brand/20 bg-brand/5">
+      <div className={`flex items-start justify-between gap-4 p-4 rounded-xl border ${jaGerou ? 'border-brand/20 bg-brand/5' : 'border-brand/30 bg-brand/5'}`}>
         <div className="flex items-start gap-3">
           <Brain size={18} className="text-brand mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-gray-900">
-              {gerando ? 'Analisando o cenário...' : jaGerou ? 'Contexto gerado pela IA' : 'Preparando contexto...'}
+              {gerando ? 'Analisando o cenário...' : jaGerou ? 'Contexto gerado pela IA' : 'Gerar cenário de dores com IA'}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
               {gerando
                 ? 'Mapeando as dores do seu público com base nas etapas anteriores...'
-                : 'Descreve as dores reais do seu mercado. O agente usa esse contexto para criar empatia e rapport na ligação.'}
+                : jaGerou
+                ? 'Descreve as dores reais do seu mercado. O agente usa esse contexto para criar empatia e rapport na ligação.'
+                : 'Clique em "Gerar com IA" para mapear o cenário e as dores do seu público. Quanto mais completas as etapas anteriores, mais preciso o resultado.'}
             </p>
           </div>
         </div>
@@ -1883,10 +1876,10 @@ function StepCenarioDores({ form, onChange }: {
           type="button"
           onClick={sugerir}
           disabled={gerando}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand border border-brand/30 rounded-lg hover:bg-brand/10 transition-colors disabled:opacity-50 shrink-0"
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 shrink-0 ${jaGerou ? 'text-brand border border-brand/30 hover:bg-brand/10' : 'text-white bg-brand hover:bg-brand/90 border border-brand'}`}
         >
-          {gerando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {gerando ? 'Gerando...' : 'Regerar'}
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : jaGerou ? <RefreshCw size={12} /> : <Brain size={12} />}
+          {gerando ? 'Gerando...' : jaGerou ? 'Regerar' : 'Gerar com IA'}
         </button>
       </div>
 
