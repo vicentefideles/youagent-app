@@ -2021,22 +2021,18 @@ function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: key
 interface LigacaoRef { file: File | null; observacao: string; resultado: 'sucesso' | 'insucesso' }
 
 function LigacoesSection({
-  titulo, descricao, tipo, cor, items, onChange,
+  tipo, items, onChange,
 }: {
-  titulo: string; descricao: string; tipo: 'sucesso' | 'insucesso'
-  cor: 'green' | 'amber'; items: LigacaoRef[]
+  tipo: 'sucesso' | 'insucesso'
+  items: LigacaoRef[]
   onChange: (items: LigacaoRef[]) => void
 }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([])
-  const borderCor = cor === 'green' ? 'border-emerald-300' : 'border-amber-300'
-  const bgCor     = cor === 'green' ? 'bg-emerald-50'      : 'bg-amber-50'
-  const textCor   = cor === 'green' ? 'text-emerald-700'   : 'text-amber-700'
-  const iconEl    = cor === 'green'
-    ? <Check size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-    : <X size={14} className="text-red-500 shrink-0 mt-0.5" />
-  const btnCor    = cor === 'green'
-    ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
-    : 'border-amber-300 text-amber-700 hover:bg-amber-50'
+  const isSucesso = tipo === 'sucesso'
+
+  const colors = isSucesso
+    ? { dot: 'bg-emerald-500', label: 'text-emerald-700', dashedBorder: 'border-emerald-300', dashedHover: 'hover:border-emerald-400 hover:bg-emerald-50', uploadIcon: 'text-emerald-400', uploadText: 'text-emerald-700', uploadSub: 'text-emerald-500', cardBg: 'bg-emerald-50 border-emerald-200', cardText: 'text-emerald-800', cardSub: 'text-emerald-500', addBtn: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300' }
+    : { dot: 'bg-amber-500', label: 'text-amber-700', dashedBorder: 'border-amber-300', dashedHover: 'hover:border-amber-400 hover:bg-amber-50', uploadIcon: 'text-amber-400', uploadText: 'text-amber-700', uploadSub: 'text-amber-500', cardBg: 'bg-amber-50 border-amber-200', cardText: 'text-amber-800', cardSub: 'text-amber-500', addBtn: 'border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300' }
 
   function addLinha() {
     onChange([...items, { file: null, observacao: '', resultado: tipo }])
@@ -2052,40 +2048,96 @@ function LigacoesSection({
     onChange(items.map((m, idx) => idx === i ? { ...m, observacao: v } : m))
   }
 
+  const tituloSecao = isSucesso
+    ? 'Ligações que converteram — o agente aprende o que funciona'
+    : 'Ligações que não converteram — o agente aprende o que evitar'
+  const descSecao = isSucesso
+    ? 'Grave ligações onde o cliente aceitou a reunião. O agente estuda o tom, o ritmo e os argumentos que levaram ao "sim".'
+    : 'Grave ligações onde o cliente recusou. O agente identifica padrões a evitar e objeções a contornar.'
+  const labelGravacao = isSucesso ? 'GRAVAÇÃO DE SUCESSO' : 'GRAVAÇÃO DE REFERÊNCIA'
+  const uploadLabel = isSucesso ? 'Enviar gravação — ligação que converteu' : 'Enviar gravação — ligação que não converteu'
+  const obsPlaceholder = isSucesso
+    ? 'Ex: CEO de fintech, usou pergunta sobre dor operacional'
+    : 'Ex: Prospect resistiu em pricing, não conseguimos contornar'
+  const addLabel = isSucesso ? 'Adicionar outra ligação de sucesso' : 'Adicionar outra ligação de referência'
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      {/* Título da seção */}
       <div>
-        <p className={`text-sm font-semibold uppercase tracking-wide ${textCor} flex items-center gap-2`}>
-          <span className={`inline-block w-2 h-2 rounded-full ${cor === 'green' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-          {titulo}
+        <p className={`text-sm font-semibold uppercase tracking-wide flex items-center gap-2 ${colors.label}`}>
+          <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+          {tituloSecao}
         </p>
-        <p className="text-xs text-gray-500 mt-1">{descricao}</p>
+        <p className="text-xs text-gray-500 mt-1">{descSecao}</p>
       </div>
-      <div className="flex flex-col gap-2">
+
+      {/* Cards de gravação */}
+      <div className="flex flex-col gap-3">
         {items.map((m, i) => (
-          <div key={i} className={`flex items-center gap-2 border border-dashed ${borderCor} ${bgCor} rounded-xl px-3 py-2.5`}>
-            <input ref={el => { refs.current[i] = el }} type="file"
-              accept=".mp3,.wav,.m4a,.mp4,.ogg,.webm" className="hidden"
-              onChange={e => setFile(i, e.target.files?.[0] ?? null)} />
-            <button type="button" onClick={() => refs.current[i]?.click()}
-              className="flex items-center gap-2 flex-1 min-w-0 text-left">
-              {iconEl}
-              <span className={`text-sm truncate ${m.file ? 'text-gray-800 font-medium' : textCor}`}>
-                {m.file ? m.file.name : `Enviar gravação — cliente ${tipo === 'sucesso' ? 'agendou' : 'não agendou'}`}
+          <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
+            {/* Header do card */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                {labelGravacao} {items.length > 1 ? i + 1 : ''}
               </span>
-              {m.file && <span className="text-xs text-gray-400 shrink-0">{(m.file.size / (1024 * 1024)).toFixed(1)}MB</span>}
-            </button>
-            <input value={m.observacao} onChange={e => setObs(i, e.target.value)}
-              placeholder="Observação (ex: cliente do setor...)"
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white w-48 shrink-0 outline-none focus:ring-1 focus:ring-brand-200" />
-            <button type="button" onClick={() => removeLinha(i)}
-              className="text-gray-300 hover:text-red-400 transition-colors shrink-0"><X size={13} /></button>
+              {items.length > 1 && (
+                <button type="button" onClick={() => removeLinha(i)}
+                  className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1">
+                  <X size={12} /> Remover
+                </button>
+              )}
+            </div>
+
+            <div className="p-4 flex flex-col gap-3">
+              <input ref={el => { refs.current[i] = el }} type="file"
+                accept=".mp3,.wav,.m4a,.mp4,.ogg,.webm" className="hidden"
+                onChange={e => { setFile(i, e.target.files?.[0] ?? null); if (e.target) e.target.value = '' }} />
+
+              {/* Zona de upload ou card de sucesso */}
+              {!m.file ? (
+                <div
+                  onClick={() => refs.current[i]?.click()}
+                  className={`flex items-center gap-3 border border-dashed ${colors.dashedBorder} rounded-lg px-4 py-3 cursor-pointer transition-colors ${colors.dashedHover}`}
+                >
+                  <Mic size={16} className={`shrink-0 ${colors.uploadIcon}`} />
+                  <div>
+                    <p className={`text-sm font-medium ${colors.uploadText}`}>{uploadLabel}</p>
+                    <p className={`text-xs ${colors.uploadSub}`}>MP3, WAV, M4A ou MP4 — máx. 50MB</p>
+                  </div>
+                </div>
+              ) : (
+                <div className={`border ${colors.cardBg} rounded-lg overflow-hidden`}>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Check size={13} className={`shrink-0 ${isSucesso ? 'text-emerald-600' : 'text-amber-600'}`} />
+                      <span className={`text-xs font-semibold truncate ${colors.cardText}`}>{m.file.name}</span>
+                      <span className={`text-xs shrink-0 ${colors.cardSub}`}>{(m.file.size / (1024 * 1024)).toFixed(1)}MB</span>
+                    </div>
+                    <button type="button" onClick={() => setFile(i, null)}
+                      className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 shrink-0 ml-2">
+                      <X size={11} /> Remover
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Observação */}
+              <input
+                value={m.observacao}
+                onChange={e => setObs(i, e.target.value)}
+                placeholder={obsPlaceholder}
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 text-gray-700 placeholder:text-gray-300 w-full"
+              />
+            </div>
           </div>
         ))}
       </div>
+
+      {/* Botão adicionar */}
       <button type="button" onClick={addLinha}
-        className={`self-start text-sm border rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5 ${btnCor}`}>
-        <Plus size={13} /> Adicionar outra ligação de {tipo === 'sucesso' ? 'sucesso' : 'referência'}
+        className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-3 text-sm font-medium transition-colors ${colors.addBtn}`}>
+        <Plus size={16} /> {addLabel}
       </button>
     </div>
   )
@@ -2099,61 +2151,38 @@ function StepLigacoesReferencia({
   ligacoesInsucesso: LigacaoRef[]; onInsucessoChange: (l: LigacaoRef[]) => void
 }) {
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0 mt-0.5">
-          <Mic size={18} className="text-brand-600" />
-        </div>
+    <div className="flex flex-col gap-7">
+      {/* Banner contextual */}
+      <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-4 flex items-start gap-3">
+        <Brain size={18} className="text-brand-500 shrink-0 mt-0.5" />
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-gray-900">Ligações reais como referência de treinamento</h2>
-            <span className="text-[11px] bg-brand-50 text-brand-600 border border-brand-100 px-2 py-0.5 rounded-full font-semibold">recomendado</span>
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Ligações reais feitas por humanos são o melhor material de treinamento possível. O agente aprende o flow natural de conversa, como contornar objeções no tom certo e identificar os sinais de interesse que levam ao agendamento.
+          <p className="text-sm font-semibold text-brand-800 mb-1">Por que ligações reais fazem diferença?</p>
+          <p className="text-xs text-brand-700 leading-relaxed">
+            Gravações humanas são o melhor material de treinamento. O sistema transcreve cada ligação com IA, extrai os argumentos, o timing e o vocabulário que funciona para o seu público — e injeta tudo no comportamento do agente.
           </p>
         </div>
       </div>
 
-      {/* Por que isso faz diferença */}
-      <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 flex items-start gap-3">
-        <Brain size={16} className="text-indigo-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-indigo-800 mb-1">Por que isso faz diferença?</p>
-          <p className="text-xs text-indigo-700 leading-relaxed">
-            Quanto mais exemplos de sucesso você fornecer, mais assertivo o agente será. O sistema transcreve automaticamente cada gravação com IA e extrai os argumentos, o timing e o vocabulário que funciona para o seu público.
-          </p>
-        </div>
-      </div>
+      {/* Sucesso */}
+      <LigacoesSection tipo="sucesso" items={ligacoesSucesso} onChange={onSucessoChange} />
 
-      {/* Seção sucesso */}
-      <LigacoesSection
-        titulo="Ligações que resultaram em agendamento — o agente aprende O QUE FUNCIONA"
-        descricao="Suba gravações de ligações onde o cliente aceitou a reunião. O agente vai estudar o tom, o ritmo, os argumentos e o momento certo de propor o agendamento."
-        tipo="sucesso" cor="green"
-        items={ligacoesSucesso} onChange={onSucessoChange}
-      />
+      {/* Divider */}
+      <div className="border-t border-gray-100" />
 
-      {/* Seção insucesso */}
-      <LigacoesSection
-        titulo="Ligações que NÃO resultaram em agendamento — o agente aprende O QUE EVITAR"
-        descricao="Suba gravações de ligações onde o cliente recusou ou não quis agendar. O agente vai identificar os erros de abordagem, as objeções não contornadas e os sinais de desinteresse para evitar os mesmos padrões."
-        tipo="insucesso" cor="amber"
-        items={ligacoesInsucesso} onChange={onInsucessoChange}
-      />
+      {/* Insucesso */}
+      <LigacoesSection tipo="insucesso" items={ligacoesInsucesso} onChange={onInsucessoChange} />
 
       {/* Como o sistema usa */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-        <p className="text-xs font-semibold text-gray-700 mb-2">Como o sistema usa essas ligações</p>
-        <ul className="space-y-1">
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5">
+        <p className="text-xs font-semibold text-gray-700 mb-2.5">Como o agente usa essas gravações</p>
+        <ul className="space-y-1.5">
           {[
-            'Ligações de sucesso: o agente copia o flow, o tom e os argumentos que funcionaram',
-            'Ligações de insucesso: o agente evita os padrões que não convertem e aprende a contornar as objeções',
-            'Todas as gravações ficam disponíveis no Centro de Inteligência para revisão e ajuste fino contínuo',
-          ].map((t, i) => (
-            <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
-              <Check size={11} className="text-brand-500 shrink-0 mt-0.5" /> {t}
+            { icon: <Check size={11} className="text-emerald-500 shrink-0 mt-0.5" />, text: 'Gravações de sucesso: replica o flow, o tom e os argumentos que converteram' },
+            { icon: <X size={11} className="text-amber-500 shrink-0 mt-0.5" />, text: 'Gravações de referência: evita os padrões que não converteram e aprende a contornar objeções' },
+            { icon: <Check size={11} className="text-brand-500 shrink-0 mt-0.5" />, text: 'Todas as transcrições ficam no Centro de Inteligência para ajuste fino contínuo' },
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+              {item.icon} {item.text}
             </li>
           ))}
         </ul>
