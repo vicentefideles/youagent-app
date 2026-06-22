@@ -1257,6 +1257,11 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 text-xs text-brand-700">
+        <span>🎧</span>
+        <span>A prévia usa uma voz similar para demonstrar o timbre. A voz ETZ real é ativada nas ligações do agente.</span>
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-gray-700">Voz do agente</p>
         <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
