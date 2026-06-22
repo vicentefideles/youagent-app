@@ -2515,9 +2515,6 @@ function Step4({
         script_abertura: form['script-abertura'],
         voz: vozNome,
         tom: form['tom'],
-        compliance_anatel: form['compliance-anatel'] === 'true',
-        compliance_optout: form['compliance-optout'] === 'true',
-        whatsapp_numero: form['whatsapp-numero'] || undefined,
         ligacoes_sucesso: ligacoesSucesso.filter(l => l.transcricao).map(l => l.transcricao),
         ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
       })
