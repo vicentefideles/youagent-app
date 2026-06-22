@@ -56,7 +56,7 @@ export const agentesApi = {
     if (tipo) fd.append('tipo', tipo)
     return api.post('/agentes/extrair-script', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 60000,
+      timeout: 180000, // 3min — PDFs digitalizados usam Claude Vision (pode levar até 90s)
     })
   },
   transcreverLigacao: (file: File, resultado: 'sucesso' | 'insucesso', observacao?: string) => {
