@@ -749,6 +749,8 @@ function Step1({
   const [buscandoCnpj, setBuscandoCnpj] = useState(false)
   const [cnpjErro, setCnpjErro] = useState<string | null>(null)
   const [iaPesquisouSite, setIaPesquisouSite] = useState(false)
+  const [sites, setSites] = useState<string[]>([form['empresa-site'] || ''])
+  const [pesquisandoSites, setPesquisandoSites] = useState<boolean[]>([false])
 
   function formatarCnpj(v: string) {
     const n = v.replace(/\D/g, '').slice(0, 14)
@@ -812,53 +814,98 @@ function Step1({
 
   async function pesquisarComIA() {
     if (pesquisando) return
-    if (!form['empresa-site'].trim()) {
-      setPesquisaErro('Informe o site da empresa antes de pesquisar')
-      document.getElementById('empresa-site')?.focus()
+    const sitesValidos = sites.map(s => s.trim()).filter(Boolean)
+    if (sitesValidos.length === 0) {
+      setPesquisaErro('Informe pelo menos um site antes de pesquisar')
       return
     }
     setPesquisando(true)
     setPesquisaErro(null)
+    setPesquisandoSites(sites.map(s => s.trim() !== ''))
+
+    type SiteData = {
+      descricao?: string; diferenciais?: string; concorrentes?: string
+      icp_porte?: string; icp_segmento?: string; gatilhos?: string
+      objecoes_comuns?: string; contexto_mercado?: string; script_abertura?: string
+      descricao_produto?: string; resultados_clientes?: string; nome_produto?: string; cases_sucesso?: string
+    }
+
     try {
-      const res = await claudeApi.pesquisarMercado({
-        empresa: form['empresa-nome'],
-        cnpj: form['empresa-cnpj'],
-        segmento: form['empresa-segmento'],
-        site: form['empresa-site'],
-        produto: form['prod-nome'],
-      })
-      const data = res.data as {
-        descricao?: string
-        diferenciais?: string
-        concorrentes?: string
-        icp_porte?: string
-        icp_segmento?: string
-        gatilhos?: string
-        objecoes_comuns?: string
-        contexto_mercado?: string
-        script_abertura?: string
-        descricao_produto?: string
-        resultados_clientes?: string
-        nome_produto?: string
-        cases_sucesso?: string
+      const resultados = await Promise.allSettled(
+        sitesValidos.map(site =>
+          claudeApi.pesquisarMercado({
+            empresa: form['empresa-nome'],
+            cnpj: form['empresa-cnpj'],
+            segmento: form['empresa-segmento'],
+            site,
+            produto: form['prod-nome'],
+          }).then(r => ({ site, data: r.data as SiteData }))
+        )
+      )
+
+      const sucessos = resultados
+        .filter((r): r is PromiseFulfilledResult<{ site: string; data: SiteData }> => r.status === 'fulfilled')
+        .map(r => r.value)
+
+      if (sucessos.length === 0) {
+        setPesquisaErro('Não foi possível pesquisar nenhum dos sites informados.')
+        return
       }
-      if (data.nome_produto) onChange('prod-nome', data.nome_produto)
-      if (data.descricao) onChange('empresa-descricao', data.descricao)
-      if (data.diferenciais) onChange('empresa-diferenciais', data.diferenciais)
-      if (data.concorrentes) onChange('prod-concorrentes', data.concorrentes)
-      if (data.icp_porte) onChange('icp-porte-alvo', data.icp_porte)
-      if (data.icp_segmento) onChange('icp-segmento-alvo', data.icp_segmento)
-      if (data.gatilhos) onChange('gatilhos-customizados', data.gatilhos)
-      const mercadoTexto = [
-        data.concorrentes ? `Concorrentes: ${data.concorrentes}` : '',
-        data.objecoes_comuns ? `\nObjeções:\n${data.objecoes_comuns}` : '',
-      ].filter(Boolean).join('')
-      if (mercadoTexto) onChange('empresa-objecoes-comuns', mercadoTexto)
-      if (data.contexto_mercado) onChange('empresa-contexto-mercado', data.contexto_mercado)
-      if (data.script_abertura) onChange('script-abertura', data.script_abertura)
-      if ((data as { descricao_produto?: string }).descricao_produto) onChange('prod-descricao', (data as { descricao_produto?: string }).descricao_produto!)
-      if ((data as { resultados_clientes?: string }).resultados_clientes) onChange('prod-resultados', (data as { resultados_clientes?: string }).resultados_clientes!)
-      if (data.cases_sucesso) onChange('prod-info-extra', data.cases_sucesso)
+
+      function acumular(campo: keyof FormData, blocos: string[]) {
+        if (blocos.length === 0) return
+        const atual = (form[campo] as string || '').trim()
+        const novo = blocos.join('\n\n')
+        onChange(campo, atual ? `${atual}\n\n${novo}` : novo)
+      }
+
+      const label = (site: string) => {
+        try { return new URL(site).hostname.replace('www.', '') } catch { return site }
+      }
+
+      const unico = sucessos.length === 1
+
+      acumular('empresa-descricao',   sucessos.filter(s => s.data.descricao).map(s => unico ? s.data.descricao! : `[${label(s.site)}]\n${s.data.descricao}`))
+      acumular('empresa-diferenciais', sucessos.filter(s => s.data.diferenciais).map(s => unico ? s.data.diferenciais! : `[${label(s.site)}]\n${s.data.diferenciais}`))
+      acumular('prod-descricao',       sucessos.filter(s => s.data.descricao_produto).map(s => unico ? s.data.descricao_produto! : `[${label(s.site)}]\n${s.data.descricao_produto}`))
+      acumular('prod-resultados',      sucessos.filter(s => s.data.resultados_clientes).map(s => unico ? s.data.resultados_clientes! : `[${label(s.site)}]\n${s.data.resultados_clientes}`))
+      acumular('prod-info-extra',      sucessos.filter(s => s.data.cases_sucesso).map(s => unico ? s.data.cases_sucesso! : `[${label(s.site)}]\n${s.data.cases_sucesso}`))
+      acumular('prod-concorrentes',    sucessos.filter(s => s.data.concorrentes).map(s => unico ? s.data.concorrentes! : `[${label(s.site)}]\n${s.data.concorrentes}`))
+      acumular('empresa-contexto-mercado', sucessos.filter(s => s.data.contexto_mercado).map(s => unico ? s.data.contexto_mercado! : `[${label(s.site)}]\n${s.data.contexto_mercado}`))
+
+      const mercadoBlocos = sucessos.map(s => {
+        const partes = [
+          s.data.concorrentes ? `Concorrentes: ${s.data.concorrentes}` : '',
+          s.data.objecoes_comuns ? `Objeções:\n${s.data.objecoes_comuns}` : '',
+        ].filter(Boolean).join('\n')
+        if (!partes) return null
+        return unico ? partes : `[${label(s.site)}]\n${partes}`
+      }).filter(Boolean) as string[]
+      acumular('empresa-objecoes-comuns', mercadoBlocos)
+
+      // script_abertura: só preenche se ainda vazio
+      const primeiroScript = sucessos.find(s => s.data.script_abertura)
+      if (primeiroScript?.data.script_abertura && !form['script-abertura'].trim()) {
+        onChange('script-abertura', primeiroScript.data.script_abertura)
+      }
+      // nome_produto: só preenche se ainda vazio
+      const primeiroNome = sucessos.find(s => s.data.nome_produto)
+      if (primeiroNome?.data.nome_produto && !form['prod-nome'].trim()) {
+        onChange('prod-nome', primeiroNome.data.nome_produto)
+      }
+      // icp: preenche do primeiro que tiver
+      const primeiroIcp = sucessos.find(s => s.data.icp_porte)
+      if (primeiroIcp?.data.icp_porte && !form['icp-porte-alvo'].trim()) onChange('icp-porte-alvo', primeiroIcp.data.icp_porte)
+      const primeiroSeg = sucessos.find(s => s.data.icp_segmento)
+      if (primeiroSeg?.data.icp_segmento && !form['icp-segmento-alvo'].trim()) onChange('icp-segmento-alvo', primeiroSeg.data.icp_segmento)
+      // gatilhos: acumula
+      acumular('gatilhos-customizados', sucessos.filter(s => s.data.gatilhos).map(s => unico ? s.data.gatilhos! : `[${label(s.site)}]\n${s.data.gatilhos}`))
+
+      // Salva o primeiro site válido em empresa-site para compatibilidade
+      onChange('empresa-site', sitesValidos[0])
+
+      const falhas = resultados.filter(r => r.status === 'rejected').length
+      if (falhas > 0) setPesquisaErro(`${sucessos.length} site(s) pesquisado(s) com sucesso. ${falhas} não respondeu.`)
       setIaPesquisouSite(true)
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { error?: string } } })?.response?.data
@@ -866,6 +913,7 @@ function Step1({
       setPesquisaErro(`Erro: ${msg}`)
     } finally {
       setPesquisando(false)
+      setPesquisandoSites(sites.map(() => false))
     }
   }
 
@@ -1002,15 +1050,45 @@ function Step1({
           </Field>
         </div>
 
-        <Field label="Site da empresa" required error={errors['empresa-site']}>
-          <input
-            id="empresa-site"
-            className={inputCls}
-            value={form['empresa-site']}
-            onChange={e => onChange('empresa-site', e.target.value)}
-            placeholder="https://suaempresa.com.br"
-          />
-        </Field>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-gray-700">
+            Sites para pesquisa com IA
+            {errors['empresa-site'] && <span className="ml-2 text-xs text-red-500">{errors['empresa-site']}</span>}
+          </label>
+          {sites.map((site, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  className={`${inputCls} pr-8`}
+                  value={site}
+                  onChange={e => {
+                    const next = sites.map((s, idx) => idx === i ? e.target.value : s)
+                    setSites(next)
+                    if (i === 0) onChange('empresa-site', e.target.value)
+                  }}
+                  placeholder={i === 0 ? 'https://suaempresa.com.br' : 'https://parceiro.com.br (opcional)'}
+                />
+                {pesquisandoSites[i] && (
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                )}
+              </div>
+              {sites.length > 1 && (
+                <button type="button" onClick={() => setSites(sites.filter((_, idx) => idx !== i))}
+                  className="shrink-0 text-gray-400 hover:text-red-500 transition-colors">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+          {sites.length < 5 && (
+            <button type="button"
+              onClick={() => setSites([...sites, ''])}
+              className="flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium w-fit mt-0.5">
+              <Plus size={13} /> Adicionar outro site
+            </button>
+          )}
+          <p className="text-xs text-gray-400">Cada site pesquisado adiciona informações às caixas abaixo — nada é apagado.</p>
+        </div>
       </div>
 
       {/* ── Seção: Sobre a empresa ──────────────────────────────────────────── */}
@@ -3003,7 +3081,7 @@ export default function OnboardingPage() {
       newErrors['empresa-nome'] = 'Nome da empresa é obrigatório'
     }
     if (step === 1 && !form['empresa-site'].trim()) {
-      newErrors['empresa-site'] = 'Site da empresa é obrigatório — necessário para a IA pesquisar'
+      newErrors['empresa-site'] = 'Informe pelo menos um site — necessário para a IA pesquisar'
     }
     if (step === 1 && !form['prod-nome'].trim()) {
       newErrors['prod-nome'] = 'Nome do produto é obrigatório'
