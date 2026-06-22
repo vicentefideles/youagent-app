@@ -2018,7 +2018,15 @@ function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: key
   )
 }
 
-interface LigacaoRef { file: File | null; observacao: string; resultado: 'sucesso' | 'insucesso' }
+interface LigacaoRef {
+  file: File | null
+  observacao: string
+  resultado: 'sucesso' | 'insucesso'
+  transcricao: string
+  resumo: string | null
+  transcrevendo: boolean
+  erro: string | null
+}
 
 function LigacoesSection({
   tipo, items, onChange,
@@ -2031,29 +2039,36 @@ function LigacoesSection({
   const isSucesso = tipo === 'sucesso'
 
   const colors = isSucesso
-    ? { dot: 'bg-emerald-500', label: 'text-emerald-700', dashedBorder: 'border-emerald-300', dashedHover: 'hover:border-emerald-400 hover:bg-emerald-50', uploadIcon: 'text-emerald-400', uploadText: 'text-emerald-700', uploadSub: 'text-emerald-500', cardBg: 'bg-emerald-50 border-emerald-200', cardText: 'text-emerald-800', cardSub: 'text-emerald-500', addBtn: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300' }
-    : { dot: 'bg-amber-500', label: 'text-amber-700', dashedBorder: 'border-amber-300', dashedHover: 'hover:border-amber-400 hover:bg-amber-50', uploadIcon: 'text-amber-400', uploadText: 'text-amber-700', uploadSub: 'text-amber-500', cardBg: 'bg-amber-50 border-amber-200', cardText: 'text-amber-800', cardSub: 'text-amber-500', addBtn: 'border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300' }
+    ? { dot: 'bg-emerald-500', label: 'text-emerald-700', dashedBorder: 'border-emerald-300', dashedHover: 'hover:border-emerald-400 hover:bg-emerald-50', uploadIcon: 'text-emerald-400', uploadText: 'text-emerald-700', uploadSub: 'text-emerald-500', cardBg: 'bg-emerald-50 border-emerald-200', cardText: 'text-emerald-800', cardSub: 'text-emerald-500', addBtn: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300', spinnerBorder: 'border-emerald-400' }
+    : { dot: 'bg-amber-500', label: 'text-amber-700', dashedBorder: 'border-amber-300', dashedHover: 'hover:border-amber-400 hover:bg-amber-50', uploadIcon: 'text-amber-400', uploadText: 'text-amber-700', uploadSub: 'text-amber-500', cardBg: 'bg-amber-50 border-amber-200', cardText: 'text-amber-800', cardSub: 'text-amber-500', addBtn: 'border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300', spinnerBorder: 'border-amber-400' }
 
-  function addLinha() {
-    onChange([...items, { file: null, observacao: '', resultado: tipo }])
+  const emptyItem = (): LigacaoRef => ({ file: null, observacao: '', resultado: tipo, transcricao: '', resumo: null, transcrevendo: false, erro: null })
+
+  function update(i: number, patch: Partial<LigacaoRef>) {
+    onChange(items.map((m, idx) => idx === i ? { ...m, ...patch } : m))
   }
+  function addLinha() { onChange([...items, emptyItem()]) }
   function removeLinha(i: number) {
-    if (items.length === 1) { onChange([{ file: null, observacao: '', resultado: tipo }]); return }
+    if (items.length === 1) { onChange([emptyItem()]); return }
     onChange(items.filter((_, idx) => idx !== i))
   }
-  function setFile(i: number, f: File | null) {
-    onChange(items.map((m, idx) => idx === i ? { ...m, file: f } : m))
-  }
-  function setObs(i: number, v: string) {
-    onChange(items.map((m, idx) => idx === i ? { ...m, observacao: v } : m))
+
+  async function handleFileSelect(i: number, file: File) {
+    update(i, { file, transcrevendo: true, erro: null, transcricao: '', resumo: null })
+    try {
+      const { data } = await agentesApi.transcreverLigacao(file, tipo, items[i].observacao)
+      update(i, { transcrevendo: false, transcricao: data.transcricao || '', resumo: data.resumo || null })
+    } catch {
+      update(i, { transcrevendo: false, erro: 'Não foi possível transcrever o áudio. Verifique o formato e tente novamente.', file: null })
+    }
   }
 
   const tituloSecao = isSucesso
     ? 'Ligações que converteram — o agente aprende o que funciona'
     : 'Ligações que não converteram — o agente aprende o que evitar'
   const descSecao = isSucesso
-    ? 'Grave ligações onde o cliente aceitou a reunião. O agente estuda o tom, o ritmo e os argumentos que levaram ao "sim".'
-    : 'Grave ligações onde o cliente recusou. O agente identifica padrões a evitar e objeções a contornar.'
+    ? 'Suba gravações onde o cliente aceitou a reunião. O agente estuda o tom, o ritmo e os argumentos que levaram ao "sim".'
+    : 'Suba gravações onde o cliente recusou. O agente identifica padrões a evitar e objeções a contornar.'
   const labelGravacao = isSucesso ? 'GRAVAÇÃO DE SUCESSO' : 'GRAVAÇÃO DE REFERÊNCIA'
   const uploadLabel = isSucesso ? 'Enviar gravação — ligação que converteu' : 'Enviar gravação — ligação que não converteu'
   const obsPlaceholder = isSucesso
@@ -2063,7 +2078,6 @@ function LigacoesSection({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Título da seção */}
       <div>
         <p className={`text-sm font-semibold uppercase tracking-wide flex items-center gap-2 ${colors.label}`}>
           <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
@@ -2072,14 +2086,13 @@ function LigacoesSection({
         <p className="text-xs text-gray-500 mt-1">{descSecao}</p>
       </div>
 
-      {/* Cards de gravação */}
       <div className="flex flex-col gap-3">
         {items.map((m, i) => (
           <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
-            {/* Header do card */}
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
               <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                {labelGravacao} {items.length > 1 ? i + 1 : ''}
+                {labelGravacao}{items.length > 1 ? ` ${i + 1}` : ''}
               </span>
               {items.length > 1 && (
                 <button type="button" onClick={() => removeLinha(i)}
@@ -2092,40 +2105,72 @@ function LigacoesSection({
             <div className="p-4 flex flex-col gap-3">
               <input ref={el => { refs.current[i] = el }} type="file"
                 accept=".mp3,.wav,.m4a,.mp4,.ogg,.webm" className="hidden"
-                onChange={e => { setFile(i, e.target.files?.[0] ?? null); if (e.target) e.target.value = '' }} />
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(i, f); e.target.value = '' }} />
 
-              {/* Zona de upload ou card de sucesso */}
-              {!m.file ? (
-                <div
-                  onClick={() => refs.current[i]?.click()}
-                  className={`flex items-center gap-3 border border-dashed ${colors.dashedBorder} rounded-lg px-4 py-3 cursor-pointer transition-colors ${colors.dashedHover}`}
-                >
+              {/* Zona de upload */}
+              {!m.file && !m.transcrevendo && (
+                <div onClick={() => refs.current[i]?.click()}
+                  className={`flex items-center gap-3 border border-dashed ${colors.dashedBorder} rounded-lg px-4 py-3 cursor-pointer transition-colors ${colors.dashedHover}`}>
                   <Mic size={16} className={`shrink-0 ${colors.uploadIcon}`} />
                   <div>
                     <p className={`text-sm font-medium ${colors.uploadText}`}>{uploadLabel}</p>
                     <p className={`text-xs ${colors.uploadSub}`}>MP3, WAV, M4A ou MP4 — máx. 50MB</p>
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {/* Transcrevendo */}
+              {m.transcrevendo && (
+                <div className="flex items-center gap-3 bg-brand-50 border border-brand-200 rounded-lg px-4 py-3">
+                  <div className={`w-4 h-4 border-2 ${colors.spinnerBorder} border-t-transparent rounded-full animate-spin shrink-0`} />
+                  <div>
+                    <p className="text-sm font-medium text-brand-700">Transcrevendo com IA...</p>
+                    <p className="text-xs text-brand-500">Whisper está convertendo o áudio em texto e extraindo aprendizados</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Card de sucesso após transcrição */}
+              {m.file && !m.transcrevendo && !m.erro && (
                 <div className={`border ${colors.cardBg} rounded-lg overflow-hidden`}>
-                  <div className="flex items-center justify-between px-3 py-2">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-opacity-50 ${isSucesso ? 'border-emerald-100' : 'border-amber-100'}">
                     <div className="flex items-center gap-2 min-w-0">
                       <Check size={13} className={`shrink-0 ${isSucesso ? 'text-emerald-600' : 'text-amber-600'}`} />
                       <span className={`text-xs font-semibold truncate ${colors.cardText}`}>{m.file.name}</span>
-                      <span className={`text-xs shrink-0 ${colors.cardSub}`}>{(m.file.size / (1024 * 1024)).toFixed(1)}MB</span>
+                      <span className={`text-xs shrink-0 ${colors.cardSub}`}>{m.transcricao.length.toLocaleString('pt-BR')} chars transcritos</span>
                     </div>
-                    <button type="button" onClick={() => setFile(i, null)}
+                    <button type="button" onClick={() => update(i, { file: null, transcricao: '', resumo: null, erro: null })}
                       className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 shrink-0 ml-2">
                       <X size={11} /> Remover
                     </button>
+                  </div>
+                  {m.resumo && (
+                    <div className="px-3 py-2.5 flex items-start gap-2">
+                      <Brain size={13} className={`shrink-0 mt-0.5 ${isSucesso ? 'text-emerald-600' : 'text-amber-600'}`} />
+                      <div>
+                        <p className={`text-xs font-semibold mb-1 ${colors.cardText}`}>Aprendizados extraídos pela IA:</p>
+                        <p className={`text-xs leading-relaxed ${colors.cardText}`}>{m.resumo}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Erro */}
+              {m.erro && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+                  <AlertTriangle size={13} className="text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-red-700 font-medium">{m.erro}</p>
+                    <button type="button" onClick={() => update(i, { erro: null })}
+                      className="text-xs text-red-500 underline mt-0.5">Tentar outro arquivo</button>
                   </div>
                 </div>
               )}
 
               {/* Observação */}
-              <input
-                value={m.observacao}
-                onChange={e => setObs(i, e.target.value)}
+              <input value={m.observacao}
+                onChange={e => update(i, { observacao: e.target.value })}
                 placeholder={obsPlaceholder}
                 className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 text-gray-700 placeholder:text-gray-300 w-full"
               />
@@ -2134,7 +2179,6 @@ function LigacoesSection({
         ))}
       </div>
 
-      {/* Botão adicionar */}
       <button type="button" onClick={addLinha}
         className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-3 text-sm font-medium transition-colors ${colors.addBtn}`}>
         <Plus size={16} /> {addLabel}
@@ -2887,8 +2931,8 @@ export default function OnboardingPage() {
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
-  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso' }])
-  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'insucesso' }])
+  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -3178,8 +3222,8 @@ export default function OnboardingPage() {
     setObjecoes(INITIAL_OBJECOES)
     setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
     setScriptFiles([])
-    setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso' }])
-    setLigInsucesso([{ file: null, observacao: '', resultado: 'insucesso' }])
+    setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+    setLigInsucesso([{ file: null, observacao: '', resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
     setEditandoId(null)
     setStep(0)
     setActivated(false)

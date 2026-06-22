@@ -59,6 +59,16 @@ export const agentesApi = {
       timeout: 60000,
     })
   },
+  transcreverLigacao: (file: File, resultado: 'sucesso' | 'insucesso', observacao?: string) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('resultado', resultado)
+    if (observacao) fd.append('observacao', observacao)
+    return api.post('/agentes/transcrever-ligacao', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    })
+  },
 }
 
 // Campanhas
