@@ -2036,6 +2036,8 @@ function LigacoesSection({
   onChange: (items: LigacaoRef[]) => void
 }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([])
+  const itemsRef = React.useRef(items)
+  React.useEffect(() => { itemsRef.current = items }, [items])
   const isSucesso = tipo === 'sucesso'
 
   const colors = isSucesso
@@ -2045,7 +2047,7 @@ function LigacoesSection({
   const emptyItem = (): LigacaoRef => ({ file: null, observacao: '', resultado: tipo, transcricao: '', resumo: null, transcrevendo: false, erro: null })
 
   function update(i: number, patch: Partial<LigacaoRef>) {
-    onChange(items.map((m, idx) => idx === i ? { ...m, ...patch } : m))
+    onChange(itemsRef.current.map((m, idx) => idx === i ? { ...m, ...patch } : m))
   }
   function addLinha() { onChange([...items, emptyItem()]) }
   function removeLinha(i: number) {
