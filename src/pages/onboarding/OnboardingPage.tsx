@@ -2335,8 +2335,8 @@ function Step4({
         script_abertura: form['script-abertura'],
         voz: vozNome,
         tom: form['tom'],
-        ligacoes_sucesso: ligacoesSucesso.filter(l => l.resumo).map(l => l.resumo as string),
-        ligacoes_insucesso: ligacoesInsucesso.filter(l => l.resumo).map(l => l.resumo as string),
+        ligacoes_sucesso: ligacoesSucesso.filter(l => l.transcricao).map(l => l.transcricao),
+        ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
       })
       onChange('prompt_gerado', (res.data as { prompt: string }).prompt || '')
     } catch {
