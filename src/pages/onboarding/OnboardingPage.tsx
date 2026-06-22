@@ -2515,6 +2515,9 @@ function Step4({
         script_abertura: form['script-abertura'],
         voz: vozNome,
         tom: form['tom'],
+        compliance_anatel: form['compliance-anatel'] === 'true',
+        compliance_optout: form['compliance-optout'] === 'true',
+        whatsapp_numero: form['whatsapp-numero'] || undefined,
         ligacoes_sucesso: ligacoesSucesso.filter(l => l.transcricao).map(l => l.transcricao),
         ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
       })
@@ -2535,24 +2538,104 @@ function Step4({
 
   if (activating) {
     return (
-      <div className="flex flex-col items-center py-10 gap-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-          <Loader2 size={32} className="text-blue-600 animate-spin" />
+      <div className="flex flex-col items-center py-8 gap-6 text-center">
+        {/* Cérebro 3D animado */}
+        <div className="relative w-32 h-32 flex items-center justify-center">
+          <svg viewBox="0 0 120 120" className="w-32 h-32 drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 18px rgba(139,92,246,0.5))' }}>
+            {/* Pulso externo */}
+            <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="1">
+              <animate attributeName="r" values="52;58;52" dur="2s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(139,92,246,0.25)" strokeWidth="1">
+              <animate attributeName="r" values="46;52;46" dur="2s" begin="0.3s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" begin="0.3s" repeatCount="indefinite" />
+            </circle>
+            {/* Fundo do cérebro */}
+            <ellipse cx="60" cy="63" rx="38" ry="32" fill="url(#brainGrad)" opacity="0.95" />
+            {/* Hemisfério esquerdo */}
+            <path d="M60 35 C44 35 28 44 26 58 C24 70 30 80 38 85 C44 88 52 89 60 88" fill="url(#leftGrad)" stroke="rgba(139,92,246,0.6)" strokeWidth="0.8" />
+            {/* Hemisfério direito */}
+            <path d="M60 35 C76 35 92 44 94 58 C96 70 90 80 82 85 C76 88 68 89 60 88" fill="url(#rightGrad)" stroke="rgba(139,92,246,0.6)" strokeWidth="0.8" />
+            {/* Sulcos - hemisfério esquerdo */}
+            <path d="M34 52 C36 48 40 46 44 47" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M29 62 C31 57 36 54 41 55" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M32 72 C35 67 40 65 45 67" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M40 81 C43 77 47 76 51 78" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeLinecap="round" />
+            <path d="M36 57 C38 53 42 51 46 52" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="0.8" strokeLinecap="round" />
+            {/* Sulcos - hemisfério direito */}
+            <path d="M86 52 C84 48 80 46 76 47" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M91 62 C89 57 84 54 79 55" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M88 72 C85 67 80 65 75 67" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M80 81 C77 77 73 76 69 78" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeLinecap="round" />
+            <path d="M84 57 C82 53 78 51 74 52" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="0.8" strokeLinecap="round" />
+            {/* Divisão central */}
+            <line x1="60" y1="36" x2="60" y2="88" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeDasharray="2,3" />
+            {/* Neurônios pulsando */}
+            <circle cx="42" cy="52" r="2" fill="#a78bfa">
+              <animate attributeName="opacity" values="1;0.2;1" dur="1.4s" begin="0s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="52" cy="67" r="1.5" fill="#c4b5fd">
+              <animate attributeName="opacity" values="1;0.2;1" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="78" cy="55" r="2" fill="#a78bfa">
+              <animate attributeName="opacity" values="1;0.2;1" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="68" cy="72" r="1.5" fill="#c4b5fd">
+              <animate attributeName="opacity" values="1;0.2;1" dur="1.3s" begin="0.2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="46" cy="76" r="1.5" fill="#a78bfa">
+              <animate attributeName="opacity" values="1;0.2;1" dur="2s" begin="0.6s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="74" cy="76" r="1.5" fill="#c4b5fd">
+              <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" begin="1s" repeatCount="indefinite" />
+            </circle>
+            {/* Sinapses */}
+            <line x1="42" y1="52" x2="52" y2="67" stroke="#a78bfa" strokeWidth="0.6" opacity="0.5">
+              <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.4s" begin="0s" repeatCount="indefinite" />
+            </line>
+            <line x1="78" y1="55" x2="68" y2="72" stroke="#a78bfa" strokeWidth="0.6" opacity="0.5">
+              <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
+            </line>
+            <line x1="52" y1="67" x2="46" y2="76" stroke="#c4b5fd" strokeWidth="0.6" opacity="0.4">
+              <animate attributeName="opacity" values="0.4;0.05;0.4" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
+            </line>
+            <line x1="68" y1="72" x2="74" y2="76" stroke="#c4b5fd" strokeWidth="0.6" opacity="0.4">
+              <animate attributeName="opacity" values="0.4;0.05;0.4" dur="1.3s" begin="0.2s" repeatCount="indefinite" />
+            </line>
+            <defs>
+              <radialGradient id="brainGrad" cx="50%" cy="40%" r="60%">
+                <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#4c1d95" stopOpacity="0.05" />
+              </radialGradient>
+              <linearGradient id="leftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#6d28d9" stopOpacity="0.2" />
+              </linearGradient>
+              <linearGradient id="rightGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#5b21b6" stopOpacity="0.2" />
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
+
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            {modoEdicao ? 'Atualizando agente...' : 'Ativando agente...'}
+          <h2 className="text-xl font-bold text-gray-900 mb-1">
+            {modoEdicao ? 'Atualizando agente...' : 'Criando o melhor agente'}
           </h2>
-          <div className="flex flex-col gap-2 text-left w-64 mx-auto">
+          <p className="text-sm text-gray-400 mb-5">Inteligência sendo calibrada para o seu mercado</p>
+
+          <div className="flex flex-col gap-2.5 text-left w-72 mx-auto">
             {LOADING_STEPS.map((s, i) => (
-              <div key={i} className={`flex items-center gap-2 text-sm transition-all ${
-                i < (activatingStep ?? 0) ? 'text-green-600' : i === (activatingStep ?? 0) ? 'text-blue-600 font-medium' : 'text-gray-300'
+              <div key={i} className={`flex items-center gap-2.5 text-sm transition-all duration-300 ${
+                i < (activatingStep ?? 0) ? 'text-emerald-600' : i === (activatingStep ?? 0) ? 'text-brand font-medium' : 'text-gray-300'
               }`}>
                 {i < (activatingStep ?? 0)
-                  ? <Check size={14} strokeWidth={3} className="shrink-0" />
+                  ? <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0"><Check size={11} strokeWidth={3} className="text-emerald-600" /></div>
                   : i === (activatingStep ?? 0)
-                  ? <Loader2 size={14} className="animate-spin shrink-0" />
-                  : <div className="w-3.5 h-3.5 rounded-full border border-gray-200 shrink-0" />
+                  ? <div className="w-5 h-5 rounded-full bg-brand/10 flex items-center justify-center shrink-0"><Loader2 size={11} className="animate-spin text-brand" /></div>
+                  : <div className="w-5 h-5 rounded-full border border-gray-200 shrink-0" />
                 }
                 {s}
               </div>
@@ -2565,33 +2648,60 @@ function Step4({
 
   if (activated) {
     return (
-      <div className="flex flex-col items-center py-10 gap-6 text-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-          <Check size={40} className="text-green-600" strokeWidth={3} />
+      <div className="flex flex-col items-center py-8 gap-6 text-center">
+        <div className="relative">
+          <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+            <Check size={38} className="text-emerald-600" strokeWidth={3} />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand flex items-center justify-center shadow-md">
+            <Brain size={14} className="text-white" />
+          </div>
         </div>
+
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            {modoEdicao ? `Agente ${form['nome-agente'] || form['empresa-nome']} atualizado!` : `Agente ${form['nome-agente'] || form['empresa-nome']} criado com sucesso!`}
+          <h2 className="text-xl font-bold text-gray-900">
+            {modoEdicao
+              ? `Agente ${form['nome-agente'] || form['empresa-nome']} atualizado!`
+              : `${form['nome-agente'] || form['empresa-nome']} está pronto!`}
           </h2>
-          <p className="text-sm text-gray-500 mt-2 max-w-md">
+          <p className="text-sm text-gray-500 mt-2 max-w-sm mx-auto">
             {modoEdicao
               ? 'As configurações foram salvas. O prompt atualizado já está ativo no Telnyx.'
-              : 'O agente está em treinamento. Certifique-o no Simulador antes de ativar para produção.'
-            }
+              : 'Antes de ir para as ligações reais, treine o agente no Simulador. Cada cenário aprovado torna o agente mais preciso.'}
           </p>
         </div>
+
+        {!modoEdicao && (
+          <div className="bg-brand/5 border border-brand/20 rounded-xl px-5 py-3.5 max-w-sm text-left">
+            <p className="text-xs font-semibold text-brand mb-1.5 flex items-center gap-1.5">
+              <Brain size={12} /> Próximo passo recomendado
+            </p>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Acesse o <span className="font-semibold text-gray-800">Simulador</span> no Centro de Inteligência e execute os 5 cenários de certificação. O agente só vai para produção após a aprovação.
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-3">
+          {!modoEdicao && (
+            <button
+              onClick={() => navigate('/inteligencia?aba=simulador')}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand/90 transition-colors shadow-sm"
+            >
+              <Brain size={15} /> Treinar no Simulador
+            </button>
+          )}
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-xl transition-colors ${modoEdicao ? 'bg-brand text-white hover:bg-brand/90 shadow-sm' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
-            Ver Dashboard <ChevronRight size={16} />
+            {modoEdicao ? <>Ver Dashboard <ChevronRight size={15} /></> : 'Ver Dashboard'}
           </button>
           <button
             onClick={onReset}
-            className="px-5 py-2.5 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-5 py-2.5 border border-gray-200 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-50 transition-colors"
           >
-            {modoEdicao ? 'Voltar aos agentes' : 'Criar outro agente'}
+            {modoEdicao ? 'Voltar' : 'Criar outro'}
           </button>
         </div>
       </div>
