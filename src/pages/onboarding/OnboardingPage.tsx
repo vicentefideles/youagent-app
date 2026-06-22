@@ -899,7 +899,7 @@ function Step1({
       const primeiroSeg = sucessos.find(s => s.data.icp_segmento)
       if (primeiroSeg?.data.icp_segmento && !form['icp-segmento-alvo'].trim()) onChange('icp-segmento-alvo', primeiroSeg.data.icp_segmento)
       // gatilhos: acumula
-      acumular('gatilhos-customizados', sucessos.filter(s => s.data.gatilhos).map(s => unico ? s.data.gatilhos! : `[${label(s.site)}]\n${s.data.gatilhos}`))
+      // gatilhos-customizados NÃO é preenchido aqui — só pelo botão "Gerar com IA" da etapa 4
 
       // Salva o primeiro site válido em empresa-site para compatibilidade
       onChange('empresa-site', sitesValidos[0])
@@ -1056,10 +1056,10 @@ function Step1({
             {errors['empresa-site'] && <span className="ml-2 text-xs text-red-500">{errors['empresa-site']}</span>}
           </label>
           {sites.map((site, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="relative flex-1">
+            <div key={i} className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
                 <input
-                  className={`${inputCls} pr-8`}
+                  className={`${inputCls} flex-1`}
                   value={site}
                   onChange={e => {
                     const next = sites.map((s, idx) => idx === i ? e.target.value : s)
@@ -1068,15 +1068,18 @@ function Step1({
                   }}
                   placeholder={i === 0 ? 'https://suaempresa.com.br' : 'https://parceiro.com.br (opcional)'}
                 />
-                {pesquisandoSites[i] && (
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                {sites.length > 1 && !pesquisandoSites[i] && (
+                  <button type="button" onClick={() => setSites(sites.filter((_, idx) => idx !== i))}
+                    className="shrink-0 text-gray-400 hover:text-red-500 transition-colors">
+                    <X size={16} />
+                  </button>
                 )}
               </div>
-              {sites.length > 1 && (
-                <button type="button" onClick={() => setSites(sites.filter((_, idx) => idx !== i))}
-                  className="shrink-0 text-gray-400 hover:text-red-500 transition-colors">
-                  <X size={16} />
-                </button>
+              {pesquisandoSites[i] && (
+                <div className="flex items-center gap-1.5 px-1">
+                  <div className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span className="text-xs text-brand-600 font-medium">Pesquisando site...</span>
+                </div>
               )}
             </div>
           ))}
