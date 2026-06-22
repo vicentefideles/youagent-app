@@ -31,6 +31,9 @@ import {
   TrendingUp,
   DollarSign,
   ClipboardList,
+  Briefcase,
+  Heart,
+  Square,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1188,9 +1191,20 @@ type FiltroGenero = 'Todos' | 'Feminino' | 'Masculino'
 function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
   const [filtro, setFiltro] = useState<FiltroGenero>('Todos')
   const [previewingId, setPreviewingId] = useState<string | null>(null)
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
 
   async function playPreview(e: React.MouseEvent, voiceId: string) {
     e.stopPropagation()
+    // Se já está tocando esta voz, para
+    if (playingId === voiceId) {
+      audioRef.current?.pause()
+      setPlayingId(null)
+      return
+    }
+    // Para qualquer áudio anterior
+    audioRef.current?.pause()
+    setPlayingId(null)
     if (previewingId) return
     setPreviewingId(voiceId)
     try {
@@ -1203,9 +1217,12 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
       const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
-      audio.onended = () => { setPreviewingId(null); URL.revokeObjectURL(url) }
-      audio.onerror = () => { setPreviewingId(null); URL.revokeObjectURL(url) }
+      audioRef.current = audio
+      audio.onended = () => { setPlayingId(null); setPreviewingId(null); URL.revokeObjectURL(url) }
+      audio.onerror = () => { setPlayingId(null); setPreviewingId(null); URL.revokeObjectURL(url) }
       audio.play()
+      setPreviewingId(null)
+      setPlayingId(voiceId)
     } catch {
       setPreviewingId(null)
     }
@@ -1219,20 +1236,26 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
     ),
   })).filter(g => g.vozes.length > 0)
 
+  const modeloBadge = (modelo: string) => {
+    if (modelo === 'Natural HD') return 'bg-violet-50 text-violet-600'
+    if (modelo === 'Ultra')      return 'bg-amber-50 text-amber-600'
+    return 'bg-gray-100 text-gray-500'
+  }
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-gray-700">Voz do agente</p>
-        <div className="flex gap-1">
+        <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
           {(['Todos', 'Feminino', 'Masculino'] as FiltroGenero[]).map(f => (
             <button
               key={f}
               type="button"
               onClick={() => setFiltro(f)}
-              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+              className={`text-xs px-3 py-1 rounded-md transition-all font-medium ${
                 filtro === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  ? 'bg-white text-brand-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {f}
@@ -1244,44 +1267,89 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
       <div className="flex flex-col gap-5">
         {grupos.map(g => (
           <div key={g.idioma}>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{g.label}</p>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-3.5 bg-brand rounded-full" />
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{g.label}</p>
+            </div>
             <div className="grid grid-cols-3 gap-2">
-              {g.vozes.map(v => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => onChange('voz', v.id)}
-                  className={`text-left p-3 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
-                    form.voz === v.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg">{v.genero === 'Feminino' ? '👩‍💼' : '👨‍💼'}</span>
-                    <div className="flex items-center gap-1">
+              {g.vozes.map(v => {
+                const selecionada = form.voz === v.id
+                const carregando  = previewingId === v.id
+                const tocando     = playingId === v.id
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => onChange('voz', v.id)}
+                    className={`text-left p-3 rounded-xl border-2 transition-all flex flex-col gap-2 group ${
+                      selecionada
+                        ? 'border-brand bg-brand-50'
+                        : 'border-gray-200 bg-white hover:border-brand-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {/* Header: avatar + play */}
+                    <div className="flex items-center justify-between">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${
+                        selecionada ? 'bg-brand-100' : 'bg-gray-100'
+                      }`}>
+                        {v.genero === 'Feminino' ? '👩‍💼' : '👨‍💼'}
+                      </div>
                       <button
                         type="button"
                         onClick={(e) => playPreview(e, v.id)}
-                        className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-100 hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Ouvir prévia"
+                        title={tocando ? 'Parar' : 'Ouvir prévia'}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                          tocando
+                            ? 'bg-brand text-white shadow-sm'
+                            : carregando
+                            ? 'bg-brand-100 text-brand-400'
+                            : 'bg-gray-100 text-gray-400 hover:bg-brand-100 hover:text-brand group-hover:bg-brand-50'
+                        }`}
                       >
-                        {previewingId === v.id
-                          ? <Loader2 size={10} className="animate-spin" />
-                          : <Play size={10} />}
+                        {carregando
+                          ? <Loader2 size={11} className="animate-spin" />
+                          : tocando
+                          ? <Square size={9} className="fill-current" />
+                          : <Play size={11} />}
                       </button>
-                      {form.voz === v.id && <div className="w-2 h-2 rounded-full bg-blue-500" />}
                     </div>
-                  </div>
-                  <p className="font-semibold text-gray-900 text-sm leading-tight">{v.nome}</p>
-                  <div className="flex flex-wrap gap-1">
-                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{v.modelo}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                      v.genero === 'Feminino' ? 'bg-pink-50 text-pink-600' : 'bg-sky-50 text-sky-600'
-                    }`}>{v.genero}</span>
-                  </div>
-                </button>
-              ))}
+
+                    {/* Nome + selecionado */}
+                    <div className="flex items-center justify-between gap-1">
+                      <p className={`font-semibold text-sm leading-tight ${selecionada ? 'text-brand-800' : 'text-gray-900'}`}>
+                        {v.nome}
+                      </p>
+                      {selecionada && (
+                        <div className="w-4 h-4 rounded-full bg-brand flex items-center justify-center shrink-0">
+                          <Check size={9} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Badges */}
+                    <div className="flex flex-wrap gap-1">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${modeloBadge(v.modelo)}`}>
+                        {v.modelo}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        v.genero === 'Feminino' ? 'bg-pink-50 text-pink-500' : 'bg-sky-50 text-sky-500'
+                      }`}>
+                        {v.genero}
+                      </span>
+                    </div>
+
+                    {/* Barra de onda animada quando tocando */}
+                    {tocando && (
+                      <div className="flex items-end gap-0.5 h-3">
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} className="w-1 bg-brand rounded-full animate-bounce"
+                            style={{ height: `${[40,70,100,60,80][i-1]}%`, animationDelay: `${i * 80}ms` }} />
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         ))}
@@ -2318,28 +2386,54 @@ function StepLigacoesReferencia({
   )
 }
 
+const TOM_ICONS: Record<string, React.ReactNode> = {
+  profissional: <Briefcase size={15} />,
+  consultivo:   <Brain size={15} />,
+  direto:       <Zap size={15} />,
+  amigavel:     <Heart size={15} />,
+}
+
 function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <VozSelector form={form} onChange={onChange} />
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-3">Tom de comunicação</p>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-brand rounded-full" />
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tom de comunicação</p>
+        </div>
         <div className="grid grid-cols-2 gap-2">
-          {TONS_CARDS.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onChange('tom', t.id)}
-              className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${
-                form.tom === t.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
-              <p className="font-semibold text-gray-900 text-sm">{t.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{t.descricao}</p>
-            </button>
-          ))}
+          {TONS_CARDS.map(t => {
+            const selecionado = form.tom === t.id
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => onChange('tom', t.id)}
+                className={`text-left px-4 py-3.5 rounded-xl border-2 transition-all flex items-start gap-3 ${
+                  selecionado
+                    ? 'border-brand bg-brand-50'
+                    : 'border-gray-200 bg-white hover:border-brand-200 hover:bg-gray-50'
+                }`}
+              >
+                <div className={`mt-0.5 shrink-0 ${selecionado ? 'text-brand-600' : 'text-gray-400'}`}>
+                  {TOM_ICONS[t.id]}
+                </div>
+                <div>
+                  <p className={`font-semibold text-sm ${selecionado ? 'text-brand-800' : 'text-gray-900'}`}>
+                    {t.label}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">{t.descricao}</p>
+                </div>
+                {selecionado && (
+                  <div className="ml-auto shrink-0 w-4 h-4 rounded-full bg-brand flex items-center justify-center">
+                    <Check size={9} className="text-white" />
+                  </div>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
