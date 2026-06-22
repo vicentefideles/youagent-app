@@ -1699,9 +1699,24 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
   onChange: (k: keyof FormData, v: string) => void
   onScriptFilesChange: (files: File[]) => void
 }) {
-  const [slots, setSlots] = React.useState<ScriptSlot[]>([
-    { id: '1', fileName: null, texto: form['script-ligacao'] || '', analise: null, extraindo: false, erro: null }
-  ])
+  const [slots, setSlots] = React.useState<ScriptSlot[]>(() => {
+    const raw = form['script-ligacao'] || ''
+    if (!raw) return [{ id: '1', fileName: null, texto: '', analise: null, extraindo: false, erro: null }]
+    // Restaura múltiplos slots a partir do texto concatenado (formato: === SCRIPT N ... ===)
+    const parts = raw.split(/(?=^=== SCRIPT \d+)/m).filter(Boolean)
+    if (parts.length <= 1) {
+      const texto = raw.replace(/^=== SCRIPT 1[^\n]*\n/, '').trim()
+      return [{ id: '1', fileName: null, texto, analise: null, extraindo: false, erro: null }]
+    }
+    return parts.map((part, i) => ({
+      id: (i + 1).toString(),
+      fileName: null,
+      texto: part.replace(/^=== SCRIPT \d+[^\n]*\n/, '').trim(),
+      analise: null,
+      extraindo: false,
+      erro: null
+    }))
+  })
 
   // Sincroniza todos os textos dos slots para form['script-ligacao']
   function syncForm(updatedSlots: ScriptSlot[]) {
