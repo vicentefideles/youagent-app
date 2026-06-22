@@ -23,7 +23,7 @@ import {
   AlertTriangle,
   Play,
   CalendarCheck,
-  Paperclip,
+
   Plus,
   FileText,
   Upload,
@@ -420,8 +420,10 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
     updateItem(i, { tipo })
   }
 
+  const totalCaracteresMateriais = materiais.reduce((acc, m) => acc + m.texto.length, 0)
+
   return (
-    <div className="col-span-2 flex flex-col gap-3">
+    <div className="col-span-2 flex flex-col gap-5">
       <div>
         <p className="text-sm font-semibold text-brand uppercase tracking-wide mb-1">
           Materiais da empresa <span className="text-gray-400 font-normal normal-case">(quanto mais, melhor)</span>
@@ -431,11 +433,34 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
         </p>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         {materiais.map((m, i) => (
           <div key={i} className="border border-gray-200 rounded-xl overflow-hidden">
-            {/* Linha de controles */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Material {i + 1}</span>
+              <div className="flex items-center gap-3">
+                <select
+                  value={m.tipo}
+                  onChange={e => onTipoChange(i, e.target.value)}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white"
+                >
+                  <option value="">Tipo do material</option>
+                  {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {materiais.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removerLinha(i)}
+                    className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
+                  >
+                    <X size={12} /> Remover
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 flex flex-col gap-3">
               <input
                 ref={el => { inputRefs.current[i] = el }}
                 type="file"
@@ -443,85 +468,83 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
                 className="hidden"
                 onChange={e => onFileChange(i, e)}
               />
-              <button
-                type="button"
-                onClick={() => inputRefs.current[i]?.click()}
-                className="flex items-center gap-2 flex-1 text-left min-w-0"
-                disabled={m.extraindo}
-              >
-                {m.extraindo ? (
-                  <div className="w-3.5 h-3.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                ) : (
-                  <Paperclip size={14} className={`shrink-0 ${m.file ? 'text-brand-500' : 'text-gray-400'}`} />
-                )}
-                <span className={`text-sm truncate ${m.file ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
-                  {m.extraindo ? 'Lendo e analisando o arquivo...' : m.file ? m.file.name : 'Clique para enviar material'}
-                </span>
-                {m.file && !m.extraindo && (
-                  <span className="text-xs text-gray-400 shrink-0">{(m.file.size / 1024 / 1024).toFixed(1)}MB</span>
-                )}
-              </button>
-              <select
-                value={m.tipo}
-                onChange={e => onTipoChange(i, e.target.value)}
-                className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white shrink-0"
-              >
-                <option value="">Tipo do material</option>
-                {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <button
-                type="button"
-                onClick={() => removerLinha(i)}
-                className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
-              >
-                <X size={14} />
-              </button>
-            </div>
 
-            {/* Card de análise + textarea do conteúdo extraído */}
-            {m.file && !m.extraindo && !m.erro && m.texto && (
-              <div>
-                {m.analise && (
-                  <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
-                    <Brain size={13} className="text-emerald-600 shrink-0" />
-                    <p className="text-xs font-semibold text-emerald-700">
-                      IA filtrou o conteúdo — dados de contato, datas e cabeçalhos foram removidos. Revise e edite se necessário:
-                    </p>
+              {/* Zona de upload — sem arquivo */}
+              {!m.file && !m.extraindo && (
+                <div
+                  onClick={() => inputRefs.current[i]?.click()}
+                  className="flex items-center gap-3 border border-dashed border-gray-300 rounded-lg px-4 py-3 cursor-pointer hover:border-brand-300 hover:bg-brand-50 transition-colors"
+                >
+                  <Upload size={16} className="text-gray-400 shrink-0" />
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">Enviar arquivo (opcional)</p>
+                    <p className="text-xs text-gray-400">PDF, Word, PPT ou TXT — máx. 25MB</p>
                   </div>
-                )}
-                <div className="p-3">
-                  <p className="text-xs text-gray-500 mb-1.5">Conteúdo extraído — você pode editar antes de continuar:</p>
-                  <textarea
-                    rows={6}
-                    value={m.texto}
-                    onChange={e => updateItem(i, { texto: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none"
-                  />
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Sem arquivo — campo de texto manual */}
-            {!m.file && !m.extraindo && (
-              <div className="p-3">
-                <textarea
-                  rows={4}
-                  value={m.texto}
-                  onChange={e => updateItem(i, { texto: e.target.value })}
-                  placeholder="Ou cole o conteúdo do material diretamente aqui..."
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none placeholder:text-gray-300"
-                />
-              </div>
-            )}
+              {/* Extraindo */}
+              {m.extraindo && (
+                <div className="flex items-center gap-3 bg-brand-50 border border-brand-200 rounded-lg px-4 py-3">
+                  <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-brand-700">Lendo e analisando o arquivo...</p>
+                    <p className="text-xs text-brand-500">Nossa IA está extraindo a inteligência comercial do documento</p>
+                  </div>
+                </div>
+              )}
 
-            {/* Erro */}
-            {m.erro && (
-              <div className="px-3 py-2 bg-red-50 flex items-center gap-2">
-                <AlertTriangle size={13} className="text-red-500 shrink-0" />
-                <p className="text-xs text-red-700 flex-1">{m.erro}</p>
-                <button type="button" onClick={() => updateItem(i, { erro: null, file: null })} className="text-xs text-red-500 underline shrink-0">Tentar novamente</button>
-              </div>
-            )}
+              {/* Card de sucesso após extração */}
+              {m.file && !m.extraindo && !m.erro && m.texto && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-emerald-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Check size={13} className="text-emerald-600 shrink-0" />
+                      <span className="text-xs font-semibold text-emerald-800 truncate">{m.file.name}</span>
+                      <span className="text-xs text-emerald-500 shrink-0">{m.texto.length.toLocaleString('pt-BR')} caracteres</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateItem(i, { file: null, analise: null, erro: null, texto: '' })}
+                      className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 shrink-0 ml-2"
+                    >
+                      <X size={11} /> Remover arquivo
+                    </button>
+                  </div>
+                  {m.analise && (
+                    <div className="px-3 py-2.5 flex items-start gap-2">
+                      <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-emerald-700 mb-1">Resumo inteligente gerado pela IA:</p>
+                        <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{m.analise}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Erro */}
+              {m.erro && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+                  <AlertTriangle size={13} className="text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-red-700 font-medium">{m.erro}</p>
+                    <button type="button" onClick={() => updateItem(i, { erro: null, file: null })} className="text-xs text-red-500 underline mt-0.5">Tentar outro arquivo</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Textarea — sempre visível */}
+              <textarea
+                rows={m.file && m.texto ? 5 : 6}
+                value={m.texto}
+                onChange={e => updateItem(i, { texto: e.target.value })}
+                placeholder={`Cole o conteúdo do material diretamente aqui ou envie um arquivo acima...
+
+Ex: descrição do produto, diferenciais, cases de sucesso, argumentos de vendas`}
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300 w-full"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -529,11 +552,19 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
       <button
         type="button"
         onClick={adicionarLinha}
-        className="self-start text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+        className="flex items-center justify-center gap-2 border-2 border-dashed border-brand-200 rounded-xl py-3 text-sm font-medium text-brand-600 hover:bg-brand-50 hover:border-brand-300 transition-colors"
       >
-        <Plus size={14} />
-        Adicionar outro material
+        <Plus size={16} /> Adicionar outro material
       </button>
+
+      {totalCaracteresMateriais > 0 && (
+        <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          <Check size={12} />
+          <span>
+            <span className="font-semibold">{totalCaracteresMateriais.toLocaleString('pt-BR')} caracteres</span> de material identificados — tudo vai para o prompt final do agente
+          </span>
+        </div>
+      )}
     </div>
   )
 }
