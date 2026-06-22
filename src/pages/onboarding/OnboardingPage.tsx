@@ -397,8 +397,10 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
       } else {
         updateItem(i, { extraindo: false, erro: 'Não foi possível extrair texto. Use PDF, Word ou TXT.', file: null })
       }
-    } catch {
-      updateItem(i, { extraindo: false, erro: 'Erro ao processar o arquivo. Tente outro formato.', file: null })
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Erro ao processar o arquivo. Tente outro formato.'
+      updateItem(i, { extraindo: false, erro: msg, file: null })
     }
   }
 
@@ -1932,8 +1934,10 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
       } else {
         updateSlot(id, { extraindo: false, erro: 'Não foi possível extrair texto. Verifique se é PDF, Word ou TXT válido.', fileName: null })
       }
-    } catch {
-      updateSlot(id, { extraindo: false, erro: 'Erro ao processar o arquivo. Cole o texto manualmente.', fileName: null })
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Erro ao processar o arquivo. Cole o texto manualmente.'
+      updateSlot(id, { extraindo: false, erro: msg, fileName: null })
     }
   }
 
