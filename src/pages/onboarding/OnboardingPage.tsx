@@ -168,29 +168,23 @@ const CARGOS_ICP = [
 ]
 
 const VOZES_TELNYX = [
-  // ── pt-BR NaturalHD
+  // ── pt-BR · NaturalHD
   { id: 'Telnyx.NaturalHD.isadora',  nome: 'Isadora',   genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
   { id: 'Telnyx.NaturalHD.lucia',    nome: 'Lucia',     genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
   { id: 'Telnyx.NaturalHD.sol',      nome: 'Sol',       genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
   { id: 'Telnyx.NaturalHD.alzira',   nome: 'Alzira',    genero: 'Feminino',  modelo: 'Natural HD', idioma: 'pt-BR' },
   { id: 'Telnyx.NaturalHD.baltasar', nome: 'Baltasar',  genero: 'Masculino', modelo: 'Natural HD', idioma: 'pt-BR' },
   { id: 'Telnyx.NaturalHD.celso',    nome: 'Celso',     genero: 'Masculino', modelo: 'Natural HD', idioma: 'pt-BR' },
-  // ── pt-BR KokoroTTS
+  // ── pt-BR · KokoroTTS
   { id: 'Telnyx.KokoroTTS.pf_dora',  nome: 'Dora',      genero: 'Feminino',  modelo: 'KokoroTTS',  idioma: 'pt-BR' },
   { id: 'Telnyx.KokoroTTS.pm_alex',  nome: 'Alex',      genero: 'Masculino', modelo: 'KokoroTTS',  idioma: 'pt-BR' },
   { id: 'Telnyx.KokoroTTS.pm_santa', nome: 'Santa',     genero: 'Masculino', modelo: 'KokoroTTS',  idioma: 'pt-BR' },
-  // ── pt-PT Ultra
-  { id: 'Telnyx.Ultra.1cf751f6-8749-43ab-98bd-230dd633abdb', nome: 'Ana Paula', genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.2f4d204f-a5dc-4196-81bc-155986b76ab6', nome: 'Mirella',   genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.5063f45b-d9e0-4095-b056-8f3ee055d411', nome: 'Camilo',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.6a16c1f4-462b-44de-998d-ccdaa4125a0a', nome: 'Hidalgo',   genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.6a360542-a117-4ed5-9e09-e8bf9b05eabb', nome: 'Tiago',     genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.700d1ee3-a641-4018-ba6e-899dcadc9e2b', nome: 'Luana',     genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.a37639f0-2f0a-4de4-9942-875a187af878', nome: 'Felipe',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.b0f46533-d4bb-493f-a26f-a99e1f2e86e3', nome: 'Heitor',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.d4b44b9a-82bc-4b65-b456-763fce4c52f9', nome: 'Beatriz',   genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.f39bf583-3b3d-402f-9ffb-6179d9ec3e35', nome: 'Isabel',    genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-PT' },
-  { id: 'Telnyx.Ultra.fbee0e7d-a83a-4082-bad1-13c70f86da4e', nome: 'Diogo',     genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-PT' },
+  // ── pt-BR · Ultra
+  { id: 'Telnyx.Ultra.07b6f895-78b9-4921-8e10-8a21c99c2e8a', nome: 'Rafael',   genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-BR' },
+  { id: 'Telnyx.Ultra.28a942b5-74f3-47bb-9b56-4c3f2562d3ba', nome: 'Gustavo',  genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-BR' },
+  { id: 'Telnyx.Ultra.8d826d43-20ad-4c56-8d37-1048eccca1bf', nome: 'Larissa',  genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-BR' },
+  { id: 'Telnyx.Ultra.b603811e-54c2-4a0a-8854-09eab9ffa63f', nome: 'Bruno',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-BR' },
+  { id: 'Telnyx.Ultra.c9611be8-aae9-4a93-bb1c-98dd6b7d52a4', nome: 'Isabella', genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-BR' },
 ]
 
 const TONS_CARDS = [
@@ -1257,11 +1251,6 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 text-xs text-brand-700">
-        <span>🎧</span>
-        <span>A prévia usa uma voz similar para demonstrar o timbre. A voz ETZ real é ativada nas ligações do agente.</span>
-      </div>
-
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-gray-700">Voz do agente</p>
         <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
