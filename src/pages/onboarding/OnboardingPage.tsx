@@ -179,13 +179,8 @@ const VOZES_TELNYX = [
   { id: 'Telnyx.KokoroTTS.pf_dora',  nome: 'Dora',      genero: 'Feminino',  modelo: 'KokoroTTS',  idioma: 'pt-BR' },
   { id: 'Telnyx.KokoroTTS.pm_alex',  nome: 'Alex',      genero: 'Masculino', modelo: 'KokoroTTS',  idioma: 'pt-BR' },
   { id: 'Telnyx.KokoroTTS.pm_santa', nome: 'Santa',     genero: 'Masculino', modelo: 'KokoroTTS',  idioma: 'pt-BR' },
-  // ── pt-BR · Ultra
-  { id: 'Telnyx.Ultra.07b6f895-78b9-4921-8e10-8a21c99c2e8a', nome: 'Rafael',   genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-BR' },
-  { id: 'Telnyx.Ultra.28a942b5-74f3-47bb-9b56-4c3f2562d3ba', nome: 'Gustavo',  genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-BR' },
-  { id: 'Telnyx.Ultra.8d826d43-20ad-4c56-8d37-1048eccca1bf', nome: 'Larissa',  genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-BR' },
-  { id: 'Telnyx.Ultra.b603811e-54c2-4a0a-8854-09eab9ffa63f', nome: 'Bruno',    genero: 'Masculino', modelo: 'Ultra', idioma: 'pt-BR' },
-  { id: 'Telnyx.Ultra.c9611be8-aae9-4a93-bb1c-98dd6b7d52a4', nome: 'Isabella', genero: 'Feminino',  modelo: 'Ultra', idioma: 'pt-BR' },
 ]
+// Ultra voices omitidas: não suportam WebSocket (usado nas ligações em tempo real)
 
 const TONS_CARDS = [
   { id: 'profissional', label: 'Profissional', descricao: 'Formal, direto ao ponto' },
