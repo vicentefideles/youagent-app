@@ -2274,6 +2274,8 @@ function Step4({
   onActivate,
   onReset,
   modoEdicao,
+  ligacoesSucesso,
+  ligacoesInsucesso,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
@@ -2284,6 +2286,8 @@ function Step4({
   onActivate: () => void
   onReset: () => void
   modoEdicao: boolean
+  ligacoesSucesso: LigacaoRef[]
+  ligacoesInsucesso: LigacaoRef[]
 }) {
   const navigate = useNavigate()
   const [gerando, setGerando] = useState(false)
@@ -2331,6 +2335,8 @@ function Step4({
         script_abertura: form['script-abertura'],
         voz: vozNome,
         tom: form['tom'],
+        ligacoes_sucesso: ligacoesSucesso.filter(l => l.resumo).map(l => l.resumo as string),
+        ligacoes_insucesso: ligacoesInsucesso.filter(l => l.resumo).map(l => l.resumo as string),
       })
       onChange('prompt_gerado', (res.data as { prompt: string }).prompt || '')
     } catch {
@@ -3610,6 +3616,8 @@ export default function OnboardingPage() {
               onActivate={handleActivate}
               onReset={reset}
               modoEdicao={!!editandoId}
+              ligacoesSucesso={ligSucesso}
+              ligacoesInsucesso={ligInsucesso}
             />
           )}
           {activateError && (
