@@ -1220,9 +1220,6 @@ function StepQualificacao({
       if (data.objecoes?.length) {
         onObjecoesChange(data.objecoes.slice(0, 5))
       }
-      if (data.sinais) {
-        onChange('gatilhos-customizados', data.sinais)
-      }
     } catch {
       setErroGeracao('Não foi possível gerar sugestões. Preencha manualmente.')
     } finally {
@@ -1250,12 +1247,12 @@ function StepQualificacao({
             <p className="text-sm font-semibold text-gray-900">
               {gerando ? 'Gerando sugestões...' : jaGerou ? 'Sugestões geradas pela IA' : 'Gerar sugestões com IA'}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className={`text-xs mt-0.5 ${!gerando && !jaGerou ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
               {gerando
                 ? 'Analisando as informações da sua empresa e produto...'
                 : jaGerou
                 ? 'Com base nas informações da etapa anterior, a IA sugeriu perguntas e objeções. Edite livremente.'
-                : 'Clique em "Gerar com IA" para a IA sugerir perguntas e objeções com base no que você preencheu. Quanto mais completa a etapa anterior, mais preciso o resultado.'}
+                : '⚠️ Antes de gerar, confirme que a etapa anterior está completamente preenchida — cada etapa alimenta a próxima. Quanto mais completo, mais preciso o resultado.'}
             </p>
           </div>
         </div>
@@ -1391,12 +1388,12 @@ function StepGatilhosFechamento({ form, onChange }: {
             <p className="text-sm font-semibold text-gray-900">
               {gerando ? 'Gerando gatilhos...' : jaGerou ? 'Gatilhos gerados pela IA' : 'Gerar gatilhos com IA'}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className={`text-xs mt-0.5 ${!gerando && !jaGerou ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
               {gerando
                 ? 'Analisando seu segmento para mapear os sinais de fechamento imediato...'
                 : jaGerou
                 ? 'Sugestões baseadas no seu produto e público. Edite para refletir o que seus prospects realmente dizem quando estão prontos para fechar.'
-                : 'Clique em "Gerar com IA" para mapear os sinais de fechamento com base no que você preencheu nas etapas anteriores.'}
+                : '⚠️ Antes de gerar, confirme que as etapas anteriores estão completamente preenchidas — cada etapa alimenta a próxima. Quanto mais completo, mais preciso o resultado.'}
             </p>
           </div>
         </div>
@@ -1527,12 +1524,12 @@ function Step3({ form, onChange }: {
               <p className="text-sm font-semibold text-gray-900">
                 {gerandoSinais ? 'Gerando sinais...' : jaGerouSinais ? 'Sinais gerados pela IA' : 'Gerar sinais de compra com IA'}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className={`text-xs mt-0.5 ${!gerandoSinais && !jaGerouSinais ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
                 {gerandoSinais
                   ? 'Analisando seu produto e segmento para mapear os sinais de compra...'
                   : jaGerouSinais
                   ? 'O agente monitora esses sinais em tempo real durante a ligação para detectar o momento certo de qualificar.'
-                  : 'Clique em "Gerar com IA" para mapear os sinais de compra do seu segmento com base nas etapas anteriores.'}
+                  : '⚠️ Antes de gerar, confirme que as etapas anteriores estão completamente preenchidas — cada etapa alimenta a próxima. Quanto mais completo, mais preciso o resultado.'}
               </p>
             </div>
           </div>
@@ -1863,12 +1860,12 @@ function StepCenarioDores({ form, onChange }: {
             <p className="text-sm font-semibold text-gray-900">
               {gerando ? 'Analisando o cenário...' : jaGerou ? 'Contexto gerado pela IA' : 'Gerar cenário de dores com IA'}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className={`text-xs mt-0.5 ${!gerando && !jaGerou ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
               {gerando
                 ? 'Mapeando as dores do seu público com base nas etapas anteriores...'
                 : jaGerou
                 ? 'Descreve as dores reais do seu mercado. O agente usa esse contexto para criar empatia e rapport na ligação.'
-                : 'Clique em "Gerar com IA" para mapear o cenário e as dores do seu público. Quanto mais completas as etapas anteriores, mais preciso o resultado.'}
+                : '⚠️ Antes de gerar, confirme que as etapas anteriores estão completamente preenchidas — cada etapa alimenta a próxima. Quanto mais completo, mais preciso o resultado.'}
             </p>
           </div>
         </div>
