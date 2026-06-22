@@ -56,7 +56,7 @@ export const agentesApi = {
     if (tipo) fd.append('tipo', tipo)
     return api.post('/agentes/extrair-script', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 30000,
+      timeout: 60000,
     })
   },
 }
