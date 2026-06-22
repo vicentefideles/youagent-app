@@ -1192,6 +1192,7 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
   const [filtro, setFiltro] = useState<FiltroGenero>('Todos')
   const [previewingId, setPreviewingId] = useState<string | null>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
+  const [previewErro, setPreviewErro] = useState<string | null>(null)
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
 
   async function playPreview(e: React.MouseEvent, voiceId: string) {
@@ -1207,13 +1208,23 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
     setPlayingId(null)
     if (previewingId) return
     setPreviewingId(voiceId)
+    setPreviewErro(null)
     try {
       const token = localStorage.getItem('youagent_jwt')
       const resp = await fetch(
         `https://app.etztech.com/api/v1/agentes/preview-voz?voice_id=${encodeURIComponent(voiceId)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      if (!resp.ok) throw new Error('preview failed')
+      if (!resp.ok) {
+        let msg = `Erro ${resp.status}`
+        try { const j = await resp.json(); msg = j.error || msg } catch {}
+        throw new Error(msg)
+      }
+      const contentType = resp.headers.get('content-type') || ''
+      if (!contentType.includes('audio')) {
+        const txt = await resp.text()
+        throw new Error(`Resposta inesperada (${contentType}): ${txt.slice(0, 120)}`)
+      }
       const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
@@ -1223,14 +1234,16 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
       audio.play()
       setPreviewingId(null)
       setPlayingId(voiceId)
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao carregar prévia'
+      setPreviewErro(msg)
       setPreviewingId(null)
     }
   }
 
-  const grupos = (['pt-BR', 'pt-PT'] as const).map(idioma => ({
+  const grupos = (['pt-BR'] as const).map(idioma => ({
     idioma,
-    label: idioma === 'pt-BR' ? 'Português — Brasil' : 'Português — Portugal',
+    label: 'Português — Brasil',
     vozes: VOZES_TELNYX.filter(
       v => v.idioma === idioma && (filtro === 'Todos' || v.genero === filtro)
     ),
@@ -1263,6 +1276,13 @@ function VozSelector({ form, onChange }: { form: FormData; onChange: (k: keyof F
           ))}
         </div>
       </div>
+
+      {previewErro && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700">
+          <AlertTriangle size={13} className="shrink-0 mt-0.5 text-red-500" />
+          <span><strong>Prévia de voz:</strong> {previewErro}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-5">
         {grupos.map(g => (
