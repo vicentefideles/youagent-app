@@ -92,6 +92,8 @@ interface FormData {
 interface Objecao {
   objecao: string
   rebuttal: string
+  sequencia?: string  // se após responder, prospect der outra objeção
+  rebuttal_sequencia?: string  // como responder à segunda objeção
 }
 
 const INITIAL_FORM: FormData = {
@@ -142,9 +144,9 @@ const INITIAL_FORM: FormData = {
 }
 
 const INITIAL_OBJECOES: Objecao[] = [
-  { objecao: '', rebuttal: '' },
-  { objecao: '', rebuttal: '' },
-  { objecao: '', rebuttal: '' },
+  { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' },
+  { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' },
+  { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' },
 ]
 
 const SEGMENTOS = [
@@ -1499,7 +1501,7 @@ function StepQualificacao({
     onObjecoesChange(objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o))
   }
   function addObjecao() {
-    if (objecoes.length < 5) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '' }])
+    if (objecoes.length < 5) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' }])
   }
   function removeObjecao(i: number) {
     if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
@@ -1588,6 +1590,30 @@ function StepQualificacao({
                 value={obj.objecao} onChange={e => updateObjecao(i, 'objecao', e.target.value)} disabled={gerando} />
               <textarea className={textareaCls} rows={2} placeholder="Como o agente responde a essa objeção..."
                 value={obj.rebuttal} onChange={e => updateObjecao(i, 'rebuttal', e.target.value)} disabled={gerando} />
+              {/* Sequência de objeção — expansível */}
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-400 mb-1.5">Se após sua resposta o prospect insistir com outra objeção:</p>
+                <input
+                  className={`${inputCls} text-xs mb-1.5`}
+                  value={obj.sequencia || ''}
+                  onChange={e => updateObjecao(i, 'sequencia', e.target.value)}
+                  placeholder="Ex: Mas já tentamos algo assim e não funcionou..."
+                  disabled={gerando}
+                />
+                {obj.sequencia && (
+                  <>
+                    <p className="text-xs text-gray-400 mb-1">Como responder:</p>
+                    <textarea
+                      className={`${textareaCls} text-xs`}
+                      rows={2}
+                      value={obj.rebuttal_sequencia || ''}
+                      onChange={e => updateObjecao(i, 'rebuttal_sequencia', e.target.value)}
+                      placeholder="Ex: Faz sentido — muitos clientes tiveram experiências frustrantes antes. O que costuma falhar é..."
+                      disabled={gerando}
+                    />
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -3408,6 +3434,7 @@ function AgenteCard({
   onDuplicar,
   onAtivar,
   onDeletar,
+  onRegenerarPrompt,
   duplicating,
   deleting,
 }: {
@@ -3417,6 +3444,7 @@ function AgenteCard({
   onDuplicar: () => void
   onAtivar: () => void
   onDeletar: () => void
+  onRegenerarPrompt: () => void
   duplicating?: boolean
   deleting?: boolean
 }) {
@@ -3489,6 +3517,10 @@ function AgenteCard({
           <button onClick={onDuplicar} disabled={duplicating} title="Duplicar"
             className="flex items-center gap-1 text-xs font-medium p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 disabled:opacity-40">
             {duplicating ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />}
+          </button>
+          <button onClick={onRegenerarPrompt} title="Atualizar prompt com aprendizados do CI"
+            className="p-1.5 rounded-lg hover:bg-brand/10 text-brand/60 hover:text-brand transition-colors">
+            <RefreshCw size={13} />
           </button>
           <button onClick={onDeletar} disabled={deleting} title="Deletar"
             className="flex items-center gap-1 text-xs font-medium p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-400 hover:text-red-500 disabled:opacity-40">
@@ -3843,6 +3875,34 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleRegenerarPrompt(agenteId: string) {
+    if (!window.confirm('Atualizar o prompt deste agente com os aprendizados do CI? O agente continuará funcionando normalmente durante o processo.')) return
+    try {
+      const { data } = await agentesApi.regenerarPrompt(agenteId)
+      if (data.jobId) {
+        let attempts = 0
+        const interval = setInterval(async () => {
+          attempts++
+          if (attempts > 60) { clearInterval(interval); return }
+          try {
+            const { data: status } = await agentesApi.regenerarPromptStatus(data.jobId)
+            if (status.status === 'done') {
+              clearInterval(interval)
+              window.alert('Prompt atualizado com sucesso! O agente já está mais inteligente.')
+              refetchAgentes()
+            } else if (status.status === 'error') {
+              clearInterval(interval)
+              window.alert('Erro ao atualizar: ' + (status.error || 'erro desconhecido'))
+            }
+          } catch { clearInterval(interval) }
+        }, 3000)
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      window.alert('Erro: ' + (e?.response?.data?.error || 'tente novamente'))
+    }
+  }
+
   function reset() {
     try { localStorage.removeItem('etz_onboarding_form'); localStorage.removeItem('etz_onboarding_step') } catch {}
     setForm(INITIAL_FORM)
@@ -4124,6 +4184,7 @@ export default function OnboardingPage() {
                     onDuplicar={() => handleDuplicar(agente)}
                     onAtivar={() => setAgenteAtivacao(agente)}
                     onDeletar={() => handleDeletar(agente)}
+                    onRegenerarPrompt={() => handleRegenerarPrompt(agente.id)}
                     duplicating={duplicatingId === agente.id}
                     deleting={deletingId === agente.id}
                   />

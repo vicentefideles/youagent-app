@@ -60,6 +60,8 @@ export const agentesApi = {
     })
   },
   extrairScriptStatus: (jobId: string) => api.get(`/agentes/extrair-script/job/${jobId}`, { timeout: 10000 }),
+  regenerarPrompt: (id: string) => api.post(`/agentes/${id}/regenerar-prompt`, {}),
+  regenerarPromptStatus: (jobId: string) => api.get(`/claude/gerar-prompt/job/${jobId}`, { timeout: 10000 }),
   transcreverLigacao: (file: File, resultado: 'sucesso' | 'insucesso', observacao?: string) => {
     const fd = new FormData()
     fd.append('file', file)
