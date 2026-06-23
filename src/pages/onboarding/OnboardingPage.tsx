@@ -3286,8 +3286,15 @@ const CI_SYNC_KEY = 'etz_ultima_sync_ci'
 export default function OnboardingPage() {
   const [tela, setTela] = useState<'grid' | 'wizard'>('grid')
   const [agenteHorarios, setAgenteHorarios] = useState<AgenteMock | null>(null)
-  const [step, setStep] = useState(0)
-  const [form, setForm] = useState<FormData>(INITIAL_FORM)
+  const [step, setStep] = useState(() => {
+    try { return Number(localStorage.getItem('etz_onboarding_step') || '0') } catch { return 0 }
+  })
+  const [form, setForm] = useState<FormData>(() => {
+    try {
+      const saved = localStorage.getItem('etz_onboarding_form')
+      return saved ? { ...INITIAL_FORM, ...JSON.parse(saved) } : INITIAL_FORM
+    } catch { return INITIAL_FORM }
+  })
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [activated, setActivated] = useState(false)
   const [activating, setActivating] = useState(false)
@@ -3350,8 +3357,17 @@ export default function OnboardingPage() {
   const agentes: AgenteMock[] = agentesRaw.map((a, i) => normalizeAgente(a, i))
 
   function onChange(k: keyof FormData, v: string) {
-    setForm(prev => ({ ...prev, [k]: v }))
+    setForm(prev => {
+      const next = { ...prev, [k]: v }
+      try { localStorage.setItem('etz_onboarding_form', JSON.stringify(next)) } catch {}
+      return next
+    })
     setErrors(prev => ({ ...prev, [k]: undefined }))
+  }
+
+  function saveStep(s: number) {
+    setStep(s)
+    try { localStorage.setItem('etz_onboarding_step', String(s)) } catch {}
   }
 
   function validate(): boolean {
@@ -3376,11 +3392,13 @@ export default function OnboardingPage() {
 
   function next() {
     if (!validate()) return
-    setStep(s => Math.min(s + 1, STEPS.length - 1))
+    const s = Math.min(step + 1, STEPS.length - 1)
+    saveStep(s)
   }
 
   function prev() {
-    setStep(s => Math.max(s - 1, 0))
+    const s = Math.max(step - 1, 0)
+    saveStep(s)
   }
 
   async function handleActivate() {
@@ -3588,6 +3606,7 @@ export default function OnboardingPage() {
   }
 
   function reset() {
+    try { localStorage.removeItem('etz_onboarding_form'); localStorage.removeItem('etz_onboarding_step') } catch {}
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
     setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
