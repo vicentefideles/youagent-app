@@ -76,6 +76,14 @@ interface FormData {
 
   voz: string
   tom: string
+  'agendamento-estrategia': string
+  'agendamento-antecedencia': string
+  'agendamento-opcoes': string
+  'agendamento-tom': string
+  'agendamento-duracao': string
+  'agendamento-apresentar-vendedor': string
+  'agendamento-recusa': string
+  'agendamento-urgencia': string
   'prompt_gerado': string
   'cenario-dores': string
   'gatilhos-fechamento': string
@@ -120,6 +128,14 @@ const INITIAL_FORM: FormData = {
 
   voz: 'Telnyx.NaturalHD.isadora',
   tom: '',
+  'agendamento-estrategia': 'proximas',
+  'agendamento-antecedencia': '24h',
+  'agendamento-opcoes': '2',
+  'agendamento-tom': 'direto',
+  'agendamento-duracao': '30',
+  'agendamento-apresentar-vendedor': 'sim',
+  'agendamento-recusa': 'reoferta',
+  'agendamento-urgencia': 'nao',
   'prompt_gerado': '',
   'cenario-dores': '',
   'gatilhos-fechamento': '',
@@ -235,6 +251,7 @@ const STEPS = [
   { label: 'Roteiro & Materiais', icon: FileText },
   { label: 'Ligações de Referência', icon: Mic },
   { label: 'Voz e Tom', icon: Mic },
+  { label: 'Agendamento', icon: CalendarCheck },
   { label: 'Revisão & Ativação', icon: Zap },
 ]
 
@@ -2492,6 +2509,103 @@ function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof Fo
 }
 
 
+// ─── Step Agendamento ─────────────────────────────────────────────────────────
+function StepAgendamento({ form, onChange }: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+}) {
+  function OptionCard({ field, value, label, desc }: { field: keyof FormData; value: string; label: string; desc: string }) {
+    const selected = form[field] === value
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(field, value)}
+        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${selected ? 'border-brand bg-brand/5' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+      >
+        <p className={`text-sm font-semibold ${selected ? 'text-brand' : 'text-gray-800'}`}>{label}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-7">
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Estratégia de datas</p>
+        <p className="text-xs text-gray-500 mb-3">Como o agente vai propor os horários ao prospect?</p>
+        <div className="grid grid-cols-2 gap-3">
+          <OptionCard field="agendamento-estrategia" value="proximas" label="🚀 Datas próximas" desc="Oferece os slots mais cedo disponíveis — cria senso de oportunidade imediata" />
+          <OptionCard field="agendamento-estrategia" value="flexiveis" label="📅 Datas flexíveis" desc="Oferece opções para a próxima semana — perfil mais consultivo e sem pressão" />
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Antecedência mínima para agendamento</p>
+        <p className="text-xs text-gray-500 mb-3">O agente nunca vai oferecer um horário mais cedo que isso</p>
+        <div className="grid grid-cols-4 gap-2">
+          {[['24h', '24 horas'], ['48h', '48 horas'], ['72h', '72 horas'], ['1semana', '1 semana']].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => onChange('agendamento-antecedencia', v)}
+              className={`py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${form['agendamento-antecedencia'] === v ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Quantas opções de horário oferecer</p>
+        <p className="text-xs text-gray-500 mb-3">Mais opções dão flexibilidade; menos opções facilitam a decisão</p>
+        <div className="grid grid-cols-2 gap-3">
+          <OptionCard field="agendamento-opcoes" value="2" label="2 opções" desc="Ex: 'Tenho terça às 14h ou quinta às 10h, qual prefere?'" />
+          <OptionCard field="agendamento-opcoes" value="3" label="3 opções" desc="Ex: 'Tenho segunda, quarta ou sexta — qual encaixa melhor?'" />
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Tom ao oferecer o agendamento</p>
+        <div className="grid grid-cols-2 gap-3">
+          <OptionCard field="agendamento-tom" value="direto" label="⚡ Direto" desc="'Tenho X ou Y — qual prefere?' — fecha rápido, menos debate" />
+          <OptionCard field="agendamento-tom" value="consultivo" label="🤝 Consultivo" desc="'Quando costuma ter mais disponibilidade?' — mais personalizado" />
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Duração da reunião</p>
+        <p className="text-xs text-gray-500 mb-3">O agente informa o prospect quanto tempo vai durar</p>
+        <div className="grid grid-cols-4 gap-2">
+          {[['15', '15 min'], ['30', '30 min'], ['45', '45 min'], ['60', '1 hora']].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => onChange('agendamento-duracao', v)}
+              className={`py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${form['agendamento-duracao'] === v ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Apresentar o vendedor ao agendar</p>
+        <p className="text-xs text-gray-500 mb-3">O agente menciona o nome e especialidade do vendedor antes da reunião?</p>
+        <div className="grid grid-cols-2 gap-3">
+          <OptionCard field="agendamento-apresentar-vendedor" value="sim" label="✅ Sim, apresentar" desc="'Você vai falar com {{vendedor_nome}}, nosso especialista em [segmento]'" />
+          <OptionCard field="agendamento-apresentar-vendedor" value="nao" label="Não mencionar" desc="Agenda direto sem apresentar — mais neutro e objetivo" />
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Se o prospect recusar a agenda</p>
+        <p className="text-xs text-gray-500 mb-3">O que o agente faz quando o prospect diz que não tem tempo agora?</p>
+        <div className="flex flex-col gap-2">
+          <OptionCard field="agendamento-recusa" value="reoferta" label="🔄 Reoferta em outro momento" desc="Propõe uma data diferente — 'E semana que vem, como fica?'" />
+          <OptionCard field="agendamento-recusa" value="perguntar" label="❓ Pergunta quando seria melhor" desc="'Quando seria uma boa semana para você? Posso reservar o horário'" />
+          <OptionCard field="agendamento-recusa" value="followup" label="📋 Encerra e agenda follow-up" desc="Agradece, encerra a ligação e cria tarefa de retorno" />
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-800 mb-1">Criar senso de urgência para confirmar</p>
+        <p className="text-xs text-gray-500 mb-3">O agente adiciona contexto de escassez natural para aumentar comprometimento?</p>
+        <div className="grid grid-cols-2 gap-3">
+          <OptionCard field="agendamento-urgencia" value="sim" label="✅ Sim, criar urgência" desc="'Esses horários costumam preencher rápido essa semana'" />
+          <OptionCard field="agendamento-urgencia" value="nao" label="Não, manter neutro" desc="Oferece as opções sem pressão adicional" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Step4({
   form,
   onChange,
@@ -2565,6 +2679,14 @@ function Step4({
         tom: form['tom'],
         ligacoes_sucesso: ligacoesSucesso.filter(l => l.transcricao).map(l => l.transcricao),
         ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
+        agendamento_estrategia: form['agendamento-estrategia'],
+        agendamento_antecedencia: form['agendamento-antecedencia'],
+        agendamento_opcoes: form['agendamento-opcoes'],
+        agendamento_tom: form['agendamento-tom'],
+        agendamento_duracao: form['agendamento-duracao'],
+        agendamento_apresentar_vendedor: form['agendamento-apresentar-vendedor'],
+        agendamento_recusa: form['agendamento-recusa'],
+        agendamento_urgencia: form['agendamento-urgencia'],
       }
       const initRes = await claudeApi.gerarPrompt(payload)
       const jobId = (initRes.data as { jobId?: string }).jobId
@@ -2780,11 +2902,6 @@ function Step4({
   return (
     <div className="flex flex-col gap-5">
 
-      {/* DEBUG TEMPORÁRIO — remover após diagnóstico */}
-      <div className="text-xs bg-gray-100 p-2 rounded font-mono text-gray-600 break-all">
-        empresa: {form['empresa-nome'] || '(vazio)'} | materiais: {form['materiais-conteudo']?.length ?? 0} chars | gerando: {String(gerando)} | erro: {erroGeracao || '(sem erro)'}
-      </div>
-
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
@@ -2799,13 +2916,92 @@ function Step4({
 
       {/* Área do prompt */}
       {gerando ? (
-        <div className="border border-brand/30 bg-brand/5 rounded-xl p-8 flex flex-col items-center gap-4 text-center">
-          <Loader2 size={32} className="text-brand animate-spin" />
+        <div className="border border-brand/30 bg-brand/5 rounded-xl p-8 flex flex-col items-center gap-5 text-center">
+          <div className="relative w-24 h-24 flex items-center justify-center">
+            <svg viewBox="0 0 120 120" className="w-24 h-24 drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 18px rgba(139,92,246,0.5))' }}>
+              {/* Pulso externo */}
+              <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="1">
+                <animate attributeName="r" values="52;58;52" dur="2s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(139,92,246,0.25)" strokeWidth="1">
+                <animate attributeName="r" values="46;52;46" dur="2s" begin="0.3s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" begin="0.3s" repeatCount="indefinite" />
+              </circle>
+              {/* Fundo do cérebro */}
+              <ellipse cx="60" cy="63" rx="38" ry="32" fill="url(#brainGrad2)" opacity="0.95" />
+              {/* Hemisfério esquerdo */}
+              <path d="M60 35 C44 35 28 44 26 58 C24 70 30 80 38 85 C44 88 52 89 60 88" fill="url(#leftGrad2)" stroke="rgba(139,92,246,0.6)" strokeWidth="0.8" />
+              {/* Hemisfério direito */}
+              <path d="M60 35 C76 35 92 44 94 58 C96 70 90 80 82 85 C76 88 68 89 60 88" fill="url(#rightGrad2)" stroke="rgba(139,92,246,0.6)" strokeWidth="0.8" />
+              {/* Sulcos - hemisfério esquerdo */}
+              <path d="M34 52 C36 48 40 46 44 47" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M29 62 C31 57 36 54 41 55" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M32 72 C35 67 40 65 45 67" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M40 81 C43 77 47 76 51 78" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeLinecap="round" />
+              <path d="M36 57 C38 53 42 51 46 52" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="0.8" strokeLinecap="round" />
+              {/* Sulcos - hemisfério direito */}
+              <path d="M86 52 C84 48 80 46 76 47" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M91 62 C89 57 84 54 79 55" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M88 72 C85 67 80 65 75 67" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M80 81 C77 77 73 76 69 78" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeLinecap="round" />
+              <path d="M84 57 C82 53 78 51 74 52" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="0.8" strokeLinecap="round" />
+              {/* Divisão central */}
+              <line x1="60" y1="36" x2="60" y2="88" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeDasharray="2,3" />
+              {/* Neurônios pulsando */}
+              <circle cx="42" cy="52" r="2" fill="#a78bfa">
+                <animate attributeName="opacity" values="1;0.2;1" dur="1.4s" begin="0s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="52" cy="67" r="1.5" fill="#c4b5fd">
+                <animate attributeName="opacity" values="1;0.2;1" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="78" cy="55" r="2" fill="#a78bfa">
+                <animate attributeName="opacity" values="1;0.2;1" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="68" cy="72" r="1.5" fill="#c4b5fd">
+                <animate attributeName="opacity" values="1;0.2;1" dur="1.3s" begin="0.2s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="46" cy="76" r="1.5" fill="#a78bfa">
+                <animate attributeName="opacity" values="1;0.2;1" dur="2s" begin="0.6s" repeatCount="indefinite" />
+              </circle>
+              <circle cx="74" cy="76" r="1.5" fill="#c4b5fd">
+                <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" begin="1s" repeatCount="indefinite" />
+              </circle>
+              {/* Sinapses */}
+              <line x1="42" y1="52" x2="52" y2="67" stroke="#a78bfa" strokeWidth="0.6" opacity="0.5">
+                <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.4s" begin="0s" repeatCount="indefinite" />
+              </line>
+              <line x1="78" y1="55" x2="68" y2="72" stroke="#a78bfa" strokeWidth="0.6" opacity="0.5">
+                <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
+              </line>
+              <line x1="52" y1="67" x2="46" y2="76" stroke="#c4b5fd" strokeWidth="0.6" opacity="0.4">
+                <animate attributeName="opacity" values="0.4;0.05;0.4" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
+              </line>
+              <line x1="68" y1="72" x2="74" y2="76" stroke="#c4b5fd" strokeWidth="0.6" opacity="0.4">
+                <animate attributeName="opacity" values="0.4;0.05;0.4" dur="1.3s" begin="0.2s" repeatCount="indefinite" />
+              </line>
+              <defs>
+                <radialGradient id="brainGrad2" cx="50%" cy="40%" r="60%">
+                  <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#4c1d95" stopOpacity="0.05" />
+                </radialGradient>
+                <linearGradient id="leftGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="#6d28d9" stopOpacity="0.2" />
+                </linearGradient>
+                <linearGradient id="rightGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="#5b21b6" stopOpacity="0.2" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <div>
-            <p className="font-medium text-gray-800">Gerando prompt expert...</p>
-            <p className="text-sm text-gray-500 mt-1">
-              A IA está lendo todas as etapas e montando as instruções perfeitas para o seu agente.
+            <p className="font-semibold text-gray-900 text-base">Montando o prompt expert...</p>
+            <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+              A IA está lendo todas as {STEPS.length + 1} etapas e construindo as instruções perfeitas para o seu agente.
             </p>
+            <p className="text-xs text-brand/70 mt-3 animate-pulse">Isso pode levar até 90 segundos</p>
           </div>
         </div>
       ) : erroGeracao ? (
@@ -3438,6 +3634,14 @@ export default function OnboardingPage() {
       compliance_optout: form['compliance-optout'] === 'true',
       voz_id: form['voz'],
       tom: form['tom'],
+      agendamento_estrategia: form['agendamento-estrategia'],
+      agendamento_antecedencia: form['agendamento-antecedencia'],
+      agendamento_opcoes: form['agendamento-opcoes'],
+      agendamento_tom: form['agendamento-tom'],
+      agendamento_duracao: form['agendamento-duracao'],
+      agendamento_apresentar_vendedor: form['agendamento-apresentar-vendedor'],
+      agendamento_recusa: form['agendamento-recusa'],
+      agendamento_urgencia: form['agendamento-urgencia'],
       system_prompt_override: form['prompt_gerado'] || undefined,
       status: 'inativo',
     }
@@ -3635,6 +3839,7 @@ export default function OnboardingPage() {
     'Roteiro & Materiais',
     'Ligações de Referência',
     'Voz e tom do agente',
+    'Estratégia de Agendamento',
     'Revisão & Ativação',
   ]
 
@@ -3988,7 +4193,8 @@ export default function OnboardingPage() {
             />
           )}
           {step === 10 && <StepVozTom form={form} onChange={onChange} />}
-          {step === 11 && (
+          {step === 11 && <StepAgendamento form={form} onChange={onChange} />}
+          {step === 12 && (
             <Step4
               form={form}
               onChange={onChange}
@@ -4010,7 +4216,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 11 && activated) && (
+          {!(step === 12 && activated) && (
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
