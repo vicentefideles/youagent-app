@@ -2533,7 +2533,7 @@ function Step4({
     setGerando(true)
     setErroGeracao('')
     try {
-      const res = await claudeApi.gerarPrompt({
+      const payload = {
         objetivo: form['objetivo'],
         nome_agente: form['nome-agente'],
         empresa: form['empresa-nome'],
@@ -2565,8 +2565,27 @@ function Step4({
         tom: form['tom'],
         ligacoes_sucesso: ligacoesSucesso.filter(l => l.transcricao).map(l => l.transcricao),
         ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
-      })
-      onChange('prompt_gerado', (res.data as { prompt: string }).prompt || '')
+      }
+      const initRes = await claudeApi.gerarPrompt(payload)
+      const jobId = (initRes.data as { jobId?: string }).jobId
+      if (jobId) {
+        // Polling até concluir (max 5 min)
+        for (let i = 0; i < 100; i++) {
+          await new Promise(r => setTimeout(r, 3000))
+          const { data } = await claudeApi.gerarPromptStatus(jobId)
+          if ((data as { status: string }).status === 'done') {
+            onChange('prompt_gerado', (data as { prompt: string }).prompt || '')
+            return
+          }
+          if ((data as { status: string }).status === 'error') {
+            throw new Error((data as { error?: string }).error || 'Erro ao gerar o prompt.')
+          }
+        }
+        throw new Error('Tempo limite excedido ao gerar o prompt.')
+      } else {
+        // Resposta direta (fallback)
+        onChange('prompt_gerado', (initRes.data as { prompt: string }).prompt || '')
+      }
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
         || (err as { message?: string })?.message
