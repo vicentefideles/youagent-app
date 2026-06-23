@@ -852,8 +852,9 @@ function Step1({
   async function pesquisarComIA() {
     if (pesquisando) return
     const sitesValidos = sites.map(s => s.trim()).filter(Boolean)
-    if (sitesValidos.length === 0) {
-      setPesquisaErro('Informe pelo menos um site antes de pesquisar')
+    const materiaisExtrados = materiais.filter(m => m.texto.trim().length > 0)
+    if (sitesValidos.length === 0 && materiaisExtrados.length === 0) {
+      setPesquisaErro('Informe pelo menos um site ou aguarde a extração dos materiais')
       return
     }
     setPesquisando(true)
@@ -868,24 +869,40 @@ function Step1({
     }
 
     try {
-      const resultados = await Promise.allSettled(
-        sitesValidos.map(site =>
-          claudeApi.pesquisarMercado({
+      const conteudoMateriais = materiais.filter(m => m.texto.trim()).map(m => m.texto.trim()).join('\n\n---\n\n')
+
+      // Chamadas por site (cada uma recebe os materiais como contexto adicional)
+      const chamadasSites = sitesValidos.map(site =>
+        claudeApi.pesquisarMercado({
+          empresa: form['empresa-nome'],
+          cnpj: form['empresa-cnpj'],
+          segmento: form['empresa-segmento'],
+          site,
+          produto: form['prod-nome'],
+          materiais_conteudo: conteudoMateriais || undefined,
+        }).then(r => ({ site, data: r.data as SiteData }))
+      )
+
+      // Se não há sites mas há materiais, faz uma chamada só com materiais
+      const chamadasSemSite = sitesValidos.length === 0 && conteudoMateriais
+        ? [claudeApi.pesquisarMercado({
             empresa: form['empresa-nome'],
             cnpj: form['empresa-cnpj'],
             segmento: form['empresa-segmento'],
-            site,
+            site: '',
             produto: form['prod-nome'],
-          }).then(r => ({ site, data: r.data as SiteData }))
-        )
-      )
+            materiais_conteudo: conteudoMateriais,
+          }).then(r => ({ site: 'materiais', data: r.data as SiteData }))]
+        : []
+
+      const resultados = await Promise.allSettled([...chamadasSites, ...chamadasSemSite])
 
       const sucessos = resultados
         .filter((r): r is PromiseFulfilledResult<{ site: string; data: SiteData }> => r.status === 'fulfilled')
         .map(r => r.value)
 
       if (sucessos.length === 0) {
-        setPesquisaErro('Não foi possível pesquisar nenhum dos sites informados.')
+        setPesquisaErro('Não foi possível pesquisar os sites informados.')
         return
       }
 
@@ -955,62 +972,27 @@ function Step1({
   }
 
   const aiPreencheu = iaPesquisouSite
+  const materiaisExtrados = materiais.filter(m => m.texto.trim().length > 0)
+  const materiaisOk = materiaisExtrados.length >= 2
+  const podePesquisar = materiaisOk
 
   return (
     <div className="flex flex-col gap-5">
 
-      {/* ── Banner IA ──────────────────────────────────────────────────────── */}
-      <div className={`rounded-2xl border p-4 transition-all ${
-        aiPreencheu
-          ? 'bg-emerald-50 border-emerald-200'
-          : 'bg-gradient-to-r from-brand-50 to-violet-50 border-brand-100'
-      }`}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-              aiPreencheu ? 'bg-emerald-100' : 'bg-white border border-brand-100'
-            }`}>
-              {aiPreencheu
-                ? <Check size={16} className="text-emerald-600" strokeWidth={3} />
-                : <Brain size={16} className="text-brand" />
-              }
+      {/* ── Banner IA — só status após pesquisar ───────────────────────────── */}
+      {aiPreencheu && (
+        <div className="rounded-2xl border bg-emerald-50 border-emerald-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100">
+              <Check size={16} className="text-emerald-600" strokeWidth={3} />
             </div>
             <div>
-              <p className={`text-sm font-semibold ${aiPreencheu ? 'text-emerald-800' : 'text-gray-900'}`}>
-                {aiPreencheu ? 'IA preencheu os campos — revise e ajuste' : 'Deixa a IA preencher por você'}
-              </p>
-              <p className={`text-xs mt-0.5 leading-relaxed ${aiPreencheu ? 'text-emerald-700' : 'text-gray-500'}`}>
-                {aiPreencheu
-                  ? 'Os campos foram preenchidos automaticamente. Revise, complemente e corrija o que precisar antes de avançar.'
-                  : 'Informe o site e clique em Pesquisar — a IA extrai dados reais, pesquisa concorrentes, objeções e preenche tudo automaticamente.'
-                }
-              </p>
+              <p className="text-sm font-semibold text-emerald-800">IA preencheu os campos — revise e ajuste</p>
+              <p className="text-xs mt-0.5 text-emerald-700">Os campos foram preenchidos com base nos sites e materiais. Revise, complemente e corrija antes de avançar.</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={pesquisarComIA}
-            disabled={pesquisando}
-            className={`shrink-0 flex items-center gap-2 text-sm px-4 py-2.5 font-semibold rounded-xl transition-all shadow-sm disabled:opacity-60 whitespace-nowrap ${
-              aiPreencheu
-                ? 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-                : 'bg-brand text-white hover:bg-brand-600'
-            }`}
-          >
-            {pesquisando
-              ? <><Loader2 size={14} className="animate-spin" /> Pesquisando...</>
-              : aiPreencheu
-              ? <><RefreshCw size={14} /> Repesquisar</>
-              : <><Brain size={14} /> Pesquisar com IA</>
-            }
-          </button>
         </div>
-        {pesquisaErro && (
-          <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5">
-            <AlertTriangle size={11} className="shrink-0" /> {pesquisaErro}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* ── Seção: Identificação ────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4">
@@ -1210,8 +1192,55 @@ function Step1({
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 bg-brand rounded-full" />
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materiais de apoio</span>
+          <span className="text-[10px] text-red-500 font-semibold uppercase tracking-wide">mínimo 2 obrigatórios</span>
         </div>
         <MateriaisUpload materiais={materiais} onMateriaisChange={onMateriaisChange} onConteudoChange={v => onChange('materiais-conteudo', v)} />
+      </div>
+
+      {/* ── Botão Pesquisar com IA ──────────────────────────────────────────── */}
+      <div className={`rounded-2xl border-2 p-5 transition-all ${podePesquisar ? 'border-brand/30 bg-brand/5' : 'border-gray-200 bg-gray-50'}`}>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${podePesquisar ? 'bg-brand/10' : 'bg-gray-200'}`}>
+              <Brain size={16} className={podePesquisar ? 'text-brand' : 'text-gray-400'} />
+            </div>
+            <div>
+              <p className={`text-sm font-semibold ${podePesquisar ? 'text-gray-900' : 'text-gray-400'}`}>
+                {podePesquisar ? 'Tudo pronto — deixa a IA preencher por você' : `Anexe pelo menos 2 materiais para liberar a pesquisa com IA`}
+              </p>
+              <p className={`text-xs mt-0.5 leading-relaxed ${podePesquisar ? 'text-gray-500' : 'text-gray-400'}`}>
+                {podePesquisar
+                  ? `${materiaisExtrados.length} ${materiaisExtrados.length === 1 ? 'material extraído' : 'materiais extraídos'} + sites informados. A IA vai preencher todos os campos acima automaticamente.`
+                  : `${materiaisExtrados.length} de 2 materiais extraídos. Quanto mais materiais, mais preciso o preenchimento e mais assertivas serão as etapas seguintes.`
+                }
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={pesquisarComIA}
+            disabled={pesquisando || !podePesquisar}
+            className={`w-full flex items-center justify-center gap-2 text-sm px-4 py-3 font-semibold rounded-xl transition-all shadow-sm ${
+              podePesquisar
+                ? aiPreencheu
+                  ? 'bg-white border border-brand/30 text-brand hover:bg-brand/5'
+                  : 'bg-brand text-white hover:bg-brand/90'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {pesquisando
+              ? <><Loader2 size={15} className="animate-spin" /> Pesquisando sites e materiais...</>
+              : aiPreencheu
+              ? <><RefreshCw size={15} /> Repesquisar com IA</>
+              : <><Brain size={15} /> Pesquisar com IA</>
+            }
+          </button>
+          {pesquisaErro && (
+            <p className="text-xs text-red-600 flex items-center gap-1.5">
+              <AlertTriangle size={11} className="shrink-0" /> {pesquisaErro}
+            </p>
+          )}
+        </div>
       </div>
 
     </div>
