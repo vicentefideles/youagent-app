@@ -2583,8 +2583,10 @@ function Step4({
         }
         throw new Error('Tempo limite excedido ao gerar o prompt.')
       } else {
-        // Resposta direta (fallback)
-        onChange('prompt_gerado', (initRes.data as { prompt: string }).prompt || '')
+        // Resposta direta (fallback — backend síncrono)
+        const promptDireto = (initRes.data as { prompt?: string }).prompt || ''
+        if (!promptDireto) throw new Error('O servidor retornou um prompt vazio. Tente novamente.')
+        onChange('prompt_gerado', promptDireto)
       }
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
