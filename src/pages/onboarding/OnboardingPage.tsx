@@ -2567,8 +2567,11 @@ function Step4({
         ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
       })
       onChange('prompt_gerado', (res.data as { prompt: string }).prompt || '')
-    } catch {
-      setErroGeracao('Não foi possível gerar o prompt. Verifique sua conexão e tente novamente.')
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || (err as { message?: string })?.message
+        || 'Não foi possível gerar o prompt. Verifique sua conexão e tente novamente.'
+      setErroGeracao(msg)
     } finally {
       setGerando(false)
     }
