@@ -2780,6 +2780,11 @@ function Step4({
   return (
     <div className="flex flex-col gap-5">
 
+      {/* DEBUG TEMPORÁRIO — remover após diagnóstico */}
+      <div className="text-xs bg-gray-100 p-2 rounded font-mono text-gray-600 break-all">
+        empresa: {form['empresa-nome'] || '(vazio)'} | materiais: {form['materiais-conteudo']?.length ?? 0} chars | gerando: {String(gerando)} | erro: {erroGeracao || '(sem erro)'}
+      </div>
+
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
