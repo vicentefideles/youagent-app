@@ -11,7 +11,7 @@ import { emailsApi, claudeApi, whatsappApi, equipeApi } from '@/services/api'
 type TabId = 'acoes' | 'fila' | 'modelos' | 'campanhas' | 'equipe' | 'whatsapp' | 'inbox' | 'enviados'
 
 interface QueueEmail {
-  id: number
+  id: string
   empresa: string
   contato: string
   campanha: string
@@ -61,7 +61,7 @@ function EmailComposer({
 }: {
   email: QueueEmail
   onBack: () => void
-  onSend: (id: number) => void
+  onSend: (id: string) => void
 }) {
   const [para, setPara] = useState(email.email)
   const [assunto, setAssunto] = useState(email.assunto)
@@ -277,38 +277,41 @@ function EmailComposer({
 
 // ─── Aba Fila ────────────────────────────────────────────────────────────────
 function TabFila() {
-  const { data: filaRows = [], isLoading: loadingFila } = useQuery({
+  const { data: filaRows = [], isLoading: loadingFila, refetch: refetchFila } = useQuery({
     queryKey: ['emails-fila'],
-    queryFn: () => emailsApi.inbox().then(r => (r.data as any[]).filter((e: any) => !e.lido).map((e: any) => ({
-      id: typeof e.id === 'number' ? e.id : Number(e.id) || Date.now(),
+    queryFn: () => emailsApi.fila().then(r => (r.data as any[]).map((e: any) => ({
+      id: typeof e.id === 'string' ? e.id : String(e.id || Date.now()),
       para: e.para ?? '',
       assunto: e.assunto ?? '',
       status: 'pendente' as const,
       agente: '',
       campanha: e.campanha ?? '—',
-      empresa: e.empresa ?? (e.de ? e.de.replace(/.*<(.+)>/, '$1').split('@')[1]?.split('.')[0] ?? '—' : '—'),
-      contato: e.de ?? '',
-      origem: e.origem ?? (e.tipo === 'inbox' ? 'Inbox' : 'Sistema'),
-      template: e.template ?? '—',
+      empresa: e.empresa ?? '—',
+      contato: e.contato ?? '—',
+      origem: e.origem ?? 'Sistema',
+      template: '—',
       horario: e.criado_em ? new Date(e.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
       email: e.para ?? '',
       corpo: e.corpo ?? '',
     } as QueueEmail))),
+    refetchInterval: 30000, // atualiza a cada 30s para capturar novos follow-ups automáticos
   })
 
-  const [localOverrides, setLocalOverrides] = useState<Record<number, QueueEmail['status']>>({})
+  const [localOverrides, setLocalOverrides] = useState<Record<string, QueueEmail['status']>>({})
   const rows: QueueEmail[] = filaRows.map(r => localOverrides[r.id] ? { ...r, status: localOverrides[r.id] } : r)
 
   const [composerEmail, setComposerEmail] = useState<QueueEmail | null>(null)
-  const [trainedIds, setTrainedIds] = useState<Set<number>>(new Set())
-  const [trainToast, setTrainToast] = useState<number | null>(null)
+  const [trainedIds, setTrainedIds] = useState<Set<string>>(new Set())
+  const [trainToast, setTrainToast] = useState<string | null>(null)
 
-  function handleSend(id: number) {
+  async function handleSend(id: string) {
     setLocalOverrides(prev => ({ ...prev, [id]: 'enviado' as const }))
     setComposerEmail(null)
+    try { await emailsApi.marcarEnviado(id) } catch { /* ignora */ }
+    refetchFila()
   }
 
-  function handleTrain(id: number) {
+  function handleTrain(id: string) {
     setTrainedIds(prev => new Set([...prev, id]))
     setTrainToast(id)
     setTimeout(() => setTrainToast(null), 3000)
@@ -349,7 +352,7 @@ function TabFila() {
           </div>
           <div className="flex gap-2 shrink-0 ml-4">
             <button
-              onClick={() => setComposerEmail({ id: Date.now(), contato: '', empresa: '', campanha: '', origem: '', template: '', horario: '', assunto: '', status: 'pendente', email: '', corpo: '' })}
+              onClick={() => setComposerEmail({ id: String(Date.now()), contato: '', empresa: '', campanha: '', origem: '', template: '', horario: '', assunto: '', status: 'pendente', email: '', corpo: '' })}
               className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 hover:bg-gray-50"
             >
               <Mail size={14} /> Novo E-mail
@@ -360,8 +363,10 @@ function TabFila() {
                   try {
                     await emailsApi.enviar({ para: r.email || r.contato, assunto: r.assunto, corpo: r.corpo || '' })
                     setLocalOverrides(prev => ({ ...prev, [r.id]: 'enviado' as const }))
+                    await emailsApi.marcarEnviado(r.id).catch(() => {})
                   } catch (e) { console.error(e) }
                 }
+                refetchFila()
               }}
               className="flex items-center gap-1.5 text-sm bg-blue-600 text-white rounded-lg px-3 py-1.5 hover:bg-blue-700"
             >
@@ -417,6 +422,8 @@ function TabFila() {
                               try {
                                 await emailsApi.enviar({ para: r.email || r.contato, assunto: r.assunto, corpo: r.corpo || '' })
                                 setLocalOverrides(prev => ({ ...prev, [r.id]: 'enviado' as const }))
+                                await emailsApi.marcarEnviado(r.id).catch(() => {})
+                                refetchFila()
                               } catch (e) { console.error(e) }
                             }}
                             className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700 flex items-center gap-1"
@@ -1179,7 +1186,7 @@ function TabInbox() {
             </div>
             <button
               onClick={() => setComposerEmail({
-                id: Date.now(),
+                id: String(Date.now()),
                 contato: emailSelecionado.de || '',
                 empresa: emailSelecionado.empresa || '',
                 assunto: 'Re: ' + (emailSelecionado.assunto || ''),

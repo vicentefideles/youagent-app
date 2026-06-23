@@ -283,9 +283,15 @@ export const inteligenciaSimuladorApi = {
 export const emailsApi = {
   inbox:    () => api.get('/emails?tipo=inbox'),
   enviados: () => api.get('/emails?tipo=enviado'),
+  fila:     () => api.get('/emails/fila'),
   marcarLido: (id: string) => api.patch(`/emails/${id}`, { lido: true }),
+  marcarEnviado: (id: string) => api.patch(`/emails/fila/${id}/marcar-enviado`, {}),
   enviar: (data: { para: string; assunto: string; corpo: string }) =>
     api.post('/emails/enviar', data),
+  criarFila: (data: { para: string; assunto: string; corpo: string; empresa?: string; contato?: string; campanha?: string }) =>
+    api.post('/emails/fila', data),
+  gerarFollowup: (data: { ligacao_id?: string; resultado: string; contato_nome?: string; empresa?: string; email_contato: string; campanha?: string; transcricao?: string; agente_nome?: string }) =>
+    api.post('/emails/gerar-followup', data),
   modelos: () => api.get('/emails/modelos'),
   saveModelo: (data: unknown) => api.post('/emails/modelos', data),
   updateModelo: (id: string, data: unknown) => api.patch(`/emails/modelos/${id}`, data),
