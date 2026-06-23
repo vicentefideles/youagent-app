@@ -435,8 +435,10 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
       }
 
       // Resposta direta (PDF com texto nativo ou Word/TXT)
+      // texto completo vai para m.texto (etapa 13 recebe tudo)
+      // resumo Haiku vai só para analise (card UI e etapas 3-6 via sugestões IA)
       if (initData.texto) {
-        const textoParaUsar = (initData as { texto_filtrado?: string }).texto_filtrado || initData.texto
+        const textoParaUsar = initData.texto
         const next = materiais.map((m, idx) =>
           idx === i ? { ...m, file, extraindo: false, texto: textoParaUsar, analise: initData.resumo || null, erro: null } : m
         )
