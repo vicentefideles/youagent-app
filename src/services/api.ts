@@ -302,7 +302,7 @@ export const emailsApi = {
 export const claudeApi = {
   status: () => api.get('/claude/status'),
   pesquisarMercado: (data: { empresa?: string; cnpj?: string; segmento?: string; site?: string; produto?: string; materiais_conteudo?: string }) =>
-    api.post('/claude/pesquisar-mercado', data, { timeout: 60000 }),
+    api.post('/claude/pesquisar-mercado', data, { timeout: 120000 }),
   gerarModelo: (data: { tipo: string; contexto?: string; campanha?: string }) =>
     api.post('/claude/gerar-modelo', data),
   chat: (messages: Array<{ role: string; content: string }>) =>

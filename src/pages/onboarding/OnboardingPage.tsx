@@ -869,7 +869,8 @@ function Step1({
     }
 
     try {
-      const conteudoMateriais = materiais.filter(m => m.texto.trim()).map(m => m.texto.trim()).join('\n\n---\n\n')
+      // Limita materiais a 20K chars para não estourar o contexto da chamada de pesquisa
+      const conteudoMateriais = materiais.filter(m => m.texto.trim()).map(m => m.texto.trim()).join('\n\n---\n\n').slice(0, 20000)
 
       // Chamadas por site (cada uma recebe os materiais como contexto adicional)
       const chamadasSites = sitesValidos.map(site =>
@@ -902,7 +903,9 @@ function Step1({
         .map(r => r.value)
 
       if (sucessos.length === 0) {
-        setPesquisaErro('Não foi possível pesquisar os sites informados.')
+        const primeiroErro = resultados.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+        const msgErro = primeiroErro?.reason?.response?.data?.error || primeiroErro?.reason?.message || 'Erro desconhecido'
+        setPesquisaErro(`Não foi possível pesquisar. ${msgErro}`)
         return
       }
 
