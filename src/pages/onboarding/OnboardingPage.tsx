@@ -238,6 +238,22 @@ const STEPS = [
   { label: 'Revisão & Ativação', icon: Zap },
 ]
 
+// ─── Polling helper para jobs assíncronos de extração ────────────────────────
+// Faz polling a cada 3s até status=done|error (max 10 min)
+async function pollJobResult(jobId: string, onProgress?: (elapsed: number) => void): Promise<{
+  texto: string; resumo: string | null; texto_filtrado: string | null; caracteres: number; nome: string
+}> {
+  const MAX_ATTEMPTS = 200 // 10 min @ 3s
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    await new Promise(r => setTimeout(r, 3000))
+    onProgress?.(i * 3)
+    const { data } = await agentesApi.extrairScriptStatus(jobId)
+    if (data.status === 'done') return data as { texto: string; resumo: string | null; texto_filtrado: string | null; caracteres: number; nome: string }
+    if (data.status === 'error') throw new Error(data.error || 'Erro na extração do arquivo.')
+  }
+  throw new Error('Tempo limite de extração excedido.')
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: number }) {
@@ -385,12 +401,27 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
     updateItem(i, { file, extraindo: true, erro: null, analise: null, texto: '' })
 
     try {
-      const { data } = await agentesApi.extrairScript(file, tipoAtual || 'material')
-      if (data.texto) {
-        // Para materiais: usa texto_filtrado (sem ruído) se disponível; fallback para texto bruto
-        const textoParaUsar = (data as { texto_filtrado?: string }).texto_filtrado || data.texto
+      const { data: initData } = await agentesApi.extrairScript(file, tipoAtual || 'material')
+
+      // Job assíncrono (PDF digitalizado OCR) — faz polling até concluir
+      if (initData.jobId) {
+        const data = await pollJobResult(initData.jobId, (elapsed) => {
+          updateItem(i, { extraindo: true, analise: `Lendo PDF com IA... ${elapsed}s` })
+        })
+        const textoParaUsar = data.texto_filtrado || data.texto
         const next = materiais.map((m, idx) =>
           idx === i ? { ...m, file, extraindo: false, texto: textoParaUsar, analise: data.resumo || null, erro: null } : m
+        )
+        onMateriaisChange(next)
+        syncConteudo(next)
+        return
+      }
+
+      // Resposta direta (PDF com texto nativo ou Word/TXT)
+      if (initData.texto) {
+        const textoParaUsar = (initData as { texto_filtrado?: string }).texto_filtrado || initData.texto
+        const next = materiais.map((m, idx) =>
+          idx === i ? { ...m, file, extraindo: false, texto: textoParaUsar, analise: initData.resumo || null, erro: null } : m
         )
         onMateriaisChange(next)
         syncConteudo(next)
@@ -398,7 +429,8 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
         updateItem(i, { extraindo: false, erro: 'Não foi possível extrair texto. Use PDF, Word ou TXT.', file: null })
       }
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      const msg = (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+        || (err as { message?: string })?.message
         || 'Erro ao processar o arquivo. Tente outro formato.'
       updateItem(i, { extraindo: false, erro: msg, file: null })
     }
@@ -1928,14 +1960,26 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
   async function handleFileSelect(id: string, file: File) {
     updateSlot(id, { fileName: file.name, extraindo: true, erro: null, analise: null })
     try {
-      const { data } = await agentesApi.extrairScript(file)
-      if (data.texto) {
+      const { data: initData } = await agentesApi.extrairScript(file)
+
+      // Job assíncrono (PDF digitalizado) — polling até concluir
+      if (initData.jobId) {
+        const data = await pollJobResult(initData.jobId, (elapsed) => {
+          updateSlot(id, { analise: `Lendo PDF com IA... ${elapsed}s` })
+        })
         updateSlot(id, { texto: data.texto, analise: data.resumo || null, extraindo: false })
+        return
+      }
+
+      // Resposta direta
+      if (initData.texto) {
+        updateSlot(id, { texto: initData.texto, analise: initData.resumo || null, extraindo: false })
       } else {
         updateSlot(id, { extraindo: false, erro: 'Não foi possível extrair texto. Verifique se é PDF, Word ou TXT válido.', fileName: null })
       }
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      const msg = (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+        || (err as { message?: string })?.message
         || 'Erro ao processar o arquivo. Cole o texto manualmente.'
       updateSlot(id, { extraindo: false, erro: msg, fileName: null })
     }

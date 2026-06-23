@@ -56,9 +56,10 @@ export const agentesApi = {
     if (tipo) fd.append('tipo', tipo)
     return api.post('/agentes/extrair-script', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180000, // 3min — PDFs digitalizados usam Claude Vision (pode levar até 90s)
+      timeout: 30000, // 30s — retorna jobId imediatamente para PDFs digitalizados
     })
   },
+  extrairScriptStatus: (jobId: string) => api.get(`/agentes/extrair-script/job/${jobId}`, { timeout: 10000 }),
   transcreverLigacao: (file: File, resultado: 'sucesso' | 'insucesso', observacao?: string) => {
     const fd = new FormData()
     fd.append('file', file)
