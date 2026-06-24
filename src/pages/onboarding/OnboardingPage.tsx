@@ -2482,12 +2482,27 @@ function LigacoesSection({
                   {m.resumo && (
                     <div className="px-3 py-2.5 flex items-start gap-2">
                       <Brain size={13} className={`shrink-0 mt-0.5 ${isSucesso ? 'text-emerald-600' : 'text-amber-600'}`} />
-                      <div>
+                      <div className="flex-1">
                         <p className={`text-xs font-semibold mb-1 ${colors.cardText}`}>Aprendizados extraídos pela IA:</p>
                         <p className={`text-xs leading-relaxed ${colors.cardText}`}>{m.resumo}</p>
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Textarea editável — aparece após transcrição, igual ao padrão das outras etapas */}
+              {m.file && !m.transcrevendo && !m.erro && m.resumo && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-1">Aprendizados — editável pelo agente:</p>
+                  <textarea
+                    rows={4}
+                    value={m.resumo}
+                    onChange={e => update(i, { resumo: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40 bg-white"
+                    placeholder="Edite os aprendizados extraídos se necessário..."
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Este texto vai direto para o prompt final — edite para corrigir ou complementar.</p>
                 </div>
               )}
 
@@ -2959,8 +2974,8 @@ function Step4({
         script_abertura: form['script-abertura'],
         voz: vozNome,
         tom: form['tom'],
-        ligacoes_sucesso: ligacoesSucesso.filter(l => l.transcricao).map(l => l.transcricao),
-        ligacoes_insucesso: ligacoesInsucesso.filter(l => l.transcricao).map(l => l.transcricao),
+        ligacoes_sucesso: ligacoesSucesso.filter(l => l.resumo || l.transcricao).map(l => l.resumo || l.transcricao),
+        ligacoes_insucesso: ligacoesInsucesso.filter(l => l.resumo || l.transcricao).map(l => l.resumo || l.transcricao),
         agendamento_estrategia: form['agendamento-estrategia'],
         agendamento_antecedencia: form['agendamento-antecedencia'],
         agendamento_opcoes: form['agendamento-opcoes'],
