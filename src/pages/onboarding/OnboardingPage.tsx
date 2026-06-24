@@ -1676,8 +1676,16 @@ function StepGatilhosFechamento({ form, onChange }: {
         diferenciais: form['empresa-diferenciais'],
         resultados_clientes: form['prod-resultados'],
         descricao_produto: form['prod-descricao'],
-        cenario_dores: form['cenario-dores'],
+        // Etapa 3 — qualificação
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
+        // Etapa 4 — sinais de compra
+        sinais_compra: form['gatilhos-customizados'],
+        // Etapa 5 — ICP
+        icp_cargo: form['icp-cargo-tipo'],
+        icp_porte: form['icp-porte-alvo'],
+        icp_segmento: form['icp-segmento-alvo'],
+        // Etapa 5b — cenário & dores
+        cenario_dores: form['cenario-dores'],
         materiais_conteudo: form['materiais-conteudo'],
       })
       const data = res.data as { gatilhos: string }
@@ -1828,6 +1836,8 @@ function Step3({ form, onChange }: {
         descricao_produto: form['prod-descricao'],
         info_adicional: form['prod-info-extra'],
         materiais_conteudo: form['materiais-conteudo'],
+        // Etapa 3 — perguntas e objeções já geradas alimentam os sinais
+        perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
       })
       const data = res.data as { sinais?: string }
       if (data.sinais) onChange('gatilhos-customizados', data.sinais)
