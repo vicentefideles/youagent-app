@@ -187,7 +187,7 @@ export const whatsappApi = {
 
 // WhatsApp pessoal do usuário logado (admin/gestor) — Z-API
 export const whatsappUsuarioApi = {
-  conectar:    () => api.post('/whatsapp/eu/conectar', {}, { timeout: 30000 }),
+  conectar:    () => api.post('/whatsapp/eu/conectar', {}, { timeout: 90000 }),
   status:      () => api.get('/whatsapp/eu/status'),
   desconectar: () => api.delete('/whatsapp/eu/desconectar'),
   enviar:      (data: { telefone: string; mensagem: string }) =>
@@ -321,11 +321,11 @@ export const claudeApi = {
   gerarPromptStatus: (jobId: string) =>
     api.get(`/claude/gerar-prompt/job/${jobId}`, { timeout: 10000 }),
   sugerirQualificacao: (data: Record<string, unknown>) =>
-    api.post('/claude/sugerir-qualificacao', data, { timeout: 30000 }),
+    api.post('/claude/sugerir-qualificacao', data, { timeout: 90000 }),
   sugerirCenarioDores: (data: Record<string, unknown>) =>
-    api.post('/claude/sugerir-cenario-dores', data, { timeout: 30000 }),
+    api.post('/claude/sugerir-cenario-dores', data, { timeout: 90000 }),
   sugerirGatilhosFechamento: (data: Record<string, unknown>) =>
-    api.post('/claude/sugerir-gatilhos-fechamento', data, { timeout: 30000 }),
+    api.post('/claude/sugerir-gatilhos-fechamento', data, { timeout: 90000 }),
   gerarCross: (data: { gatilho: string; exemplos: string[] }) =>
     api.post('/claude/gerar-cross', data),
   scoreInteligencia: () => api.get('/claude/score-inteligencia'),
