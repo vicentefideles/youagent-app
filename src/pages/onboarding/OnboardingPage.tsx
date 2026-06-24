@@ -1464,15 +1464,19 @@ function StepQualificacao({
   onChange,
   objecoes,
   onObjecoesChange,
+  perguntas,
+  onPerguntasChange,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
   objecoes: Objecao[]
   onObjecoesChange: (o: Objecao[]) => void
+  perguntas: string[]
+  onPerguntasChange: (p: string[]) => void
 }) {
   const [gerando, setGerando] = useState(false)
   const [erroGeracao, setErroGeracao] = useState('')
-  const jaGerou = form['wiz-qualif-q1'] || objecoes.some(o => o.objecao)
+  const jaGerou = perguntas.some(p => p) || objecoes.some(o => o.objecao)
 
   async function sugerir() {
     setGerando(true)
@@ -1493,12 +1497,13 @@ function StepQualificacao({
       })
       const data = res.data as { perguntas?: string[]; objecoes?: Objecao[]; sinais?: string }
       if (data.perguntas?.length) {
+        onPerguntasChange(data.perguntas)
         onChange('wiz-qualif-q1', data.perguntas[0] || '')
         onChange('wiz-qualif-q2', data.perguntas[1] || '')
         onChange('wiz-qualif-q3', data.perguntas[2] || '')
       }
       if (data.objecoes?.length) {
-        onObjecoesChange(data.objecoes.slice(0, 5))
+        onObjecoesChange(data.objecoes)
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error || (err as { message?: string })?.message || 'erro desconhecido'
@@ -1513,10 +1518,19 @@ function StepQualificacao({
     onObjecoesChange(objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o))
   }
   function addObjecao() {
-    if (objecoes.length < 5) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' }])
+    onObjecoesChange([...objecoes, { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' }])
   }
   function removeObjecao(i: number) {
     if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
+  }
+  function updatePergunta(i: number, v: string) {
+    onPerguntasChange(perguntas.map((p, idx) => idx === i ? v : p))
+  }
+  function addPergunta() {
+    if (perguntas.length < 10) onPerguntasChange([...perguntas, ''])
+  }
+  function removePergunta(i: number) {
+    if (perguntas.length > 1) onPerguntasChange(perguntas.filter((_, idx) => idx !== i))
   }
 
   return (
@@ -1556,22 +1570,31 @@ function StepQualificacao({
       {/* Perguntas de qualificação */}
       <div>
         <p className="text-sm font-medium text-gray-700 mb-1">Perguntas de qualificação</p>
-        <p className="text-xs text-gray-400 mb-3">O agente fará uma pergunta por vez, aguardando a resposta antes de avançar.</p>
+        <p className="text-xs text-gray-400 mb-3">O agente seleciona as melhores perguntas para cada ligação com base no perfil do prospect.</p>
         <div className="flex flex-col gap-2">
-          {(['wiz-qualif-q1', 'wiz-qualif-q2', 'wiz-qualif-q3'] as const).map((k, i) => (
-            <div key={k} className="flex items-center gap-2">
+          {perguntas.map((p, i) => (
+            <div key={i} className="flex items-center gap-2">
               <span className="text-xs font-semibold text-brand w-5 shrink-0">{i + 1}.</span>
               <input
-                id={k}
                 className={inputCls}
-                value={form[k]}
-                onChange={e => onChange(k, e.target.value)}
+                value={p}
+                onChange={e => updatePergunta(i, e.target.value)}
                 placeholder={gerando ? 'Aguardando geração...' : `Pergunta ${i + 1}`}
                 disabled={gerando}
               />
+              {perguntas.length > 3 && (
+                <button type="button" onClick={() => removePergunta(i)}
+                  className="text-xs text-red-400 hover:text-red-600 shrink-0">✕</button>
+              )}
             </div>
           ))}
         </div>
+        {perguntas.length < 10 && (
+          <button type="button" onClick={addPergunta}
+            className="mt-2 text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
+            + Adicionar pergunta
+          </button>
+        )}
       </div>
 
       {/* Objeções */}
@@ -1581,12 +1604,10 @@ function StepQualificacao({
             <p className="text-sm font-medium text-gray-700">Objeções e respostas</p>
             <p className="text-xs text-gray-400 mt-0.5">Como o agente responde quando o contato hesitar.</p>
           </div>
-          {objecoes.length < 5 && (
-            <button type="button" onClick={addObjecao}
-              className="text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
-              + Adicionar objeção
-            </button>
-          )}
+          <button type="button" onClick={addObjecao}
+            className="text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
+            + Adicionar objeção
+          </button>
         </div>
         <div className="flex flex-col gap-3">
           {objecoes.map((obj, i) => (
@@ -3673,6 +3694,7 @@ export default function OnboardingPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [promptStatuses, setPromptStatuses] = useState<Record<string, boolean>>({})
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
+  const [perguntas, setPerguntas] = useState<string[]>(['', '', ''])
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
   const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
@@ -3711,6 +3733,14 @@ export default function OnboardingPage() {
     } finally {
       setSincronizando(false)
     }
+  }
+
+  function handlePerguntasChange(p: string[]) {
+    setPerguntas(p)
+    // Sincroniza os 3 primeiros para compatibilidade com gerar-prompt
+    onChange('wiz-qualif-q1', p[0] || '')
+    onChange('wiz-qualif-q2', p[1] || '')
+    onChange('wiz-qualif-q3', p[2] || '')
   }
 
   // Limpa feedback ao trocar de tela
@@ -4029,6 +4059,7 @@ export default function OnboardingPage() {
     try { localStorage.removeItem('etz_onboarding_form'); localStorage.removeItem('etz_onboarding_step') } catch {}
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
+    setPerguntas(['', '', ''])
     setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
     setScriptFiles([])
     setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
@@ -4397,6 +4428,8 @@ export default function OnboardingPage() {
               onChange={onChange}
               objecoes={objecoes}
               onObjecoesChange={setObjecoes}
+              perguntas={perguntas}
+              onPerguntasChange={handlePerguntasChange}
             />
           )}
           {step === 3 && <Step3 form={form} onChange={onChange} />}
