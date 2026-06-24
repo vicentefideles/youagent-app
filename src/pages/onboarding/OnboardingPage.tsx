@@ -2367,7 +2367,7 @@ function LigacoesSection({
   tipo: 'sucesso' | 'insucesso'
   items: LigacaoRef[]
   onChange: (items: LigacaoRef[]) => void
-  form: Record<string, string>
+  form: FormData
 }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([])
   const itemsRef = React.useRef(items)
@@ -2553,7 +2553,7 @@ function StepLigacoesReferencia({
 }: {
   ligacoesSucesso: LigacaoRef[]; onSucessoChange: (l: LigacaoRef[]) => void
   ligacoesInsucesso: LigacaoRef[]; onInsucessoChange: (l: LigacaoRef[]) => void
-  form: Record<string, string>
+  form: FormData
 }) {
   const totalCarregadas = [
     ...ligacoesSucesso.filter(l => l.resumo),
