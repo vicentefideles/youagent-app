@@ -3231,92 +3231,44 @@ function Step4({
 
       {/* Área do prompt */}
       {gerando ? (
-        <div className="border border-brand/30 bg-brand/5 rounded-xl p-8 flex flex-col items-center gap-5 text-center">
-          <div className="relative w-24 h-24 flex items-center justify-center">
-            <svg viewBox="0 0 120 120" className="w-24 h-24 drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 18px rgba(139,92,246,0.5))' }}>
-              {/* Pulso externo */}
-              <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="1">
-                <animate attributeName="r" values="52;58;52" dur="2s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(139,92,246,0.25)" strokeWidth="1">
-                <animate attributeName="r" values="46;52;46" dur="2s" begin="0.3s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" begin="0.3s" repeatCount="indefinite" />
-              </circle>
-              {/* Fundo do cérebro */}
-              <ellipse cx="60" cy="63" rx="38" ry="32" fill="url(#brainGrad2)" opacity="0.95" />
-              {/* Hemisfério esquerdo */}
-              <path d="M60 35 C44 35 28 44 26 58 C24 70 30 80 38 85 C44 88 52 89 60 88" fill="url(#leftGrad2)" stroke="rgba(139,92,246,0.6)" strokeWidth="0.8" />
-              {/* Hemisfério direito */}
-              <path d="M60 35 C76 35 92 44 94 58 C96 70 90 80 82 85 C76 88 68 89 60 88" fill="url(#rightGrad2)" stroke="rgba(139,92,246,0.6)" strokeWidth="0.8" />
-              {/* Sulcos - hemisfério esquerdo */}
-              <path d="M34 52 C36 48 40 46 44 47" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M29 62 C31 57 36 54 41 55" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M32 72 C35 67 40 65 45 67" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M40 81 C43 77 47 76 51 78" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeLinecap="round" />
-              <path d="M36 57 C38 53 42 51 46 52" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="0.8" strokeLinecap="round" />
-              {/* Sulcos - hemisfério direito */}
-              <path d="M86 52 C84 48 80 46 76 47" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M91 62 C89 57 84 54 79 55" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M88 72 C85 67 80 65 75 67" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M80 81 C77 77 73 76 69 78" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeLinecap="round" />
-              <path d="M84 57 C82 53 78 51 74 52" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="0.8" strokeLinecap="round" />
-              {/* Divisão central */}
-              <line x1="60" y1="36" x2="60" y2="88" stroke="rgba(139,92,246,0.4)" strokeWidth="1" strokeDasharray="2,3" />
-              {/* Neurônios pulsando */}
-              <circle cx="42" cy="52" r="2" fill="#a78bfa">
-                <animate attributeName="opacity" values="1;0.2;1" dur="1.4s" begin="0s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="52" cy="67" r="1.5" fill="#c4b5fd">
-                <animate attributeName="opacity" values="1;0.2;1" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="78" cy="55" r="2" fill="#a78bfa">
-                <animate attributeName="opacity" values="1;0.2;1" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="68" cy="72" r="1.5" fill="#c4b5fd">
-                <animate attributeName="opacity" values="1;0.2;1" dur="1.3s" begin="0.2s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="46" cy="76" r="1.5" fill="#a78bfa">
-                <animate attributeName="opacity" values="1;0.2;1" dur="2s" begin="0.6s" repeatCount="indefinite" />
-              </circle>
-              <circle cx="74" cy="76" r="1.5" fill="#c4b5fd">
-                <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" begin="1s" repeatCount="indefinite" />
-              </circle>
-              {/* Sinapses */}
-              <line x1="42" y1="52" x2="52" y2="67" stroke="#a78bfa" strokeWidth="0.6" opacity="0.5">
-                <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.4s" begin="0s" repeatCount="indefinite" />
-              </line>
-              <line x1="78" y1="55" x2="68" y2="72" stroke="#a78bfa" strokeWidth="0.6" opacity="0.5">
-                <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
-              </line>
-              <line x1="52" y1="67" x2="46" y2="76" stroke="#c4b5fd" strokeWidth="0.6" opacity="0.4">
-                <animate attributeName="opacity" values="0.4;0.05;0.4" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
-              </line>
-              <line x1="68" y1="72" x2="74" y2="76" stroke="#c4b5fd" strokeWidth="0.6" opacity="0.4">
-                <animate attributeName="opacity" values="0.4;0.05;0.4" dur="1.3s" begin="0.2s" repeatCount="indefinite" />
-              </line>
-              <defs>
-                <radialGradient id="brainGrad2" cx="50%" cy="40%" r="60%">
-                  <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="#4c1d95" stopOpacity="0.05" />
-                </radialGradient>
-                <linearGradient id="leftGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#6d28d9" stopOpacity="0.2" />
-                </linearGradient>
-                <linearGradient id="rightGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#5b21b6" stopOpacity="0.2" />
-                </linearGradient>
-              </defs>
-            </svg>
+        <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-6">
+          {/* Cabeçalho */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+              <Loader2 size={20} className="text-violet-600 animate-spin" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-violet-900">Construindo o prompt expert do seu agente</p>
+              <p className="text-xs text-violet-600 mt-0.5">Nossa IA usa 2 passagens para garantir máxima qualidade</p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-gray-900 text-base">Montando o prompt expert...</p>
-            <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
-              A IA está lendo todas as {STEPS.length + 1} etapas e construindo as instruções perfeitas para o seu agente.
+
+          {/* Etapas do processo */}
+          <div className="space-y-2.5 mb-5">
+            {[
+              { label: 'Lendo todas as 14 etapas preenchidas', detail: 'empresa, produto, ICP, scripts, roteiros, calibração de voz...' },
+              { label: 'Passagem 1 — Gerando o rascunho do prompt', detail: 'Opus 4.8 com raciocínio adaptativo monta as instruções base' },
+              { label: 'Passagem 2 — Revisão e refinamento crítico', detail: 'Verifica especificidade, dados reais, objeções e sinais de compra' },
+              { label: 'Entregando o prompt finalizado', detail: 'Pronto para revisar, editar e ativar' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-3 bg-white/60 rounded-lg px-3 py-2.5">
+                <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <Loader2 size={11} className="text-violet-500 animate-spin" style={{ animationDelay: `${i * 0.3}s` }} />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-violet-900">{item.label}</p>
+                  <p className="text-[10px] text-violet-500 mt-0.5">{item.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tempo estimado */}
+          <div className="flex items-center gap-2 bg-violet-100/60 rounded-lg px-3 py-2">
+            <Clock size={13} className="text-violet-500 shrink-0" />
+            <p className="text-xs text-violet-700">
+              <span className="font-semibold">Pode levar até 5 minutos</span> — quanto mais informações você preencheu, mais preciso e personalizado será o agente.
             </p>
-            <p className="text-xs text-brand/70 mt-3 animate-pulse">Isso pode levar até 3 minutos — quanto mais material, mais preciso o agente</p>
           </div>
         </div>
       ) : erroGeracao ? (
