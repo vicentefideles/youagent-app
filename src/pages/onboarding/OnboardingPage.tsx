@@ -1499,8 +1499,10 @@ function StepQualificacao({
       if (data.objecoes?.length) {
         onObjecoesChange(data.objecoes.slice(0, 5))
       }
-    } catch {
-      setErroGeracao('Não foi possível gerar sugestões. Preencha manualmente.')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error || (err as { message?: string })?.message || 'erro desconhecido'
+      console.error('[sugerir-qualificacao] erro:', msg, err)
+      setErroGeracao(`Não foi possível gerar sugestões. Erro: ${msg}`)
     } finally {
       setGerando(false)
     }
