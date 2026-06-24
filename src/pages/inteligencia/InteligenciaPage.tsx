@@ -86,7 +86,7 @@ function KpiCard({
 
 // ─── TAB PANELS ──────────────────────────────────────────────────────────────
 
-function TabTestes({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+function TabTestes({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
   const [cicloRodou, setCicloRodou] = useState(false)
   const [cicloMsg, setCicloMsg]     = useState('')
 
@@ -4226,6 +4226,7 @@ interface PadraoArg {
   argumento: string
   eficacia: number
   status: string
+  aprovado: boolean
   criado_em: string
   aprovado_em: string | null
   origem: string
