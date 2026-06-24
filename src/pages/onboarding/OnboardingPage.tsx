@@ -4190,85 +4190,51 @@ export default function OnboardingPage() {
 
         {/* Modal de boas-vindas — exibido ao clicar em "Criar novo agente" */}
         {showBemVindo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
 
-              {/* Header */}
-              <div className="px-7 pt-7 pb-5 flex items-start justify-between gap-4 border-b border-gray-100">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
-                    <Zap size={18} className="text-brand" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-semibold text-gray-900 leading-snug">Como seu agente aprende e performa</h2>
-                    <p className="mt-1 text-sm text-gray-500 leading-relaxed max-w-lg">
-                      O agente não vai para a ligação no escuro. Tudo que você preencher aqui é carregado para ele antes de cada ligação — quanto mais rico o treinamento, mais preparado ele chega.
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setShowBemVindo(false)} className="text-gray-300 hover:text-gray-500 transition-colors shrink-0 mt-0.5">
+              {/* Header com gradiente */}
+              <div className="bg-gradient-to-br from-brand to-violet-700 px-7 pt-7 pb-6 relative">
+                <button onClick={() => setShowBemVindo(false)} className="absolute top-4 right-4 text-white/50 hover:text-white/90 transition-colors">
                   <X size={18} />
                 </button>
+                <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center mb-4">
+                  <Brain size={22} className="text-white" />
+                </div>
+                <h2 className="text-lg font-bold text-white leading-snug mb-1">Seu agente aprende antes de discar</h2>
+                <p className="text-sm text-white/75 leading-relaxed">
+                  Tudo que você preencher aqui vai direto para a memória do agente — quanto mais completo, mais preciso ele será desde a primeira ligação.
+                </p>
               </div>
 
               {/* Fases */}
-              <div className="px-7 py-5 grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-2 p-4 rounded-xl bg-blue-50 border border-blue-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-brand flex items-center justify-center">
-                      <span className="text-white text-[10px] font-bold">1</span>
-                    </div>
-                    <span className="text-xs font-semibold text-brand">Treinamento inicial</span>
-                  </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">Você alimenta o agente com tudo sobre sua empresa, produto e clientes. Quanto mais detalhe, melhor o ponto de partida.</p>
-                </div>
-                <div className="flex flex-col gap-2 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                      <span className="text-white text-[10px] font-bold">2</span>
-                    </div>
-                    <span className="text-xs font-semibold text-emerald-700">Aprendizado automático</span>
-                  </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">Depois de ativo, o agente aprende com cada ligação — detecta o que funciona e melhora continuamente sem intervenção.</p>
-                </div>
-                <div className="flex flex-col gap-2 p-4 rounded-xl bg-purple-50 border border-purple-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
-                      <span className="text-white text-[10px] font-bold">3</span>
-                    </div>
-                    <span className="text-xs font-semibold text-purple-700">Enriquecimento contínuo</span>
-                  </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">Você continua alimentando o Centro de Inteligência com novos materiais. Cada adição torna o agente mais afiado.</p>
-                </div>
-              </div>
-
-              {/* Tipos de material */}
-              <div className="px-7 pb-5 flex flex-wrap gap-1.5">
+              <div className="px-6 pt-5 pb-4 space-y-3">
                 {[
-                  { icon: '📄', label: 'Apresentações e ebooks' },
-                  { icon: '🎙️', label: 'Ligações de vendedores humanos' },
-                  { icon: '💬', label: 'Objeções já mapeadas' },
-                  { icon: '🏆', label: 'Cases e diferenciais' },
-                ].map(({ icon, label }) => (
-                  <span key={label} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-1 rounded-full">
-                    <span>{icon}</span> {label}
-                  </span>
+                  {
+                    num: '1', color: 'bg-brand/10 text-brand', title: 'Treinamento inicial',
+                    desc: 'Você preenche empresa, produto, ICP, scripts e objeções — 14 etapas que formam a base do agente.',
+                  },
+                  {
+                    num: '2', color: 'bg-emerald-50 text-emerald-600', title: 'Aprendizado após cada ligação',
+                    desc: 'O agente detecta o que funciona e melhora automaticamente. Cada transferência vira inteligência.',
+                  },
+                  {
+                    num: '3', color: 'bg-violet-50 text-violet-600', title: 'Enriquecimento contínuo',
+                    desc: 'Adicione PDFs, ebooks e ligações no Centro de Inteligência — cada material torna o agente mais persuasivo.',
+                  },
+                ].map(({ num, color, title, desc }) => (
+                  <div key={num} className="flex items-start gap-3">
+                    <div className={`w-7 h-7 rounded-lg ${color} flex items-center justify-center shrink-0 font-bold text-xs mt-0.5`}>{num}</div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{desc}</p>
+                    </div>
+                  </div>
                 ))}
               </div>
 
-              {/* Aviso CI */}
-              <div className="mx-7 mb-5 flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <Brain size={15} className="text-brand shrink-0 mt-0.5" />
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  <span className="font-semibold text-gray-800">Após ativar:</span> acesse o <span className="text-brand font-medium">Centro de Inteligência</span> para adicionar PDFs, vídeos, áudios e inteligência de mercado — cada material adicionado torna o agente mais persuasivo.
-                </p>
-              </div>
-
               {/* Rodapé */}
-              <div className="px-7 py-5 border-t border-gray-100 flex items-center justify-between gap-4">
-                <p className="text-xs text-gray-400 leading-relaxed max-w-xs">
-                  Ao clicar em <span className="font-medium text-gray-500">Entendi</span>, você confirma que compreendeu como funciona o treinamento do agente. Esse aceite é registrado com data e hora.
-                </p>
+              <div className="px-6 pb-6 pt-2 border-t border-gray-100 mt-1">
                 <button
                   onClick={() => {
                     localStorage.setItem('etz_aceite_treinamento', JSON.stringify({
@@ -4282,11 +4248,14 @@ export default function OnboardingPage() {
                     setActivated(false)
                     setTela('wizard')
                   }}
-                  className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand-600 transition-colors shadow-sm"
+                  className="w-full mt-4 inline-flex items-center justify-center gap-2 px-5 py-3 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand/90 transition-colors shadow-sm"
                 >
                   Entendi, vamos começar
                   <ChevronRight size={15} />
                 </button>
+                <p className="text-[10px] text-gray-400 text-center mt-3 leading-relaxed">
+                  Ao continuar você confirma que compreendeu como funciona o treinamento. Aceite registrado com data e hora.
+                </p>
               </div>
 
             </div>
