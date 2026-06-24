@@ -21,6 +21,7 @@ import {
   Brain,
   Search,
   AlertTriangle,
+  AlertCircle,
   Play,
   CalendarCheck,
 
@@ -1676,9 +1677,13 @@ function StepGatilhosFechamento({ form, onChange }: {
         segmento: form['empresa-segmento'],
         descricao_empresa: form['empresa-descricao'],
         diferenciais: form['empresa-diferenciais'],
+        objecoes_comuns: form['empresa-objecoes-comuns'],
+        contexto_mercado: form['empresa-contexto-mercado'],
         resultados_clientes: form['prod-resultados'],
+        concorrentes: form['prod-concorrentes'],
         descricao_produto: form['prod-descricao'],
-        // Etapa 3 — qualificação
+        info_adicional: form['prod-info-extra'],
+        // Etapa 3 — qualificação + objeções
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
         // Etapa 4 — sinais de compra
         sinais_compra: form['gatilhos-customizados'],
@@ -2205,9 +2210,12 @@ function StepCenarioDores({ form, onChange }: {
         segmento: form['empresa-segmento'],
         descricao_empresa: form['empresa-descricao'],
         diferenciais: form['empresa-diferenciais'],
+        objecoes_comuns: form['empresa-objecoes-comuns'],
+        contexto_mercado: form['empresa-contexto-mercado'],
         resultados_clientes: form['prod-resultados'],
         concorrentes: form['prod-concorrentes'],
         descricao_produto: form['prod-descricao'],
+        info_adicional: form['prod-info-extra'],
         cargos_alvo: form['icp-cargo-tipo'],
         sinais: form['gatilhos-customizados'],
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean).join(' | '),
@@ -2617,11 +2625,125 @@ function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof Fo
 }
 
 
-function StepCalibracaoVoz({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+function StepCalibracaoVoz({
+  form, onChange, objecoes, perguntas,
+}: {
+  form: FormData
+  onChange: (k: keyof FormData, v: string) => void
+  objecoes: Objecao[]
+  perguntas: string[]
+}) {
+  const [gerando, setGerando] = useState(false)
+  const [erroGeracao, setErroGeracao] = useState<string | null>(null)
+  const jaGerou = form['voz-pronuncia'] || form['voz-termos-tecnicos'] || form['voz-ritmo-tom'] || form['voz-palavras-proibidas']
+
+  async function sugerir() {
+    setGerando(true)
+    setErroGeracao(null)
+    try {
+      const objecoesTexto = objecoes
+        .filter(o => o.objecao)
+        .map(o => `• ${o.objecao}${o.rebuttal ? ` → ${o.rebuttal}` : ''}`)
+        .join('\n')
+
+      const res = await claudeApi.sugerirCalibracaoVoz({
+        // Etapa 1
+        objetivo: form['objetivo'],
+        nome_agente: form['nome-agente'],
+        // Etapa 2 — Empresa & Produto
+        empresa: form['empresa-nome'],
+        segmento: form['empresa-segmento'],
+        porte: form['empresa-porte'],
+        descricao_empresa: form['empresa-descricao'],
+        diferenciais: form['empresa-diferenciais'],
+        objecoes_comuns: form['empresa-objecoes-comuns'],
+        contexto_mercado: form['empresa-contexto-mercado'],
+        produto: form['prod-nome'],
+        descricao_produto: form['prod-descricao'],
+        resultados_clientes: form['prod-resultados'],
+        concorrentes: form['prod-concorrentes'],
+        info_adicional: form['prod-info-extra'],
+        materiais_conteudo: form['materiais-conteudo'],
+        // Etapa 3 — Qualificação & Objeções
+        perguntas_qualificacao: perguntas.filter(Boolean).join('\n'),
+        objecoes_texto: objecoesTexto,
+        // Etapa 4 — Sinais de compra
+        sinais_compra: form['gatilhos-customizados'],
+        // Etapa 5 — ICP + Cenário & Dores
+        icp_cargo: form['icp-cargo-tipo'],
+        icp_porte: form['icp-porte-alvo'],
+        icp_segmento: form['icp-segmento-alvo'],
+        cenario_dores: form['cenario-dores'],
+        // Etapa 6 — Gatilhos de fechamento
+        gatilhos_fechamento: form['gatilhos-fechamento'],
+        // Etapa 10 — Voz e Tom
+        voz: form['voz'],
+        tom: form['tom'],
+        // Etapa 8 — Script de abertura
+        script_abertura: form['script-abertura'],
+        // Etapa 9 — Scripts (ligações reais)
+        script_ligacao: form['script-ligacao'],
+        // Etapa 7 — Metodologia
+        metodologia: form['metodologia'],
+        // Etapas 11/12 — Agendamento
+        agendamento_estrategia: form['agendamento-estrategia'],
+        agendamento_tom: form['agendamento-tom'],
+        agendamento_duracao: form['agendamento-duracao'],
+        agendamento_recusa: form['agendamento-recusa'],
+      })
+      const data = res.data as { pronuncia?: string; termos_tecnicos?: string; ritmo_tom?: string; palavras_proibidas?: string }
+      if (data.pronuncia) onChange('voz-pronuncia', data.pronuncia)
+      if (data.termos_tecnicos) onChange('voz-termos-tecnicos', data.termos_tecnicos)
+      if (data.ritmo_tom) onChange('voz-ritmo-tom', data.ritmo_tom)
+      if (data.palavras_proibidas) onChange('voz-palavras-proibidas', data.palavras_proibidas)
+    } catch {
+      setErroGeracao('Não foi possível gerar as sugestões. Tente novamente.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
   const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 bg-white'
   const textareaCls = inputCls + ' resize-none'
   return (
     <div className="space-y-5">
+      {/* Banner Gerar com IA */}
+      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+            <Brain size={16} className="text-violet-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-violet-900 mb-0.5">Calibração inteligente com IA</p>
+            <p className="text-xs text-violet-700 leading-relaxed">A IA vai analisar tudo que foi preenchido nas etapas anteriores — empresa, produto, ICP, scripts, roteiros e metodologia — para gerar a calibração ideal para o seu agente.</p>
+          </div>
+          <button
+            type="button"
+            onClick={sugerir}
+            disabled={gerando}
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            {gerando ? (
+              <>
+                <Loader2 size={13} className="animate-spin" />
+                Gerando...
+              </>
+            ) : (
+              <>
+                <Brain size={13} />
+                {jaGerou ? 'Regerar com IA' : 'Gerar com IA'}
+              </>
+            )}
+          </button>
+        </div>
+        {erroGeracao && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <AlertCircle size={13} className="shrink-0" />
+            {erroGeracao}
+          </div>
+        )}
+      </div>
+
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
@@ -4461,7 +4583,7 @@ export default function OnboardingPage() {
           )}
           {step === 10 && <StepVozTom form={form} onChange={onChange} />}
           {step === 11 && <StepAgendamento form={form} onChange={onChange} />}
-          {step === 12 && <StepCalibracaoVoz form={form} onChange={onChange} />}
+          {step === 12 && <StepCalibracaoVoz form={form} onChange={onChange} objecoes={objecoes} perguntas={perguntas} />}
           {step === 13 && (
             <Step4
               materiais={materiais}
