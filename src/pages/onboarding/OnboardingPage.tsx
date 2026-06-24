@@ -3316,7 +3316,7 @@ function Step4({
             <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
               A IA está lendo todas as {STEPS.length + 1} etapas e construindo as instruções perfeitas para o seu agente.
             </p>
-            <p className="text-xs text-brand/70 mt-3 animate-pulse">Isso pode levar até 90 segundos</p>
+            <p className="text-xs text-brand/70 mt-3 animate-pulse">Isso pode levar até 3 minutos — quanto mais material, mais preciso o agente</p>
           </div>
         </div>
       ) : erroGeracao ? (
