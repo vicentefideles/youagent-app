@@ -321,7 +321,7 @@ export const claudeApi = {
   gerarPromptStatus: (jobId: string) =>
     api.get(`/claude/gerar-prompt/job/${jobId}`, { timeout: 10000 }),
   sugerirQualificacao: (data: Record<string, unknown>) =>
-    api.post('/claude/sugerir-qualificacao', data, { timeout: 90000 }),
+    api.post('/claude/sugerir-qualificacao', data, { timeout: 180000 }),
   sugerirCenarioDores: (data: Record<string, unknown>) =>
     api.post('/claude/sugerir-cenario-dores', data, { timeout: 90000 }),
   sugerirGatilhosFechamento: (data: Record<string, unknown>) =>
