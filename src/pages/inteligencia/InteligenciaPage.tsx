@@ -86,9 +86,14 @@ function KpiCard({
 
 // ─── TAB PANELS ──────────────────────────────────────────────────────────────
 
-function TabTestes() {
+function TabTestes({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const [cicloRodou, setCicloRodou] = useState(false)
   const [cicloMsg, setCicloMsg]     = useState('')
+
+  const { data: agentes = [] } = useQuery({
+    queryKey: ['agentes-testes-ci'],
+    queryFn: () => agentesApi.list().then(r => r.data as any[]).catch(() => []),
+  })
 
   const { data: testesData, isLoading, refetch } = useQuery({
     queryKey: ['inteligencia-testes'],
@@ -125,6 +130,27 @@ function TabTestes() {
 
   return (
     <div className="space-y-4">
+
+      {/* Card: validar no simulador antes de ligar para clientes reais */}
+      {(agentes as any[]).filter((a: any) => a.ativo).length > 0 && (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <FlaskConical size={16} className="text-violet-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-violet-900 mb-0.5">Valide o agente antes de ligar para clientes reais</p>
+            <p className="text-xs text-violet-700 mb-2">
+              Uma simulação confirma que o nome da empresa, produto e dados reais aparecem no diálogo — antes de qualquer ligação real.
+            </p>
+            <button
+              onClick={() => onNavigate?.('simulador')}
+              className="text-xs bg-violet-600 text-white px-3 py-1.5 rounded-lg hover:bg-violet-700 transition-colors font-medium"
+            >
+              Abrir Simulador →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Explicação para o cliente ─────────────────────────────────────── */}
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
@@ -4248,6 +4274,8 @@ function TabPadroes() {
   })
   // Padrões = comportamentais (sequências, timing, conduta detectada nas ligações)
   const padroes = todosArgs.filter(p => p.tipo === 'padrao_comportamental')
+  const sequenciasObjecao = todosArgs.filter(p => p.tipo === 'sequencia_objecao')
+  const sequenciasPendentes = sequenciasObjecao.filter(p => !p.aprovado)
   const { data: ligsRaw = [] } = useQuery({
     queryKey: ['padroes-ligs'],
     queryFn: () => api.get('https://app.etztech.com/api/v1/ligacoes').then(r => r.data as any[]).catch(() => []),
@@ -4496,6 +4524,47 @@ function TabPadroes() {
           ))}
         </div>
       </div>
+
+      {/* ── Sequências de Objeção Detectadas ─────────────────────────────── */}
+      {sequenciasObjecao.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <GitBranch size={16} className="text-orange-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Sequências de Objeção Detectadas</h3>
+            {sequenciasPendentes.length > 0 && (
+              <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                {sequenciasPendentes.length} pendente{sequenciasPendentes.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            O sistema detectou que prospects costumam dar uma segunda objeção após a sua resposta inicial. Aprove para incluir automaticamente no prompt na próxima regeneração via CI.
+          </p>
+          <div className="space-y-2">
+            {sequenciasObjecao.map(s => (
+              <div key={s.id} className="border border-gray-100 rounded-lg p-3">
+                <p className="text-xs font-medium text-gray-800 mb-1">{s.gatilho}</p>
+                <p className="text-xs text-gray-600 mb-2">Sugestão: <em>"{s.frase}"</em></p>
+                {!s.aprovado && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => { try { await inteligenciaApi.aprovarCross(s.id); refetch() } catch {} }}
+                      className="text-[10px] bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 transition-colors"
+                    >Aprovar</button>
+                    <button
+                      onClick={async () => { try { await inteligenciaApi.rejeitarCross(s.id); refetch() } catch {} }}
+                      className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200 transition-colors"
+                    >Rejeitar</button>
+                  </div>
+                )}
+                {s.aprovado && (
+                  <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">✓ Aprovado — incluído na próxima regeneração</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -6669,7 +6738,7 @@ export default function InteligenciaPage() {
   const scoreSaude: number | null = saudeData?.score ?? null
 
   const tabContent: Record<TabId, React.ReactNode> = {
-    testes: <TabTestes />,
+    testes: <TabTestes onNavigate={setActiveTab} />,
     qualidade: <TabQualidade />,
     coletiva: <TabColetiva />,
     horarios: <TabHorarios />,
