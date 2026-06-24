@@ -1518,7 +1518,7 @@ function StepQualificacao({
     onObjecoesChange(objecoes.map((o, idx) => idx === i ? { ...o, [field]: value } : o))
   }
   function addObjecao() {
-    onObjecoesChange([...objecoes, { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' }])
+    if (objecoes.length < 10) onObjecoesChange([...objecoes, { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' }])
   }
   function removeObjecao(i: number) {
     if (objecoes.length > 1) onObjecoesChange(objecoes.filter((_, idx) => idx !== i))
@@ -1604,10 +1604,12 @@ function StepQualificacao({
             <p className="text-sm font-medium text-gray-700">Objeções e respostas</p>
             <p className="text-xs text-gray-400 mt-0.5">Como o agente responde quando o contato hesitar.</p>
           </div>
-          <button type="button" onClick={addObjecao}
-            className="text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
-            + Adicionar objeção
-          </button>
+          {objecoes.length < 10 && (
+            <button type="button" onClick={addObjecao}
+              className="text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
+              + Adicionar objeção
+            </button>
+          )}
         </div>
         <div className="flex flex-col gap-3">
           {objecoes.map((obj, i) => (
