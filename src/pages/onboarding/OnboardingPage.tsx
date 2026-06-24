@@ -2362,11 +2362,12 @@ interface LigacaoRef {
 }
 
 function LigacoesSection({
-  tipo, items, onChange,
+  tipo, items, onChange, form,
 }: {
   tipo: 'sucesso' | 'insucesso'
   items: LigacaoRef[]
   onChange: (items: LigacaoRef[]) => void
+  form: Record<string, string>
 }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([])
   const itemsRef = React.useRef(items)
@@ -2391,7 +2392,13 @@ function LigacoesSection({
   async function handleFileSelect(i: number, file: File) {
     update(i, { file, transcrevendo: true, erro: null, transcricao: '', resumo: null })
     try {
-      const { data } = await agentesApi.transcreverLigacao(file, tipo, items[i].observacao)
+      const ctx = {
+        empresa:   form['empresa-nome']     || '',
+        segmento:  form['empresa-segmento'] || '',
+        produto:   form['prod-nome']        || '',
+        icp_cargo: form['icp-cargo-tipo']   || '',
+      }
+      const { data } = await agentesApi.transcreverLigacao(file, tipo, items[i].observacao, ctx)
       update(i, { transcrevendo: false, transcricao: data.transcricao || '', resumo: data.resumo || null })
     } catch {
       update(i, { transcrevendo: false, erro: 'Não foi possível transcrever o áudio. Verifique o formato e tente novamente.', file: null })
@@ -2459,8 +2466,8 @@ function LigacoesSection({
                 <div className="flex items-center gap-3 bg-brand-50 border border-brand-200 rounded-lg px-4 py-3">
                   <div className={`w-4 h-4 border-2 ${colors.spinnerBorder} border-t-transparent rounded-full animate-spin shrink-0`} />
                   <div>
-                    <p className="text-sm font-medium text-brand-700">Transcrevendo com IA...</p>
-                    <p className="text-xs text-brand-500">Whisper está convertendo o áudio em texto e extraindo aprendizados</p>
+                    <p className="text-sm font-medium text-brand-700">Analisando ligação real...</p>
+                    <p className="text-xs text-brand-500">Whisper transcreve o áudio · IA extrai os padrões específicos para o seu mercado</p>
                   </div>
                 </div>
               )}
@@ -2483,7 +2490,9 @@ function LigacoesSection({
                     <div className="px-3 py-2.5 flex items-start gap-2">
                       <Brain size={13} className={`shrink-0 mt-0.5 ${isSucesso ? 'text-emerald-600' : 'text-amber-600'}`} />
                       <div className="flex-1">
-                        <p className={`text-xs font-semibold mb-1 ${colors.cardText}`}>Aprendizados extraídos pela IA:</p>
+                        <p className={`text-xs font-semibold mb-1 ${colors.cardText}`}>
+                          Padrões extraídos — injetados no prompt final do agente:
+                        </p>
                         <p className={`text-xs leading-relaxed ${colors.cardText}`}>{m.resumo}</p>
                       </div>
                     </div>
@@ -2540,40 +2549,60 @@ function LigacoesSection({
 function StepLigacoesReferencia({
   ligacoesSucesso, onSucessoChange,
   ligacoesInsucesso, onInsucessoChange,
+  form,
 }: {
   ligacoesSucesso: LigacaoRef[]; onSucessoChange: (l: LigacaoRef[]) => void
   ligacoesInsucesso: LigacaoRef[]; onInsucessoChange: (l: LigacaoRef[]) => void
+  form: Record<string, string>
 }) {
+  const totalCarregadas = [
+    ...ligacoesSucesso.filter(l => l.resumo),
+    ...ligacoesInsucesso.filter(l => l.resumo),
+  ].length
+
   return (
     <div className="flex flex-col gap-7">
-      {/* Banner contextual */}
-      <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-4 flex items-start gap-3">
-        <Brain size={18} className="text-brand-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-brand-800 mb-1">Por que ligações reais fazem diferença?</p>
-          <p className="text-xs text-brand-700 leading-relaxed">
-            Gravações humanas são o melhor material de treinamento. O sistema transcreve cada ligação com IA, extrai os argumentos, o timing e o vocabulário que funciona para o seu público — e injeta tudo no comportamento do agente.
-          </p>
+      {/* Banner principal */}
+      <div className="bg-gradient-to-br from-violet-50 to-brand-50 border border-violet-200 rounded-xl px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0 mt-0.5">
+            <Brain size={16} className="text-violet-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-violet-900 mb-1">Ligações reais — o dado que nenhuma IA consegue fabricar</p>
+            <p className="text-xs text-violet-700 leading-relaxed">
+              Cada gravação é transcrita pelo Whisper e analisada por IA com o contexto da sua empresa, produto e ICP. Os padrões reais — o vocabulário que converte, o ritmo, as objeções deste mercado — são injetados diretamente no prompt final. Seu agente nasce sabendo o que funciona aqui, não o que funciona em geral.
+            </p>
+          </div>
         </div>
+        {totalCarregadas > 0 && (
+          <div className="mt-3 pt-3 border-t border-violet-200 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-xs font-semibold text-violet-800">
+              {totalCarregadas} ligação{totalCarregadas > 1 ? 'ões' : ''} analisada{totalCarregadas > 1 ? 's' : ''} — padrões reais já incorporados ao agente
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Sucesso */}
-      <LigacoesSection tipo="sucesso" items={ligacoesSucesso} onChange={onSucessoChange} />
+      <LigacoesSection tipo="sucesso" items={ligacoesSucesso} onChange={onSucessoChange} form={form} />
 
       {/* Divider */}
       <div className="border-t border-gray-100" />
 
       {/* Insucesso */}
-      <LigacoesSection tipo="insucesso" items={ligacoesInsucesso} onChange={onInsucessoChange} />
+      <LigacoesSection tipo="insucesso" items={ligacoesInsucesso} onChange={onInsucessoChange} form={form} />
 
       {/* Como o sistema usa */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5">
         <p className="text-xs font-semibold text-gray-700 mb-2.5">Como o agente usa essas gravações</p>
         <ul className="space-y-1.5">
           {[
-            { icon: <Check size={11} className="text-emerald-500 shrink-0 mt-0.5" />, text: 'Gravações de sucesso: replica o flow, o tom e os argumentos que converteram' },
-            { icon: <X size={11} className="text-amber-500 shrink-0 mt-0.5" />, text: 'Gravações de referência: evita os padrões que não converteram e aprende a contornar objeções' },
-            { icon: <Check size={11} className="text-brand-500 shrink-0 mt-0.5" />, text: 'Todas as transcrições ficam no Centro de Inteligência para ajuste fino contínuo' },
+            { icon: <Check size={11} className="text-emerald-500 shrink-0 mt-0.5" />, text: 'Ligações de sucesso: o agente replica o flow, o tom, o vocabulário e os argumentos que levaram ao sim' },
+            { icon: <Check size={11} className="text-amber-500 shrink-0 mt-0.5" />, text: 'Ligações de referência: o agente aprende quais padrões geram resistência e como contornar objeções reais' },
+            { icon: <Check size={11} className="text-violet-500 shrink-0 mt-0.5" />, text: 'A IA analisa com o contexto da sua empresa — os aprendizados são específicos para o seu mercado, não genéricos' },
+            { icon: <Check size={11} className="text-brand-500 shrink-0 mt-0.5" />, text: 'Todas as transcrições ficam no Centro de Inteligência para ajuste fino contínuo após o agente entrar em produção' },
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
               {item.icon} {item.text}
@@ -4515,6 +4544,7 @@ export default function OnboardingPage() {
             <StepLigacoesReferencia
               ligacoesSucesso={ligSucesso} onSucessoChange={setLigSucesso}
               ligacoesInsucesso={ligInsucesso} onInsucessoChange={setLigInsucesso}
+              form={form}
             />
           )}
           {step === 10 && <StepVozTom form={form} onChange={onChange} />}

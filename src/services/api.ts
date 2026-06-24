@@ -63,11 +63,20 @@ export const agentesApi = {
   regenerarPrompt: (id: string) => api.post(`/agentes/${id}/regenerar-prompt`, {}),
   regenerarPromptStatus: (jobId: string) => api.get(`/claude/gerar-prompt/job/${jobId}`, { timeout: 10000 }),
   promptStatus: (id: string) => api.get(`/agentes/${id}/prompt-status`),
-  transcreverLigacao: (file: File, resultado: 'sucesso' | 'insucesso', observacao?: string) => {
+  transcreverLigacao: (
+    file: File,
+    resultado: 'sucesso' | 'insucesso',
+    observacao?: string,
+    ctx?: { empresa?: string; segmento?: string; produto?: string; icp_cargo?: string }
+  ) => {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('resultado', resultado)
     if (observacao) fd.append('observacao', observacao)
+    if (ctx?.empresa)   fd.append('empresa',   ctx.empresa)
+    if (ctx?.segmento)  fd.append('segmento',  ctx.segmento)
+    if (ctx?.produto)   fd.append('produto',   ctx.produto)
+    if (ctx?.icp_cargo) fd.append('icp_cargo', ctx.icp_cargo)
     return api.post('/agentes/transcrever-ligacao', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 120000,
