@@ -87,6 +87,10 @@ interface FormData {
   'prompt_gerado': string
   'cenario-dores': string
   'gatilhos-fechamento': string
+  'voz-pronuncia': string
+  'voz-termos-tecnicos': string
+  'voz-ritmo-tom': string
+  'voz-palavras-proibidas': string
 }
 
 interface Objecao {
@@ -141,6 +145,10 @@ const INITIAL_FORM: FormData = {
   'prompt_gerado': '',
   'cenario-dores': '',
   'gatilhos-fechamento': '',
+  'voz-pronuncia': '',
+  'voz-termos-tecnicos': '',
+  'voz-ritmo-tom': '',
+  'voz-palavras-proibidas': '',
 }
 
 const INITIAL_OBJECOES: Objecao[] = [
@@ -254,6 +262,7 @@ const STEPS = [
   { label: 'Ligações de Referência', icon: Mic },
   { label: 'Voz e Tom', icon: Mic },
   { label: 'Agendamento', icon: CalendarCheck },
+  { label: 'Calibração de Voz', icon: Mic },
   { label: 'Revisão & Ativação', icon: Zap },
 ]
 
@@ -2569,6 +2578,48 @@ function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof Fo
 }
 
 
+function StepCalibracaoVoz({ form, onChange }: { form: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 bg-white'
+  const textareaCls = inputCls + ' resize-none'
+  return (
+    <div className="space-y-5">
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
+            <Mic size={18} className="text-violet-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Calibração de Voz</h3>
+            <p className="text-xs text-gray-500">Como o agente deve soar ao falar com seus prospects</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Pronúncia do nome da empresa / produto <span className="text-gray-400 font-normal">(opcional)</span></label>
+            <input className={inputCls} value={form['voz-pronuncia']} onChange={e => onChange('voz-pronuncia', e.target.value)} placeholder='Ex: "ETZ se pronuncia É-TÊ-ZÊ" ou "Cimed = CI-MED, não SIMED"' />
+            <p className="text-[10px] text-gray-400 mt-1">Se o agente vai pronunciar o nome errado, corrija aqui.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Termos técnicos do seu segmento <span className="text-gray-400 font-normal">(opcional)</span></label>
+            <textarea className={textareaCls} rows={3} value={form['voz-termos-tecnicos']} onChange={e => onChange('voz-termos-tecnicos', e.target.value)} placeholder={'Ex: CRM, NPS, churn, SLA — liste os termos que o agente vai usar'} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Ritmo e tom ideal para seu público <span className="text-gray-400 font-normal">(opcional)</span></label>
+            <textarea className={textareaCls} rows={2} value={form['voz-ritmo-tom']} onChange={e => onChange('voz-ritmo-tom', e.target.value)} placeholder={'Ex: "Público conservador — falar devagar e formal" ou "Público jovem — tom descontraído"'} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Palavras que o agente NUNCA deve usar <span className="text-gray-400 font-normal">(opcional)</span></label>
+            <textarea className={textareaCls} rows={2} value={form['voz-palavras-proibidas']} onChange={e => onChange('voz-palavras-proibidas', e.target.value)} placeholder={'Ex: "parceiro", "solução", "inovador" — expressões artificiais para o seu mercado'} />
+          </div>
+        </div>
+      </div>
+      <div className="bg-violet-50 border border-violet-100 rounded-xl p-4">
+        <p className="text-xs text-violet-700"><strong>Esses dados enriquecem a seção VOZ E DICÇÃO do prompt final.</strong> Quanto mais específico, mais natural o agente vai soar.</p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Step Agendamento ─────────────────────────────────────────────────────────
 function StepAgendamento({ form, onChange }: {
   form: FormData
@@ -2747,6 +2798,10 @@ function Step4({
         agendamento_apresentar_vendedor: form['agendamento-apresentar-vendedor'],
         agendamento_recusa: form['agendamento-recusa'],
         agendamento_urgencia: form['agendamento-urgencia'],
+        voz_pronuncia: form['voz-pronuncia'],
+        voz_termos_tecnicos: form['voz-termos-tecnicos'],
+        voz_ritmo_tom: form['voz-ritmo-tom'],
+        voz_palavras_proibidas: form['voz-palavras-proibidas'],
       }
       const initRes = await claudeApi.gerarPrompt(payload)
       const jobId = (initRes.data as { jobId?: string }).jobId
@@ -2973,6 +3028,35 @@ function Step4({
           Revise, edite se necessário, e ative.
         </p>
       </div>
+
+      {/* Aviso de qualidade */}
+      {!gerando && !form['prompt_gerado'] && (() => {
+        const avisos: string[] = []
+        const resultados = form['prod-resultados'] || ''
+        if (!resultados || !/\d/.test(resultados)) avisos.push('Adicione pelo menos 1 resultado com número ou percentual (etapa 2)')
+        const objecoesValidas = objecoes.filter(o => o.objecao && o.rebuttal)
+        if (objecoesValidas.length < 2) avisos.push(`Complete pelo menos 2 objeções com resposta — você tem ${objecoesValidas.length} (etapa 3)`)
+        const sinais = form['gatilhos-customizados'] || ''
+        const qtdSinais = sinais.split('\n').filter((s: string) => s.trim()).length
+        if (qtdSinais < 3) avisos.push(`Adicione pelo menos 3 sinais de compra — você tem ${qtdSinais} (etapa 4)`)
+        if (avisos.length === 0) return null
+        return (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={14} className="text-amber-600" />
+              <p className="text-xs font-semibold text-amber-800">Para um prompt mais preciso, considere completar:</p>
+            </div>
+            <ul className="space-y-1">
+              {avisos.map((a: string, i: number) => (
+                <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
+                  <span className="mt-0.5 flex-shrink-0">•</span><span>{a}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[10px] text-amber-600 mt-2">Você pode gerar mesmo assim — é uma sugestão, não um bloqueio.</p>
+          </div>
+        )
+      })()}
 
       {/* Área do prompt */}
       {gerando ? (
@@ -3437,6 +3521,7 @@ function AgenteCard({
   onRegenerarPrompt,
   duplicating,
   deleting,
+  precisaAtualizar,
 }: {
   agente: AgenteMock
   onHorarios: () => void
@@ -3447,6 +3532,7 @@ function AgenteCard({
   onRegenerarPrompt: () => void
   duplicating?: boolean
   deleting?: boolean
+  precisaAtualizar?: boolean
 }) {
   const emTreinamento = agente.status === 'em_treinamento' || agente.status === 'inativo'
   const vozNome = VOZES_TELNYX.find(v => v.id === agente.voz)?.nome
@@ -3518,10 +3604,15 @@ function AgenteCard({
             className="flex items-center gap-1 text-xs font-medium p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 disabled:opacity-40">
             {duplicating ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />}
           </button>
-          <button onClick={onRegenerarPrompt} title="Atualizar prompt com aprendizados do CI"
-            className="p-1.5 rounded-lg hover:bg-brand/10 text-brand/60 hover:text-brand transition-colors">
-            <RefreshCw size={13} />
-          </button>
+          <div className="relative">
+            <button onClick={onRegenerarPrompt} title={precisaAtualizar ? "20+ ligações novas — atualizar prompt com CI" : "Atualizar prompt com aprendizados do CI"}
+              className={`p-1.5 rounded-lg transition-colors ${precisaAtualizar ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'hover:bg-brand/10 text-brand/60 hover:text-brand'}`}>
+              <RefreshCw size={13} />
+            </button>
+            {precisaAtualizar && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+            )}
+          </div>
           <button onClick={onDeletar} disabled={deleting} title="Deletar"
             className="flex items-center gap-1 text-xs font-medium p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-400 hover:text-red-500 disabled:opacity-40">
             {deleting ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
@@ -3567,6 +3658,7 @@ export default function OnboardingPage() {
   const [sincronizando, setSincronizando] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [promptStatuses, setPromptStatuses] = useState<Record<string, boolean>>({})
   const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
@@ -3613,8 +3705,25 @@ export default function OnboardingPage() {
 
   const { data: agentesRaw = [], refetch: refetchAgentes } = useQuery({
     queryKey: ['agentes'],
-    queryFn: () => agentesApi.list().then(r => r.data as Record<string, unknown>[]),
+    queryFn: () => agentesApi.list().then(r => {
+      const lista = r.data as Record<string, unknown>[]
+      carregarPromptStatuses(lista)
+      return lista
+    }),
   })
+
+  async function carregarPromptStatuses(lista: any[]) {
+    const statuses: Record<string, boolean> = {}
+    await Promise.allSettled(
+      lista.filter(a => a.prompt_gerado).map(async (a: any) => {
+        try {
+          const { data } = await agentesApi.promptStatus(a.id)
+          statuses[a.id] = (data as any).precisa_atualizar ?? false
+        } catch { statuses[a.id] = false }
+      })
+    )
+    setPromptStatuses(statuses)
+  }
 
   const agentes: AgenteMock[] = agentesRaw.map((a, i) => normalizeAgente(a, i))
 
@@ -3934,6 +4043,7 @@ export default function OnboardingPage() {
     'Ligações de Referência',
     'Voz e tom do agente',
     'Estratégia de Agendamento',
+    'Calibração de Voz',
     'Revisão & Ativação',
   ]
 
@@ -4187,6 +4297,7 @@ export default function OnboardingPage() {
                     onRegenerarPrompt={() => handleRegenerarPrompt(agente.id)}
                     duplicating={duplicatingId === agente.id}
                     deleting={deletingId === agente.id}
+                    precisaAtualizar={promptStatuses[agente.id] ?? false}
                   />
                 ))}
               </div>
@@ -4289,7 +4400,8 @@ export default function OnboardingPage() {
           )}
           {step === 10 && <StepVozTom form={form} onChange={onChange} />}
           {step === 11 && <StepAgendamento form={form} onChange={onChange} />}
-          {step === 12 && (
+          {step === 12 && <StepCalibracaoVoz form={form} onChange={onChange} />}
+          {step === 13 && (
             <Step4
               form={form}
               onChange={onChange}
@@ -4311,7 +4423,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {!(step === 12 && activated) && (
+          {!(step === 13 && activated) && (
             <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={step === 0 ? () => setTela('grid') : prev}
