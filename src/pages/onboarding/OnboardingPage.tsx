@@ -370,7 +370,8 @@ const textareaCls =
 interface Material {
   file: File | null
   tipo: string
-  texto: string
+  texto: string       // resumo Haiku (editável — alimenta etapas 3-12)
+  textoRaw?: string   // texto bruto completo (alimenta gerar-prompt)
   analise: string | null
   extraindo: boolean
   erro: string | null
@@ -436,9 +437,10 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
         const data = await pollJobResult(initData.jobId, (elapsed) => {
           updateItem(i, { extraindo: true, analise: `Lendo PDF com IA... ${elapsed}s` })
         })
-        const textoParaUsar = data.texto_filtrado || data.texto
+        // resumo → textarea editável (etapas 3-12)
+        // texto completo → textoRaw oculto (gerar-prompt)
         const next = materiais.map((m, idx) =>
-          idx === i ? { ...m, file, extraindo: false, texto: textoParaUsar, analise: data.resumo || null, erro: null } : m
+          idx === i ? { ...m, file, extraindo: false, texto: data.resumo || data.texto, textoRaw: data.texto, analise: data.resumo || null, erro: null } : m
         )
         onMateriaisChange(next)
         syncConteudo(next)
@@ -446,12 +448,11 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
       }
 
       // Resposta direta (PDF com texto nativo ou Word/TXT)
-      // texto completo vai para m.texto (etapa 13 recebe tudo)
-      // resumo Haiku vai só para analise (card UI e etapas 3-6 via sugestões IA)
+      // resumo Haiku → textarea editável (etapas 3-12)
+      // texto bruto → textoRaw oculto (gerar-prompt recebe tudo)
       if (initData.texto) {
-        const textoParaUsar = initData.texto
         const next = materiais.map((m, idx) =>
-          idx === i ? { ...m, file, extraindo: false, texto: textoParaUsar, analise: initData.resumo || null, erro: null } : m
+          idx === i ? { ...m, file, extraindo: false, texto: initData.resumo || initData.texto, textoRaw: initData.texto, analise: initData.resumo || null, erro: null } : m
         )
         onMateriaisChange(next)
         syncConteudo(next)
@@ -586,7 +587,7 @@ function MateriaisUpload({ materiais, onMateriaisChange, onConteudoChange }: {
 
               {/* Textarea — sempre visível */}
               <textarea
-                rows={m.file && m.texto ? 5 : 6}
+                rows={m.file && m.texto ? 12 : 6}
                 value={m.texto}
                 onChange={e => updateItem(i, { texto: e.target.value })}
                 placeholder={`Cole o conteúdo do material diretamente aqui ou envie um arquivo acima...
@@ -2731,6 +2732,7 @@ function Step4({
   modoEdicao,
   ligacoesSucesso,
   ligacoesInsucesso,
+  materiais,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
@@ -2743,6 +2745,7 @@ function Step4({
   modoEdicao: boolean
   ligacoesSucesso: LigacaoRef[]
   ligacoesInsucesso: LigacaoRef[]
+  materiais?: Material[]
 }) {
   const navigate = useNavigate()
   const [gerando, setGerando] = useState(false)
@@ -2785,7 +2788,15 @@ function Step4({
         perguntas: [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].filter(Boolean),
         objecoes_mapeadas: objecoes.filter(o => o.objecao.trim()),
         metodologia: form['metodologia'],
-        materiais_empresa: form['materiais-conteudo'],
+        materiais_empresa: (() => {
+          const partes = (materiais || []).filter(m => m.texto?.trim() || m.textoRaw?.trim()).map((m, i) => {
+            const label = m.tipo || `Material ${i + 1}`
+            const resumo = m.texto?.trim() ? `=== ${label.toUpperCase()} — RESUMO EDITADO ===\n${m.texto.trim()}` : ''
+            const raw = m.textoRaw?.trim() ? `=== ${label.toUpperCase()} — TEXTO COMPLETO ===\n${m.textoRaw.trim()}` : ''
+            return [resumo, raw].filter(Boolean).join('\n\n')
+          })
+          return partes.length > 0 ? partes.join('\n\n') : form['materiais-conteudo']
+        })(),
         script_ligacao: form['script-ligacao'],
         script_abertura: form['script-abertura'],
         voz: vozNome,
@@ -4405,6 +4416,7 @@ export default function OnboardingPage() {
           {step === 12 && <StepCalibracaoVoz form={form} onChange={onChange} />}
           {step === 13 && (
             <Step4
+              materiais={materiais}
               form={form}
               onChange={onChange}
               activated={activated}
