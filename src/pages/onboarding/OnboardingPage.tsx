@@ -1903,7 +1903,8 @@ function Step3({ form, onChange }: {
 type ScriptSlot = {
   id: string
   fileName: string | null
-  texto: string
+  texto: string       // resumo editável (aparece no textarea)
+  textoRaw?: string   // texto bruto completo (vai para o prompt final)
   analise: string | null
   extraindo: boolean
   erro: string | null
@@ -2059,12 +2060,14 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
   })
 
   // Sincroniza todos os textos dos slots para form['script-ligacao']
+  // Usa textoRaw (conteúdo bruto completo) quando disponível — caso contrário usa texto editável
   function syncForm(updatedSlots: ScriptSlot[]) {
-    const textos = updatedSlots.map((s, i) =>
-      updatedSlots.length > 1 && s.texto.trim()
-        ? `=== SCRIPT ${i + 1}${s.fileName ? ` (${s.fileName})` : ''} ===\n${s.texto.trim()}`
-        : s.texto.trim()
-    ).filter(Boolean)
+    const textos = updatedSlots.map((s, i) => {
+      const conteudo = (s.textoRaw || s.texto).trim()
+      return updatedSlots.length > 1 && conteudo
+        ? `=== SCRIPT ${i + 1}${s.fileName ? ` (${s.fileName})` : ''} ===\n${conteudo}`
+        : conteudo
+    }).filter(Boolean)
     onChange('script-ligacao', textos.join('\n\n'))
 
     // Arquivos para upload pós-ativação
@@ -2089,13 +2092,13 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
         const data = await pollJobResult(initData.jobId, (elapsed) => {
           updateSlot(id, { analise: `Lendo PDF com IA... ${elapsed}s` })
         })
-        updateSlot(id, { texto: data.texto, analise: data.resumo || null, extraindo: false })
+        updateSlot(id, { texto: data.resumo || data.texto, textoRaw: data.texto, analise: data.resumo || null, extraindo: false })
         return
       }
 
       // Resposta direta
       if (initData.texto) {
-        updateSlot(id, { texto: initData.texto, analise: initData.resumo || null, extraindo: false })
+        updateSlot(id, { texto: initData.resumo || initData.texto, textoRaw: initData.texto, analise: initData.resumo || null, extraindo: false })
       } else {
         updateSlot(id, { extraindo: false, erro: 'Não foi possível extrair texto. Verifique se é PDF, Word ou TXT válido.', fileName: null })
       }
