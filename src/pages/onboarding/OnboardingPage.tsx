@@ -2353,7 +2353,6 @@ function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: key
 
 interface LigacaoRef {
   file: File | null
-  observacao: string
   resultado: 'sucesso' | 'insucesso'
   transcricao: string
   resumo: string | null
@@ -2378,7 +2377,7 @@ function LigacoesSection({
     ? { dot: 'bg-emerald-500', label: 'text-emerald-700', dashedBorder: 'border-emerald-300', dashedHover: 'hover:border-emerald-400 hover:bg-emerald-50', uploadIcon: 'text-emerald-400', uploadText: 'text-emerald-700', uploadSub: 'text-emerald-500', cardBg: 'bg-emerald-50 border-emerald-200', cardText: 'text-emerald-800', cardSub: 'text-emerald-500', addBtn: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300', spinnerBorder: 'border-emerald-400' }
     : { dot: 'bg-amber-500', label: 'text-amber-700', dashedBorder: 'border-amber-300', dashedHover: 'hover:border-amber-400 hover:bg-amber-50', uploadIcon: 'text-amber-400', uploadText: 'text-amber-700', uploadSub: 'text-amber-500', cardBg: 'bg-amber-50 border-amber-200', cardText: 'text-amber-800', cardSub: 'text-amber-500', addBtn: 'border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300', spinnerBorder: 'border-amber-400' }
 
-  const emptyItem = (): LigacaoRef => ({ file: null, observacao: '', resultado: tipo, transcricao: '', resumo: null, transcrevendo: false, erro: null })
+  const emptyItem = (): LigacaoRef => ({ file: null, resultado: tipo, transcricao: '', resumo: null, transcrevendo: false, erro: null })
 
   function update(i: number, patch: Partial<LigacaoRef>) {
     onChange(itemsRef.current.map((m, idx) => idx === i ? { ...m, ...patch } : m))
@@ -2398,7 +2397,7 @@ function LigacoesSection({
         produto:   form['prod-nome']        || '',
         icp_cargo: form['icp-cargo-tipo']   || '',
       }
-      const { data } = await agentesApi.transcreverLigacao(file, tipo, items[i].observacao, ctx)
+      const { data } = await agentesApi.transcreverLigacao(file, tipo, undefined, ctx)
       update(i, { transcrevendo: false, transcricao: data.transcricao || '', resumo: data.resumo || null })
     } catch {
       update(i, { transcrevendo: false, erro: 'Não foi possível transcrever o áudio. Verifique o formato e tente novamente.', file: null })
@@ -2413,9 +2412,6 @@ function LigacoesSection({
     : 'Suba gravações onde o cliente recusou. O agente identifica padrões a evitar e objeções a contornar.'
   const labelGravacao = isSucesso ? 'GRAVAÇÃO DE SUCESSO' : 'GRAVAÇÃO DE REFERÊNCIA'
   const uploadLabel = isSucesso ? 'Enviar gravação — ligação que converteu' : 'Enviar gravação — ligação que não converteu'
-  const obsPlaceholder = isSucesso
-    ? 'Ex: CEO de fintech, usou pergunta sobre dor operacional'
-    : 'Ex: Prospect resistiu em pricing, não conseguimos contornar'
   const addLabel = isSucesso ? 'Adicionar outra ligação de sucesso' : 'Adicionar outra ligação de referência'
 
   return (
@@ -2527,12 +2523,6 @@ function LigacoesSection({
                 </div>
               )}
 
-              {/* Observação */}
-              <input value={m.observacao}
-                onChange={e => update(i, { observacao: e.target.value })}
-                placeholder={obsPlaceholder}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 text-gray-700 placeholder:text-gray-300 w-full"
-              />
             </div>
           </div>
         ))}
@@ -3830,8 +3820,8 @@ export default function OnboardingPage() {
   const [perguntas, setPerguntas] = useState<string[]>(['', '', ''])
   const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
-  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
-  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, observacao: '', resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -4043,7 +4033,7 @@ export default function OnboardingPage() {
           todasLig.forEach(l => {
             fdLig.append('files', l.file!)
             fdLig.append('resultados', l.resultado)
-            fdLig.append('observacoes', l.observacao || '')
+            fdLig.append('observacoes', '')
           })
           const token = localStorage.getItem('youagent_jwt')
           await fetch(
@@ -4195,8 +4185,8 @@ export default function OnboardingPage() {
     setPerguntas(['', '', ''])
     setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
     setScriptFiles([])
-    setLigSucesso([{ file: null, observacao: '', resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
-    setLigInsucesso([{ file: null, observacao: '', resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+    setLigSucesso([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+    setLigInsucesso([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
     setEditandoId(null)
     setStep(0)
     setActivated(false)
