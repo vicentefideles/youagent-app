@@ -342,7 +342,7 @@ export const claudeApi = {
   analisarLista: (data: { campanha_id?: string; segmento?: string; total_contatos?: number; amostra?: Array<{ nome?: string; empresa?: string; cargo?: string }> }) =>
     api.post('/claude/analisar-lista', data),
   gerarPrompt: (data: Record<string, unknown>) =>
-    api.post('/claude/gerar-prompt', data, { timeout: 15000 }),
+    api.post('/claude/gerar-prompt', data, { timeout: 300000 }),
   gerarPromptStatus: (jobId: string) =>
     api.get(`/claude/gerar-prompt/job/${jobId}`, { timeout: 10000 }),
   sugerirQualificacao: (data: Record<string, unknown>) =>
