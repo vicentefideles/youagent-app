@@ -2983,8 +2983,8 @@ function Step4({
         objecoes_mapeadas: objecoes.filter(o => o.objecao.trim()),
         metodologia: form['metodologia'],
         materiais_empresa: (() => {
-          const partes = (materiais || []).filter(m => m.texto?.trim()).map((m, i) => {
-            const label = m.tipo || `Material ${i + 1}`
+          const partes = (materiais || []).filter(m => m.texto?.trim()).map((m, idx) => {
+            const label = m.tipo || `Material ${idx + 1}`
             return `=== ${label.toUpperCase()} ===\n${m.texto!.trim()}`
           })
           return partes.length > 0 ? partes.join('\n\n') : form['materiais-conteudo']
