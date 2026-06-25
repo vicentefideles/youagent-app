@@ -3816,12 +3816,34 @@ export default function OnboardingPage() {
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [promptStatuses, setPromptStatuses] = useState<Record<string, boolean>>({})
-  const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
-  const [perguntas, setPerguntas] = useState<string[]>(['', '', ''])
-  const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
+  const [objecoes, setObjecoes] = useState<Objecao[]>(() => {
+    try { const s = localStorage.getItem('etz_onboarding_objecoes'); return s ? JSON.parse(s) : INITIAL_OBJECOES } catch { return INITIAL_OBJECOES }
+  })
+  const [perguntas, setPerguntas] = useState<string[]>(() => {
+    try { const s = localStorage.getItem('etz_onboarding_perguntas'); return s ? JSON.parse(s) : ['', '', ''] } catch { return ['', '', ''] }
+  })
+  const [materiais, setMateriais] = useState<Material[]>(() => {
+    try {
+      const s = localStorage.getItem('etz_onboarding_materiais')
+      if (s) return JSON.parse(s).map((m: Material) => ({ ...m, file: null, extraindo: false, erro: null }))
+    } catch {}
+    return [{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }]
+  })
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
-  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
-  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>(() => {
+    try {
+      const s = localStorage.getItem('etz_onboarding_ligsucesso')
+      if (s) return JSON.parse(s).map((l: LigacaoRef) => ({ ...l, file: null, transcrevendo: false, erro: null }))
+    } catch {}
+    return [{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }]
+  })
+  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>(() => {
+    try {
+      const s = localStorage.getItem('etz_onboarding_liginsucesso')
+      if (s) return JSON.parse(s).map((l: LigacaoRef) => ({ ...l, file: null, transcrevendo: false, erro: null }))
+    } catch {}
+    return [{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }]
+  })
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -3892,6 +3914,32 @@ export default function OnboardingPage() {
   }
 
   const agentes: AgenteMock[] = agentesRaw.map((a, i) => normalizeAgente(a, i))
+
+  // Persiste estados complexos no localStorage sempre que mudam
+  useEffect(() => {
+    try { localStorage.setItem('etz_onboarding_objecoes', JSON.stringify(objecoes)) } catch {}
+  }, [objecoes])
+  useEffect(() => {
+    try { localStorage.setItem('etz_onboarding_perguntas', JSON.stringify(perguntas)) } catch {}
+  }, [perguntas])
+  useEffect(() => {
+    try {
+      const serial = materiais.map(m => ({ tipo: m.tipo, texto: m.texto, analise: m.analise, textoRaw: m.textoRaw }))
+      localStorage.setItem('etz_onboarding_materiais', JSON.stringify(serial))
+    } catch {}
+  }, [materiais])
+  useEffect(() => {
+    try {
+      const serial = ligSucesso.map(l => ({ resultado: l.resultado, transcricao: l.transcricao, resumo: l.resumo }))
+      localStorage.setItem('etz_onboarding_ligsucesso', JSON.stringify(serial))
+    } catch {}
+  }, [ligSucesso])
+  useEffect(() => {
+    try {
+      const serial = ligInsucesso.map(l => ({ resultado: l.resultado, transcricao: l.transcricao, resumo: l.resumo }))
+      localStorage.setItem('etz_onboarding_liginsucesso', JSON.stringify(serial))
+    } catch {}
+  }, [ligInsucesso])
 
   function onChange(k: keyof FormData, v: string) {
     setForm(prev => {
@@ -4179,7 +4227,9 @@ export default function OnboardingPage() {
   }
 
   function reset() {
-    try { localStorage.removeItem('etz_onboarding_form'); localStorage.removeItem('etz_onboarding_step') } catch {}
+    try {
+      ['etz_onboarding_form','etz_onboarding_step','etz_onboarding_objecoes','etz_onboarding_perguntas','etz_onboarding_materiais','etz_onboarding_ligsucesso','etz_onboarding_liginsucesso'].forEach(k => localStorage.removeItem(k))
+    } catch {}
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
     setPerguntas(['', '', ''])
