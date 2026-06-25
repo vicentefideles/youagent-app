@@ -2925,6 +2925,7 @@ function Step4({
   ligacoesSucesso,
   ligacoesInsucesso,
   materiais,
+  novoAgenteId,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
@@ -2938,6 +2939,7 @@ function Step4({
   ligacoesSucesso: LigacaoRef[]
   ligacoesInsucesso: LigacaoRef[]
   materiais?: Material[]
+  novoAgenteId?: string
 }) {
   const navigate = useNavigate()
   const [gerando, setGerando] = useState(false)
@@ -2981,11 +2983,9 @@ function Step4({
         objecoes_mapeadas: objecoes.filter(o => o.objecao.trim()),
         metodologia: form['metodologia'],
         materiais_empresa: (() => {
-          const partes = (materiais || []).filter(m => m.texto?.trim() || m.textoRaw?.trim()).map((m, i) => {
+          const partes = (materiais || []).filter(m => m.texto?.trim()).map((m, i) => {
             const label = m.tipo || `Material ${i + 1}`
-            const resumo = m.texto?.trim() ? `=== ${label.toUpperCase()} — RESUMO EDITADO ===\n${m.texto.trim()}` : ''
-            const raw = m.textoRaw?.trim() ? `=== ${label.toUpperCase()} — TEXTO COMPLETO ===\n${m.textoRaw.trim()}` : ''
-            return [resumo, raw].filter(Boolean).join('\n\n')
+            return `=== ${label.toUpperCase()} ===\n${m.texto!.trim()}`
           })
           return partes.length > 0 ? partes.join('\n\n') : form['materiais-conteudo']
         })(),
@@ -3196,7 +3196,7 @@ function Step4({
         <div className="flex gap-3">
           {!modoEdicao && (
             <button
-              onClick={() => navigate('/inteligencia?aba=simulador')}
+              onClick={() => navigate(`/inteligencia?aba=simulador${novoAgenteId ? `&agente_id=${novoAgenteId}` : ''}`)}
               className="flex items-center gap-2 px-5 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-brand/90 transition-colors shadow-sm"
             >
               <Brain size={15} /> Treinar no Simulador
@@ -3379,6 +3379,7 @@ interface AgenteMock {
   tom?: string
   status?: string
   horarios?: Record<string, boolean>
+  system_prompt_override?: string
 }
 
 const COR_LIST = ['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500']
@@ -3402,6 +3403,7 @@ function normalizeAgente(raw: Record<string, unknown>, idx: number): AgenteMock 
     status: raw.status as string,
     horarios: raw.horarios as Record<string, boolean> | undefined,
     metodologia: raw.metodologia as string,
+    system_prompt_override: raw.system_prompt_override as string | undefined,
   } as AgenteMock & { metodologia?: string }
 }
 
@@ -3668,6 +3670,86 @@ function ModalAtivacao({ agente, onClose, onAtivado }: { agente: AgenteMock; onC
   )
 }
 
+function ModalAjustarPrompt({ agente, onClose, onSalvo }: { agente: AgenteMock; onClose: () => void; onSalvo: () => void }) {
+  const [prompt, setPrompt] = React.useState(agente.system_prompt_override || '')
+  const [instrucao, setInstrucao] = React.useState('')
+  const [aplicando, setAplicando] = React.useState(false)
+  const [salvando, setSalvando] = React.useState(false)
+  const [erro, setErro] = React.useState('')
+
+  async function handleAplicarIA() {
+    if (!instrucao.trim()) return
+    setAplicando(true); setErro('')
+    try {
+      const { data } = await claudeApi.ajustarPrompt({ prompt_atual: prompt, instrucao })
+      setPrompt((data as { prompt: string }).prompt)
+      setInstrucao('')
+    } catch { setErro('Erro ao aplicar ajuste. Tente novamente.') }
+    finally { setAplicando(false) }
+  }
+
+  async function handleSalvar() {
+    setSalvando(true); setErro('')
+    try {
+      await agentesApi.update(agente.id, { system_prompt_override: prompt, status: 'inativo' })
+      onSalvo()
+      onClose()
+    } catch { setErro('Erro ao salvar. Tente novamente.') }
+    finally { setSalvando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Ajustar prompt</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{agente.nome} · ajustes salvos requerem re-certificação</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X size={18} /></button>
+        </div>
+        <div className="flex flex-col gap-4 p-6 overflow-y-auto flex-1">
+          <div>
+            <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Prompt atual</label>
+            <textarea
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              rows={14}
+              className="w-full text-xs font-mono border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 text-gray-800 leading-relaxed"
+            />
+          </div>
+          <div className="bg-violet-50 border border-violet-100 rounded-xl p-4">
+            <label className="text-xs font-semibold text-violet-800 mb-2 block flex items-center gap-1.5"><Brain size={12} /> Descreva o ajuste e a IA aplica</label>
+            <div className="flex gap-2">
+              <input
+                value={instrucao}
+                onChange={e => setInstrucao(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAplicarIA()}
+                placeholder='Ex: "adicionar concorrente HubSpot na seção de objeções"'
+                className="flex-1 text-xs border border-violet-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
+              />
+              <button onClick={handleAplicarIA} disabled={aplicando || !instrucao.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50">
+                {aplicando ? <Loader2 size={12} className="animate-spin" /> : <Brain size={12} />}
+                {aplicando ? 'Aplicando...' : 'Aplicar'}
+              </button>
+            </div>
+          </div>
+          {erro && <p className="text-xs text-red-600 font-medium">{erro}</p>}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancelar</button>
+          <button onClick={handleSalvar} disabled={salvando || !prompt.trim()}
+            className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold bg-brand text-white rounded-xl hover:bg-brand/90 transition-colors disabled:opacity-50">
+            {salvando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {salvando ? 'Salvando...' : 'Salvar ajuste'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AgenteCard({
   agente,
   onHorarios,
@@ -3676,6 +3758,7 @@ function AgenteCard({
   onAtivar,
   onDeletar,
   onRegenerarPrompt,
+  onAjustarPrompt,
   duplicating,
   deleting,
   precisaAtualizar,
@@ -3687,11 +3770,13 @@ function AgenteCard({
   onAtivar: () => void
   onDeletar: () => void
   onRegenerarPrompt: () => void
+  onAjustarPrompt: () => void
   duplicating?: boolean
   deleting?: boolean
   precisaAtualizar?: boolean
 }) {
-  const emTreinamento = agente.status === 'em_treinamento' || agente.status === 'inativo'
+  const pendenteCertificacao = agente.status === 'pendente_certificacao'
+  const emTreinamento = pendenteCertificacao || agente.status === 'em_treinamento' || agente.status === 'inativo'
   const vozNome = VOZES_TELNYX.find(v => v.id === agente.voz)?.nome
   const infoTags = [
     vozNome || agente.voz,
@@ -3714,11 +3799,13 @@ function AgenteCard({
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-semibold text-sm text-gray-900 truncate leading-tight">{agente.nome}</p>
               <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
-                emTreinamento
+                pendenteCertificacao
+                  ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                  : emTreinamento
                   ? 'bg-amber-50 text-amber-700 border border-amber-200'
                   : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               }`}>
-                {emTreinamento ? 'Configurando' : 'Ativo'}
+                {pendenteCertificacao ? 'Aguardando certificação' : emTreinamento ? 'Configurando' : 'Ativo'}
               </span>
             </div>
             {agente.empresa && agente.empresa !== agente.nome && (
@@ -3740,6 +3827,11 @@ function AgenteCard({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-xs text-gray-500">{agente.campanhasAtivas} campanha{agente.campanhasAtivas !== 1 ? 's' : ''} ativa{agente.campanhasAtivas !== 1 ? 's' : ''}</span>
           </div>
+        ) : pendenteCertificacao ? (
+          <div className="flex items-center gap-1.5">
+            <Brain size={12} className="text-orange-500 shrink-0" />
+            <span className="text-xs text-gray-500">Passe pelos <span className="font-medium text-gray-700">5 cenários</span> no Simulador para ativar</span>
+          </div>
         ) : (
           <div className="flex items-center gap-1.5">
             <Brain size={12} className="text-amber-500 shrink-0" />
@@ -3749,10 +3841,16 @@ function AgenteCard({
 
         {/* Ações */}
         <div className="flex items-center gap-1 pt-2 border-t border-gray-100">
-          <button onClick={onEditar} title="Editar"
+          <button onClick={onEditar} title="Editar configurações"
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900">
             <Pencil size={12} /> Editar
           </button>
+          {agente.system_prompt_override && (
+            <button onClick={onAjustarPrompt} title="Ajustar prompt gerado pela IA"
+              className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-violet-50 transition-colors text-violet-600 hover:text-violet-800">
+              <Brain size={12} /> Prompt
+            </button>
+          )}
           <button onClick={onHorarios} title="Horários"
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900">
             <Clock size={12} /> Horários
@@ -3812,6 +3910,8 @@ export default function OnboardingPage() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [agenteAtivacao, setAgenteAtivacao] = useState<AgenteMock | null>(null)
+  const [novoAgenteId, setNovoAgenteId] = useState<string>('')
+  const [agenteAjuste, setAgenteAjuste] = useState<AgenteMock | null>(null)
   const [sincronizando, setSincronizando] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
@@ -4094,6 +4194,7 @@ export default function OnboardingPage() {
       await new Promise(r => setTimeout(r, 600))
       setActivatingStep(3)
       await new Promise(r => setTimeout(r, 400))
+      setNovoAgenteId(agenteId)
       setActivated(true)
       refetchAgentes()
     } catch {
@@ -4481,6 +4582,7 @@ export default function OnboardingPage() {
                     onAtivar={() => setAgenteAtivacao(agente)}
                     onDeletar={() => handleDeletar(agente)}
                     onRegenerarPrompt={() => handleRegenerarPrompt(agente.id)}
+                    onAjustarPrompt={() => setAgenteAjuste(agente)}
                     duplicating={duplicatingId === agente.id}
                     deleting={deletingId === agente.id}
                     precisaAtualizar={promptStatuses[agente.id] ?? false}
@@ -4536,6 +4638,13 @@ export default function OnboardingPage() {
             agente={agenteAtivacao}
             onClose={() => setAgenteAtivacao(null)}
             onAtivado={() => { refetchAgentes(); setAgenteAtivacao(null) }}
+          />
+        )}
+        {agenteAjuste && (
+          <ModalAjustarPrompt
+            agente={agenteAjuste}
+            onClose={() => setAgenteAjuste(null)}
+            onSalvo={() => { refetchAgentes(); setAgenteAjuste(null) }}
           />
         )}
       </div>
@@ -4604,6 +4713,7 @@ export default function OnboardingPage() {
               modoEdicao={!!editandoId}
               ligacoesSucesso={ligSucesso}
               ligacoesInsucesso={ligInsucesso}
+              novoAgenteId={novoAgenteId}
             />
           )}
           {activateError && (

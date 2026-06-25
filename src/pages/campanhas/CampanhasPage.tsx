@@ -415,10 +415,11 @@ export default function CampanhasPage() {
     staleTime: 0,             // sempre considera dados desatualizados
   })
 
-  const { data: agentes = [] } = useQuery({
+  const { data: agentesRaw = [] } = useQuery({
     queryKey: ['agentes'],
     queryFn: () => agentesApi.list().then((r) => r.data),
   })
+  const agentes = (agentesRaw as Array<{ id: string; nome: string; status?: string }>).filter(a => a.status !== 'pendente_certificacao')
 
   const { data: equipeRaw = [] } = useQuery({
     queryKey: ['equipe'],
