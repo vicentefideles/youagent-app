@@ -4650,7 +4650,10 @@ function TabSimulador() {
   })
 
   // ── Estado geral ──────────────────────────────────────────────
-  const [agenteId, setAgenteId]   = useState('')
+  const [agenteId, setAgenteId]   = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('agente_id') || ''
+  })
   const [cenario, setCenario]     = useState('preco')
   const [scoreMin, setScoreMin]   = useState(75)
   const [loading, setLoading]     = useState(false)

@@ -341,6 +341,8 @@ export const claudeApi = {
     api.post('/claude/sugerir-horario', data),
   analisarLista: (data: { campanha_id?: string; segmento?: string; total_contatos?: number; amostra?: Array<{ nome?: string; empresa?: string; cargo?: string }> }) =>
     api.post('/claude/analisar-lista', data),
+  ajustarPrompt: (data: { prompt_atual: string; instrucao: string }) =>
+    api.post('/claude/ajustar-prompt', data, { timeout: 60000 }),
   gerarPrompt: (data: Record<string, unknown>) =>
     api.post('/claude/gerar-prompt', data, { timeout: 300000 }),
   gerarPromptStatus: (jobId: string) =>
