@@ -9,11 +9,27 @@ export const api = axios.create({
   timeout: 15000,
 })
 
-// Injeta JWT em todas as requests
+// Remove caracteres de controle que quebram JSON (form feed, vertical tab, null, etc.)
+// \n \r \t são mantidos pois o JSON os escapa corretamente
+function sanitizeStrings(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ').trim()
+  }
+  if (Array.isArray(value)) return value.map(sanitizeStrings)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeStrings(v)]))
+  }
+  return value
+}
+
+// Injeta JWT em todas as requests + sanitiza payload
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(JWT_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  if (config.data && !(config.data instanceof FormData)) {
+    config.data = sanitizeStrings(config.data)
   }
   return config
 })
