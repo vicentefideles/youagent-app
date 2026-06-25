@@ -2944,6 +2944,7 @@ function Step4({
   const navigate = useNavigate()
   const [gerando, setGerando] = useState(false)
   const [erroGeracao, setErroGeracao] = useState('')
+  const [stepProgress, setStepProgress] = useState<number[]>([0, 0, 0, 0])
   const vozNome = VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz
 
   // Gera automaticamente ao montar, se ainda não gerou
@@ -2956,6 +2957,21 @@ function Step4({
   async function gerarPrompt() {
     setGerando(true)
     setErroGeracao('')
+    setStepProgress([0, 0, 0, 0])
+
+    // Etapa 0: "Lendo 14 etapas" — 3s até 100%
+    const step0 = setInterval(() => {
+      setStepProgress(p => p[0] >= 100 ? p : [Math.min(p[0] + 5, 100), p[1], p[2], p[3]])
+    }, 150)
+    await new Promise(r => setTimeout(r, 3000))
+    clearInterval(step0)
+    setStepProgress([100, 0, 0, 0])
+
+    // Etapa 1: "Passagem 1 — Opus 4.8" — sobe lentamente até 88%, aguarda job
+    const step1 = setInterval(() => {
+      setStepProgress(p => p[1] >= 88 ? p : [p[0], Math.min(p[1] + 0.6, 88), p[2], p[3]])
+    }, 800)
+
     try {
       const payload = {
         objetivo: form['objetivo'],
@@ -3016,18 +3032,36 @@ function Step4({
           await new Promise(r => setTimeout(r, 3000))
           const { data } = await claudeApi.gerarPromptStatus(jobId)
           if ((data as { status: string }).status === 'done') {
+            clearInterval(step1)
+            // Etapa 1 → 100%, depois etapa 2 rápida, depois etapa 3 (entrega)
+            setStepProgress([100, 100, 0, 0])
+            // Passagem 2 animada em 2s
+            const step2 = setInterval(() => {
+              setStepProgress(p => p[2] >= 100 ? p : [p[0], p[1], Math.min(p[2] + 5, 100), p[3]])
+            }, 100)
+            await new Promise(r => setTimeout(r, 2000))
+            clearInterval(step2)
+            setStepProgress([100, 100, 100, 0])
+            // Entrega
+            await new Promise(r => setTimeout(r, 800))
+            setStepProgress([100, 100, 100, 100])
+            await new Promise(r => setTimeout(r, 400))
             onChange('prompt_gerado', (data as { prompt: string }).prompt || '')
             return
           }
           if ((data as { status: string }).status === 'error') {
+            clearInterval(step1)
             throw new Error((data as { error?: string }).error || 'Erro ao gerar o prompt.')
           }
         }
+        clearInterval(step1)
         throw new Error('Tempo limite excedido ao gerar o prompt.')
       } else {
+        clearInterval(step1)
         // Resposta direta (fallback — backend síncrono)
         const promptDireto = (initRes.data as { prompt?: string }).prompt || ''
         if (!promptDireto) throw new Error('O servidor retornou um prompt vazio. Tente novamente.')
+        setStepProgress([100, 100, 100, 100])
         onChange('prompt_gerado', promptDireto)
       }
     } catch (err) {
@@ -3277,24 +3311,43 @@ function Step4({
             </div>
           </div>
 
-          {/* Etapas do processo */}
+          {/* Etapas do processo com barras de progresso */}
           <div className="space-y-2.5 mb-5">
             {[
               { label: 'Lendo todas as 14 etapas preenchidas', detail: 'empresa, produto, ICP, scripts, roteiros, calibração de voz...' },
               { label: 'Passagem 1 — Gerando o rascunho do prompt', detail: 'Opus 4.8 com raciocínio adaptativo monta as instruções base' },
               { label: 'Passagem 2 — Revisão e refinamento crítico', detail: 'Verifica especificidade, dados reais, objeções e sinais de compra' },
               { label: 'Entregando o prompt finalizado', detail: 'Pronto para revisar, editar e ativar' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-3 bg-white/60 rounded-lg px-3 py-2.5">
-                <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <Loader2 size={11} className="text-violet-500 animate-spin" style={{ animationDelay: `${i * 0.3}s` }} />
+            ].map((item, i) => {
+              const pct = stepProgress[i] ?? 0
+              const done = pct >= 100
+              const active = !done && (i === 0 || (stepProgress[i - 1] ?? 0) >= 100)
+              return (
+                <div key={i} className={`bg-white/60 rounded-lg px-3 py-2.5 transition-all ${active ? 'ring-1 ring-violet-300' : ''}`}>
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${done ? 'bg-green-100' : active ? 'bg-violet-100' : 'bg-gray-100'}`}>
+                      {done
+                        ? <svg viewBox="0 0 12 12" className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="2,6 5,9 10,3"/></svg>
+                        : active
+                          ? <Loader2 size={11} className="text-violet-500 animate-spin" />
+                          : <div className="w-2 h-2 rounded-full bg-gray-300" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium ${done ? 'text-green-700' : active ? 'text-violet-900' : 'text-gray-400'}`}>{item.label}</p>
+                      <p className={`text-[10px] mt-0.5 ${done ? 'text-green-500' : active ? 'text-violet-500' : 'text-gray-300'}`}>{item.detail}</p>
+                    </div>
+                    <span className={`text-[10px] font-mono font-semibold shrink-0 ${done ? 'text-green-500' : active ? 'text-violet-600' : 'text-gray-300'}`}>{Math.round(pct)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${done ? 'bg-green-400' : 'bg-violet-500'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-violet-900">{item.label}</p>
-                  <p className="text-[10px] text-violet-500 mt-0.5">{item.detail}</p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Tempo estimado */}
