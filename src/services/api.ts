@@ -357,6 +357,8 @@ export const claudeApi = {
     api.post('/claude/sugerir-calibracao-voz', data, { timeout: 180000 }),
   sugerirAbordagens: (data: Record<string, unknown>) =>
     api.post('/claude/sugerir-abordagens', data, { timeout: 60000 }),
+  sugerirRebuttalsCanal: (data: Record<string, unknown>) =>
+    api.post('/claude/sugerir-rebuttals-canal', data, { timeout: 60000 }),
   validarPrompt: (data: { prompt: string; empresa: string; produto: string }) =>
     api.post('/claude/validar-prompt', data, { timeout: 60000 }),
   gerarCross: (data: { gatilho: string; exemplos: string[] }) =>
