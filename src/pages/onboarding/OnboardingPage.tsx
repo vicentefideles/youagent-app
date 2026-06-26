@@ -113,6 +113,7 @@ interface ObjecaoCanal {
   id: string
   objecao: string
   rebuttal: string
+  fixo?: boolean
 }
 
 const INITIAL_FORM: FormData = {
@@ -2933,13 +2934,18 @@ function StepAbordagensAbertura({
   form,
   abordagens,
   onAbordagensChange,
+  objecoes,
+  perguntas,
 }: {
   form: FormData
   abordagens: Abordagem[]
   onAbordagensChange: (a: Abordagem[]) => void
+  objecoes: Objecao[]
+  perguntas: string[]
 }) {
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState('')
+
   const jaGerou = abordagens.length > 0
 
   async function gerar() {
@@ -2957,10 +2963,11 @@ function StepAbordagensAbertura({
         descricao_produto: form['prod-descricao'],
         resultados_clientes: form['prod-resultados'],
         concorrentes: form['prod-concorrentes'],
-        icp_cargo: form['icp-cargo-tipo'],
-        icp_porte: form['icp-porte-alvo'],
-        icp_segmento: form['icp-segmento-alvo'],
         objetivo: form['objetivo'],
+        // Cascade — etapa 2 (qualificação e objeções)
+        perguntas_qualificacao: perguntas.filter(Boolean).join(' | '),
+        objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).filter(Boolean).join('\n'),
+        script_abertura: form['script-abertura'],
       })
       const novas: Abordagem[] = (res.data.abordagens || []).map((a: { id: string; tipo: string; texto: string }) => ({
         ...a,
@@ -2975,12 +2982,22 @@ function StepAbordagensAbertura({
     }
   }
 
+  function adicionar() {
+    const novoId = String(Date.now())
+    onAbordagensChange([...abordagens, { id: novoId, tipo: 'personalizado', texto: '', selecionada: true }])
+  }
+
+  function remover(id: string) {
+    onAbordagensChange(abordagens.filter(a => a.id !== id))
+  }
+
   const TIPO_LABEL: Record<string, string> = {
     risco_invisivel: 'Risco Invisível',
     custo_reducao: 'Custo / Redução',
     caso_real: 'Caso Real',
     contexto_mercado: 'Contexto do Mercado',
     diagnostico: 'Diagnóstico',
+    personalizado: 'Personalizada',
   }
 
   const selecionadas = abordagens.filter(a => a.selecionada).length
@@ -2989,57 +3006,73 @@ function StepAbordagensAbertura({
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900">Abordagens de Abertura</h2>
-        <p className="text-sm text-gray-500 mt-1">Nossa IA gera 5 formas de iniciar a ligação, cada uma com um ângulo diferente de ancoragem na dor do cliente. Selecione as que preferir — o agente vai alternar entre elas.</p>
+        <p className="text-sm text-gray-500 mt-1">Formas de iniciar a ligação — cada uma com um ângulo diferente de ancoragem na dor do cliente. O agente vai alternar entre as selecionadas.</p>
       </div>
 
-      {!jaGerou ? (
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-6 flex flex-col items-center gap-4 text-center">
-          <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
-            <Zap size={22} className="text-violet-600" />
+      {/* Banner Gerar com IA */}
+      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+            <Brain size={16} className="text-violet-600" />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-violet-900">Gerar 5 abordagens personalizadas</p>
-            <p className="text-xs text-violet-600 mt-1">A IA vai usar o contexto da sua empresa e produto para criar hooks específicos para o seu mercado.</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-violet-900 mb-0.5">Abordagens geradas com IA</p>
+            <p className="text-xs text-violet-700 leading-relaxed">A IA usa tudo que foi preenchido nas etapas anteriores — empresa, produto e qualificação — para criar 5 abordagens específicas para o seu mercado.</p>
           </div>
           <button
             type="button"
             onClick={gerar}
             disabled={gerando}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-brand rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
-            {gerando ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
-            {gerando ? 'Gerando abordagens...' : 'Gerar abordagens com IA'}
+            {gerando ? (
+              <><Loader2 size={13} className="animate-spin" />Gerando...</>
+            ) : (
+              <><Brain size={13} />{jaGerou ? 'Regerar com IA' : 'Gerar com IA'}</>
+            )}
           </button>
-          {erro && <p className="text-xs text-red-500">{erro}</p>}
         </div>
-      ) : (
+        {erro && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertCircle size={13} className="shrink-0" />{erro}
+          </div>
+        )}
+      </div>
+
+      {/* Lista de abordagens */}
+      {abordagens.length > 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">{selecionadas} de {abordagens.length} selecionadas</p>
-            <button type="button" onClick={gerar} disabled={gerando} className="flex items-center gap-1.5 text-xs text-brand hover:opacity-75 font-medium transition-opacity disabled:opacity-60">
-              {gerando ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Regerar
-            </button>
+            <p className="text-xs text-gray-500">{selecionadas} de {abordagens.length} selecionadas para o agente</p>
           </div>
           {abordagens.map((a, idx) => (
             <div
               key={a.id}
-              className={`rounded-xl border p-4 transition-all cursor-pointer ${a.selecionada ? 'border-brand/40 bg-violet-50/60' : 'border-gray-200 bg-white opacity-60'}`}
-              onClick={() => {
-                const updated = abordagens.map((x, i) => i === idx ? { ...x, selecionada: !x.selecionada } : x)
-                onAbordagensChange(updated)
-              }}
+              className={`rounded-xl border p-4 transition-all ${a.selecionada ? 'border-brand/40 bg-violet-50/40' : 'border-gray-200 bg-white opacity-60'}`}
             >
               <div className="flex items-start gap-3">
-                <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${a.selecionada ? 'bg-brand border-brand' : 'border-gray-300'}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = abordagens.map((x, i) => i === idx ? { ...x, selecionada: !x.selecionada } : x)
+                    onAbordagensChange(updated)
+                  }}
+                  className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${a.selecionada ? 'bg-brand border-brand' : 'border-gray-300'}`}
+                >
                   {a.selecionada && <Check size={11} className="text-white" strokeWidth={3} />}
-                </div>
+                </button>
                 <div className="flex-1 min-w-0">
-                  <span className="inline-block text-[10px] font-semibold text-brand bg-violet-100 px-2 py-0.5 rounded-full mb-1.5">{TIPO_LABEL[a.tipo] || a.tipo}</span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="inline-block text-[10px] font-semibold text-brand bg-violet-100 px-2 py-0.5 rounded-full">{TIPO_LABEL[a.tipo] || a.tipo}</span>
+                    <button type="button" onClick={() => remover(a.id)} className="text-gray-300 hover:text-red-400 transition-colors">
+                      <X size={13} />
+                    </button>
+                  </div>
                   <textarea
-                    className="w-full text-sm text-gray-700 bg-transparent resize-none focus:outline-none leading-relaxed"
+                    className="w-full text-sm text-gray-700 bg-transparent resize-none focus:outline-none leading-relaxed border-0 p-0"
                     rows={3}
+                    placeholder="Digite a abordagem..."
                     value={a.texto}
-                    onClick={e => e.stopPropagation()}
                     onChange={e => {
                       const updated = abordagens.map((x, i) => i === idx ? { ...x, texto: e.target.value } : x)
                       onAbordagensChange(updated)
@@ -3052,12 +3085,23 @@ function StepAbordagensAbertura({
           {selecionadas === 0 && (
             <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Selecione pelo menos 1 abordagem para continuar.</p>
           )}
-          {erro && <p className="text-xs text-red-500">{erro}</p>}
+        </div>
+      ) : (
+        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center">
+          <p className="text-sm text-gray-400">Clique em "Gerar com IA" para criar as abordagens, ou adicione manualmente abaixo.</p>
         </div>
       )}
 
+      <button
+        type="button"
+        onClick={adicionar}
+        className="flex items-center gap-2 text-sm text-brand font-medium hover:opacity-75 transition-opacity"
+      >
+        <Plus size={15} /> Adicionar abordagem manualmente
+      </button>
+
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-xs text-blue-700"><span className="font-semibold">Como funciona:</span> O agente vai alternar entre as abordagens selecionadas ao longo das ligações, nunca repetindo a mesma em sequência. Você pode editar o texto de cada abordagem livremente.</p>
+        <p className="text-xs text-blue-700"><span className="font-semibold">Como funciona:</span> O agente alterna entre as abordagens selecionadas ao longo das ligações, nunca repetindo a mesma em sequência. Você pode editar o texto de cada uma livremente.</p>
       </div>
     </div>
   )
@@ -3065,63 +3109,153 @@ function StepAbordagensAbertura({
 
 // ─── StepObjecoesCanal ────────────────────────────────────────────────────────
 function StepObjecoesCanal({
+  form,
   objecoesCanal,
   onObjecoesCanalChange,
+  abordagens,
 }: {
+  form: FormData
   objecoesCanal: ObjecaoCanal[]
   onObjecoesCanalChange: (o: ObjecaoCanal[]) => void
+  abordagens: Abordagem[]
 }) {
-  function atualizar(id: string, campo: keyof ObjecaoCanal, valor: string) {
-    onObjecoesCanalChange(objecoesCanal.map(o => o.id === id ? { ...o, [campo]: valor } : o))
+  const [gerandoRebuttals, setGerandoRebuttals] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const fixas = objecoesCanal.filter(o => o.fixo)
+  const novas = objecoesCanal.filter(o => !o.fixo)
+  const novasComObjecao = novas.filter(o => o.objecao.trim())
+
+  function atualizarRebuttal(id: string, valor: string) {
+    onObjecoesCanalChange(objecoesCanal.map(o => o.id === id ? { ...o, rebuttal: valor } : o))
+  }
+
+  function atualizarObjecao(id: string, valor: string) {
+    onObjecoesCanalChange(objecoesCanal.map(o => o.id === id ? { ...o, objecao: valor } : o))
   }
 
   function adicionar() {
     const novoId = String(Date.now())
-    onObjecoesCanalChange([...objecoesCanal, { id: novoId, objecao: '', rebuttal: '' }])
+    onObjecoesCanalChange([...objecoesCanal, { id: novoId, fixo: false, objecao: '', rebuttal: '' }])
   }
 
   function remover(id: string) {
     onObjecoesCanalChange(objecoesCanal.filter(o => o.id !== id))
   }
 
+  async function gerarRebuttals() {
+    if (!novasComObjecao.length) return
+    setGerandoRebuttals(true)
+    setErro('')
+    try {
+      // @ts-ignore — sugerirRebuttalsCanal será adicionado ao api.ts
+      const res = await claudeApi.sugerirRebuttalsCanal({
+        objecoes_novas: novasComObjecao.map(o => ({ id: o.id, objecao: o.objecao })),
+        empresa: form['empresa-nome'],
+        segmento: form['empresa-segmento'],
+        porte: form['empresa-porte'],
+        produto: form['prod-nome'],
+        resultados_clientes: form['prod-resultados'],
+        abordagens_contexto: abordagens.filter(a => a.selecionada).map(a => a.texto).join(' | '),
+      })
+      const rebuttals: Array<{ id: string; rebuttal: string }> = res.data.rebuttals || []
+      onObjecoesCanalChange(objecoesCanal.map(o => {
+        const found = rebuttals.find(r => r.id === o.id)
+        return found ? { ...o, rebuttal: found.rebuttal } : o
+      }))
+    } catch (e) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string }
+      setErro(err?.response?.data?.error || err?.message || 'Erro ao gerar rebuttals.')
+    } finally {
+      setGerandoRebuttals(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900">Objeções de Canal</h2>
-        <p className="text-sm text-gray-500 mt-1">São as objeções de <strong>processo</strong>, não de valor — quando o prospect não quer falar agora, mas não necessariamente rejeitou o produto. Configure como o agente responde a cada uma.</p>
+        <p className="text-sm text-gray-500 mt-1">São as objeções de <strong>processo</strong>, não de valor — quando o prospect não quer falar agora mas não rejeitou o produto. As 5 mais comuns já estão configuradas; edite as respostas se quiser.</p>
       </div>
 
+      {/* Objeções fixas */}
       <div className="flex flex-col gap-3">
-        {objecoesCanal.map((o) => (
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Objeções padrão</p>
+        {fixas.map((o) => (
           <div key={o.id} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3 bg-white">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1">
-                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Objeção do prospect</label>
-                <textarea
-                  className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10"
-                  rows={2}
-                  placeholder='Ex: "Me manda um e-mail primeiro."'
-                  value={o.objecao}
-                  onChange={e => atualizar(o.id, 'objecao', e.target.value)}
-                />
-              </div>
-              <button type="button" onClick={() => remover(o.id)} className="text-gray-300 hover:text-red-400 transition-colors mt-5 shrink-0">
-                <X size={15} />
-              </button>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Objeção do prospect</label>
+              <p className="mt-1 text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">{o.objecao}</p>
             </div>
             <div>
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Resposta do agente</label>
               <textarea
                 className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10"
                 rows={3}
-                placeholder="Como o agente responde..."
                 value={o.rebuttal}
-                onChange={e => atualizar(o.id, 'rebuttal', e.target.value)}
+                onChange={e => atualizarRebuttal(o.id, e.target.value)}
               />
             </div>
           </div>
         ))}
       </div>
+
+      {/* Objeções novas */}
+      {novas.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Objeções adicionadas</p>
+            {novasComObjecao.length > 0 && (
+              <button
+                type="button"
+                onClick={gerarRebuttals}
+                disabled={gerandoRebuttals}
+                className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {gerandoRebuttals ? (
+                  <><Loader2 size={11} className="animate-spin" />Gerando...</>
+                ) : (
+                  <><Brain size={11} />Gerar com IA</>
+                )}
+              </button>
+            )}
+          </div>
+          {novas.map((o) => (
+            <div key={o.id} className="border border-violet-200 rounded-xl p-4 flex flex-col gap-3 bg-violet-50/30">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Objeção do prospect</label>
+                  <textarea
+                    className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 bg-white"
+                    rows={2}
+                    placeholder='Ex: "Já trabalhamos com outra empresa."'
+                    value={o.objecao}
+                    onChange={e => atualizarObjecao(o.id, e.target.value)}
+                  />
+                </div>
+                <button type="button" onClick={() => remover(o.id)} className="text-gray-300 hover:text-red-400 transition-colors mt-5 shrink-0">
+                  <X size={15} />
+                </button>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Resposta do agente</label>
+                <textarea
+                  className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 bg-white"
+                  rows={3}
+                  placeholder="Como o agente responde... (ou clique em Gerar com IA)"
+                  value={o.rebuttal}
+                  onChange={e => atualizarRebuttal(o.id, e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
+          {erro && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertCircle size={13} className="shrink-0" />{erro}
+            </div>
+          )}
+        </div>
+      )}
 
       <button
         type="button"
@@ -3132,7 +3266,7 @@ function StepObjecoesCanal({
       </button>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p className="text-xs text-amber-700"><span className="font-semibold">Dica:</span> Objeções de canal são diferentes das objeções de valor. Aqui o prospect não está rejeitando seu produto — ele só não quer falar agora. O agente precisa saber contornar isso para chegar no agendamento.</p>
+        <p className="text-xs text-amber-700"><span className="font-semibold">Dica:</span> As 5 objeções padrão cobrem os casos mais comuns. Edite as respostas para o tom do seu segmento. Adicione objeções específicas do seu mercado e clique "Gerar com IA" para gerar os rebuttals.</p>
       </div>
     </div>
   )
@@ -4326,17 +4460,17 @@ export default function OnboardingPage() {
   })
   const [objecoesCanal, setObjecoesCanal] = useState<ObjecaoCanal[]>(() => {
     try { const s = localStorage.getItem('etz_onboarding_objecoes_canal'); return s ? JSON.parse(s) : [
-      { id: '1', objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
-      { id: '2', objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
-      { id: '3', objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
-      { id: '4', objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
-      { id: '5', objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
+      { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
+      { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
+      { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
+      { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
+      { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
     ] } catch { return [
-      { id: '1', objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
-      { id: '2', objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
-      { id: '3', objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
-      { id: '4', objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
-      { id: '5', objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
+      { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
+      { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
+      { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
+      { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
+      { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
     ] }
   })
   const [perguntas, setPerguntas] = useState<string[]>(() => {
@@ -4503,6 +4637,8 @@ export default function OnboardingPage() {
 
   function next() {
     if (!validate()) return
+    // Step 3 — Abordagens de Abertura: exige ao menos 1 selecionada
+    if (step === 3 && abordagens.filter(a => a.selecionada).length === 0) return
     const s = Math.min(step + 1, STEPS.length - 1)
     saveStep(s)
   }
@@ -5114,12 +5250,16 @@ export default function OnboardingPage() {
               form={form}
               abordagens={abordagens}
               onAbordagensChange={setAbordagens}
+              objecoes={objecoes}
+              perguntas={perguntas}
             />
           )}
           {step === 4 && (
             <StepObjecoesCanal
+              form={form}
               objecoesCanal={objecoesCanal}
               onObjecoesCanalChange={setObjecoesCanal}
+              abordagens={abordagens}
             />
           )}
           {step === 5 && <Step3 form={form} onChange={onChange} />}
