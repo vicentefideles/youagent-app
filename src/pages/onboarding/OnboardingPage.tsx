@@ -3040,57 +3040,48 @@ function StepAbordagensAbertura({
       </div>
 
       {/* Lista de abordagens */}
-      {abordagens.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">{selecionadas} de {abordagens.length} selecionadas para o agente</p>
-          </div>
-          {abordagens.map((a, idx) => (
-            <div
-              key={a.id}
-              className={`rounded-xl border p-4 transition-all ${a.selecionada ? 'border-brand/40 bg-violet-50/40' : 'border-gray-200 bg-white opacity-60'}`}
-            >
-              <div className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const updated = abordagens.map((x, i) => i === idx ? { ...x, selecionada: !x.selecionada } : x)
+      <div className="flex flex-col gap-3">
+        {abordagens.length > 0 && (
+          <p className="text-xs text-gray-500">{selecionadas} de {abordagens.length} selecionadas para o agente</p>
+        )}
+        {abordagens.map((a, idx) => (
+          <div
+            key={a.id}
+            className={`rounded-xl border p-4 transition-all ${a.selecionada ? 'border-brand/40 bg-violet-50/40' : 'border-gray-200 bg-white opacity-60'}`}
+          >
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = abordagens.map((x, i) => i === idx ? { ...x, selecionada: !x.selecionada } : x)
+                  onAbordagensChange(updated)
+                }}
+                className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${a.selecionada ? 'bg-brand border-brand' : 'border-gray-300'}`}
+              >
+                {a.selecionada && <Check size={11} className="text-white" strokeWidth={3} />}
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="inline-block text-[10px] font-semibold text-brand bg-violet-100 px-2 py-0.5 rounded-full">{TIPO_LABEL[a.tipo] || a.tipo}</span>
+                  <button type="button" onClick={() => remover(a.id)} className="text-gray-300 hover:text-red-400 transition-colors">
+                    <X size={13} />
+                  </button>
+                </div>
+                <textarea
+                  className="w-full text-sm text-gray-700 bg-transparent resize-none focus:outline-none leading-relaxed border-0 p-0"
+                  rows={3}
+                  placeholder="Digite a abordagem de abertura..."
+                  value={a.texto}
+                  onChange={e => {
+                    const updated = abordagens.map((x, i) => i === idx ? { ...x, texto: e.target.value } : x)
                     onAbordagensChange(updated)
                   }}
-                  className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${a.selecionada ? 'bg-brand border-brand' : 'border-gray-300'}`}
-                >
-                  {a.selecionada && <Check size={11} className="text-white" strokeWidth={3} />}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="inline-block text-[10px] font-semibold text-brand bg-violet-100 px-2 py-0.5 rounded-full">{TIPO_LABEL[a.tipo] || a.tipo}</span>
-                    <button type="button" onClick={() => remover(a.id)} className="text-gray-300 hover:text-red-400 transition-colors">
-                      <X size={13} />
-                    </button>
-                  </div>
-                  <textarea
-                    className="w-full text-sm text-gray-700 bg-transparent resize-none focus:outline-none leading-relaxed border-0 p-0"
-                    rows={3}
-                    placeholder="Digite a abordagem..."
-                    value={a.texto}
-                    onChange={e => {
-                      const updated = abordagens.map((x, i) => i === idx ? { ...x, texto: e.target.value } : x)
-                      onAbordagensChange(updated)
-                    }}
-                  />
-                </div>
+                />
               </div>
             </div>
-          ))}
-          {selecionadas === 0 && (
-            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Selecione pelo menos 1 abordagem para continuar.</p>
-          )}
-        </div>
-      ) : (
-        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center">
-          <p className="text-sm text-gray-400">Clique em "Gerar com IA" para criar as abordagens, ou adicione manualmente abaixo.</p>
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
 
       <button
         type="button"
@@ -4646,7 +4637,6 @@ export default function OnboardingPage() {
   function next() {
     if (!validate()) return
     // Step 3 — Abordagens de Abertura: exige ao menos 1 selecionada
-    if (step === 3 && abordagens.filter(a => a.selecionada).length === 0) return
     const s = Math.min(step + 1, STEPS.length - 1)
     saveStep(s)
   }
