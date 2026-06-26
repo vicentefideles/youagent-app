@@ -2944,13 +2944,14 @@ function StepAbordagensAbertura({
   perguntas: string[]
 }) {
   const [gerando, setGerando] = useState(false)
-  const [erro, setErro] = useState('')
+  const [erroGeracao, setErroGeracao] = useState('')
 
-  const jaGerou = abordagens.length > 0
+  const jaGerou = abordagens.some(a => a.texto.trim())
+  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 bg-white'
 
   async function gerar() {
     setGerando(true)
-    setErro('')
+    setErroGeracao('')
     try {
       const res = await claudeApi.sugerirAbordagens({
         empresa: form['empresa-nome'],
@@ -2964,7 +2965,6 @@ function StepAbordagensAbertura({
         resultados_clientes: form['prod-resultados'],
         concorrentes: form['prod-concorrentes'],
         objetivo: form['objetivo'],
-        // Cascade — etapa 2 (qualificação e objeções)
         perguntas_qualificacao: perguntas.filter(Boolean).join(' | '),
         objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).filter(Boolean).join('\n'),
         script_abertura: form['script-abertura'],
@@ -2976,7 +2976,7 @@ function StepAbordagensAbertura({
       onAbordagensChange(novas)
     } catch (e) {
       const err = e as { response?: { data?: { error?: string } }; message?: string }
-      setErro(err?.response?.data?.error || err?.message || 'Erro ao gerar abordagens.')
+      setErroGeracao(err?.response?.data?.error || err?.message || 'Erro ao gerar abordagens.')
     } finally {
       setGerando(false)
     }
@@ -2988,7 +2988,7 @@ function StepAbordagensAbertura({
   }
 
   function remover(id: string) {
-    onAbordagensChange(abordagens.filter(a => a.id !== id))
+    if (abordagens.length > 1) onAbordagensChange(abordagens.filter(a => a.id !== id))
   }
 
   const TIPO_LABEL: Record<string, string> = {
@@ -2997,102 +2997,79 @@ function StepAbordagensAbertura({
     caso_real: 'Caso Real',
     contexto_mercado: 'Contexto do Mercado',
     diagnostico: 'Diagnóstico',
-    personalizado: 'Personalizada',
+    personalizado: '',
   }
 
-  const selecionadas = abordagens.filter(a => a.selecionada).length
-
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">Abordagens de Abertura</h2>
-        <p className="text-sm text-gray-500 mt-1">Formas de iniciar a ligação — cada uma com um ângulo diferente de ancoragem na dor do cliente. O agente vai alternar entre as selecionadas.</p>
-      </div>
-
-      {/* Banner Gerar com IA */}
-      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-4">
+    <div className="flex flex-col gap-6">
+      {/* Banner — padrão idêntico ao StepQualificacao */}
+      <div className={`flex items-start justify-between gap-4 p-4 rounded-xl border ${jaGerou ? 'border-brand/20 bg-brand/5' : 'border-brand/30 bg-brand/5'}`}>
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
-            <Brain size={16} className="text-violet-600" />
+          <Brain size={18} className="text-brand mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {gerando ? 'Gerando abordagens...' : jaGerou ? 'Abordagens geradas pela IA' : 'Gerar abordagens de abertura com IA'}
+            </p>
+            <p className={`text-xs mt-0.5 ${!gerando && !jaGerou ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
+              {gerando
+                ? 'Analisando empresa, produto e qualificação das etapas anteriores...'
+                : jaGerou
+                ? 'A IA gerou abordagens com base nas etapas anteriores. Edite livremente.'
+                : '⚠️ A IA vai usar tudo que foi preenchido nas etapas anteriores — empresa, produto e qualificação. Você também pode escrever manualmente.'}
+            </p>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-violet-900 mb-0.5">Abordagens geradas com IA</p>
-            <p className="text-xs text-violet-700 leading-relaxed">A IA usa tudo que foi preenchido nas etapas anteriores — empresa, produto e qualificação — para criar 5 abordagens específicas para o seu mercado.</p>
-          </div>
-          <button
-            type="button"
-            onClick={gerar}
-            disabled={gerando}
-            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-          >
-            {gerando ? (
-              <><Loader2 size={13} className="animate-spin" />Gerando...</>
-            ) : (
-              <><Brain size={13} />{jaGerou ? 'Regerar com IA' : 'Gerar com IA'}</>
-            )}
-          </button>
         </div>
-        {erro && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <AlertCircle size={13} className="shrink-0" />{erro}
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={gerar}
+          disabled={gerando}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 shrink-0 ${jaGerou ? 'text-brand border border-brand/30 hover:bg-brand/10' : 'text-white bg-brand hover:bg-brand/90 border border-brand'}`}
+        >
+          {gerando ? <Loader2 size={12} className="animate-spin" /> : jaGerou ? <RefreshCw size={12} /> : <Brain size={12} />}
+          {gerando ? 'Gerando...' : jaGerou ? 'Regerar' : 'Gerar com IA'}
+        </button>
       </div>
 
-      {/* Lista de abordagens */}
-      <div className="flex flex-col gap-3">
-        {abordagens.length > 0 && (
-          <p className="text-xs text-gray-500">{selecionadas} de {abordagens.length} selecionadas para o agente</p>
-        )}
-        {abordagens.map((a, idx) => (
-          <div
-            key={a.id}
-            className={`rounded-xl border p-4 transition-all ${a.selecionada ? 'border-brand/40 bg-violet-50/40' : 'border-gray-200 bg-white opacity-60'}`}
-          >
-            <div className="flex items-start gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  const updated = abordagens.map((x, i) => i === idx ? { ...x, selecionada: !x.selecionada } : x)
-                  onAbordagensChange(updated)
-                }}
-                className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${a.selecionada ? 'bg-brand border-brand' : 'border-gray-300'}`}
-              >
-                {a.selecionada && <Check size={11} className="text-white" strokeWidth={3} />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="inline-block text-[10px] font-semibold text-brand bg-violet-100 px-2 py-0.5 rounded-full">{TIPO_LABEL[a.tipo] || a.tipo}</span>
-                  <button type="button" onClick={() => remover(a.id)} className="text-gray-300 hover:text-red-400 transition-colors">
-                    <X size={13} />
-                  </button>
-                </div>
-                <textarea
-                  className="w-full text-sm text-gray-700 bg-transparent resize-none focus:outline-none leading-relaxed border-0 p-0"
-                  rows={3}
-                  placeholder="Digite a abordagem de abertura..."
+      {erroGeracao && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{erroGeracao}</p>
+      )}
+
+      {/* Campos de texto — padrão numerado igual às perguntas da etapa 3 */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Abordagens de abertura</p>
+        <p className="text-xs text-gray-400 mb-3">O agente alterna entre as abordagens ao longo das ligações, nunca repetindo a mesma em sequência.</p>
+        <div className="flex flex-col gap-2">
+          {abordagens.map((a, idx) => (
+            <div key={a.id} className="flex items-start gap-2">
+              <span className="text-xs font-semibold text-brand w-5 shrink-0 mt-2.5">{idx + 1}.</span>
+              <div className="flex-1 flex flex-col gap-0.5">
+                {a.tipo && a.tipo !== 'personalizado' && (
+                  <span className="text-[10px] font-semibold text-brand/70">{TIPO_LABEL[a.tipo]}</span>
+                )}
+                <input
+                  className={inputCls}
                   value={a.texto}
                   onChange={e => {
                     const updated = abordagens.map((x, i) => i === idx ? { ...x, texto: e.target.value } : x)
                     onAbordagensChange(updated)
                   }}
+                  placeholder={gerando ? 'Aguardando geração...' : `Abordagem ${idx + 1}`}
+                  disabled={gerando}
                 />
               </div>
+              {abordagens.length > 1 && (
+                <button type="button" onClick={() => remover(a.id)}
+                  className="text-xs text-red-400 hover:text-red-600 shrink-0 mt-2.5">✕</button>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
-
-      <button
-        type="button"
-        onClick={adicionar}
-        className="flex items-center gap-2 text-sm text-brand font-medium hover:opacity-75 transition-opacity"
-      >
-        <Plus size={15} /> Adicionar abordagem manualmente
-      </button>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-xs text-blue-700"><span className="font-semibold">Como funciona:</span> O agente alterna entre as abordagens selecionadas ao longo das ligações, nunca repetindo a mesma em sequência. Você pode editar o texto de cada uma livremente.</p>
+          ))}
+        </div>
+        {abordagens.length < 10 && (
+          <button type="button" onClick={adicionar}
+            className="mt-2 text-xs text-brand hover:text-brand-600 font-medium flex items-center gap-1">
+            + Adicionar abordagem
+          </button>
+        )}
       </div>
     </div>
   )
@@ -4454,23 +4431,35 @@ export default function OnboardingPage() {
   const [objecoes, setObjecoes] = useState<Objecao[]>(() => {
     try { const s = localStorage.getItem('etz_onboarding_objecoes'); return s ? JSON.parse(s) : INITIAL_OBJECOES } catch { return INITIAL_OBJECOES }
   })
+  const ABORDAGENS_VAZIAS: Abordagem[] = [
+    { id: 'a1', tipo: 'personalizado', texto: '', selecionada: true },
+    { id: 'a2', tipo: 'personalizado', texto: '', selecionada: true },
+    { id: 'a3', tipo: 'personalizado', texto: '', selecionada: true },
+  ]
   const [abordagens, setAbordagens] = useState<Abordagem[]>(() => {
-    try { const s = localStorage.getItem('etz_onboarding_abordagens'); return s ? JSON.parse(s) : [] } catch { return [] }
+    try { const s = localStorage.getItem('etz_onboarding_abordagens'); return s ? JSON.parse(s) : ABORDAGENS_VAZIAS } catch { return ABORDAGENS_VAZIAS }
   })
+  const OBJECOES_CANAL_DEFAULTS: ObjecaoCanal[] = [
+    { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
+    { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
+    { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
+    { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
+    { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
+  ]
   const [objecoesCanal, setObjecoesCanal] = useState<ObjecaoCanal[]>(() => {
-    try { const s = localStorage.getItem('etz_onboarding_objecoes_canal'); return s ? JSON.parse(s) : [
-      { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
-      { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
-      { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
-      { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
-      { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
-    ] } catch { return [
-      { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
-      { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
-      { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
-      { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
-      { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
-    ] }
+    try {
+      const s = localStorage.getItem('etz_onboarding_objecoes_canal')
+      if (!s) return OBJECOES_CANAL_DEFAULTS
+      const loaded: ObjecaoCanal[] = JSON.parse(s)
+      // Migração: dados antigos sem fixo:true voltam para defaults preservando rebuttals editados
+      if (!loaded.some(o => o.fixo)) {
+        return OBJECOES_CANAL_DEFAULTS.map((def, i) => ({
+          ...def,
+          rebuttal: loaded[i]?.rebuttal || def.rebuttal,
+        }))
+      }
+      return loaded
+    } catch { return OBJECOES_CANAL_DEFAULTS }
   })
   const [perguntas, setPerguntas] = useState<string[]>(() => {
     try { const s = localStorage.getItem('etz_onboarding_perguntas'); return s ? JSON.parse(s) : ['', '', ''] } catch { return ['', '', ''] }
