@@ -3113,11 +3113,15 @@ function StepObjecoesCanal({
   objecoesCanal,
   onObjecoesCanalChange,
   abordagens,
+  objecoes,
+  perguntas,
 }: {
   form: FormData
   objecoesCanal: ObjecaoCanal[]
   onObjecoesCanalChange: (o: ObjecaoCanal[]) => void
   abordagens: Abordagem[]
+  objecoes: Objecao[]
+  perguntas: string[]
 }) {
   const [gerandoRebuttals, setGerandoRebuttals] = useState(false)
   const [erro, setErro] = useState('')
@@ -3156,6 +3160,10 @@ function StepObjecoesCanal({
         porte: form['empresa-porte'],
         produto: form['prod-nome'],
         resultados_clientes: form['prod-resultados'],
+        // Cascade etapa 3 — qualificação e objeções de valor
+        perguntas_qualificacao: perguntas.filter(Boolean).join(' | '),
+        objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).join('\n'),
+        // Cascade etapa 4 — abordagens de abertura aprovadas
         abordagens_contexto: abordagens.filter(a => a.selecionada).map(a => a.texto).join(' | '),
       })
       const rebuttals: Array<{ id: string; rebuttal: string }> = res.data.rebuttals || []
@@ -5260,6 +5268,8 @@ export default function OnboardingPage() {
               objecoesCanal={objecoesCanal}
               onObjecoesCanalChange={setObjecoesCanal}
               abordagens={abordagens}
+              objecoes={objecoes}
+              perguntas={perguntas}
             />
           )}
           {step === 5 && <Step3 form={form} onChange={onChange} />}
