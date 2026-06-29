@@ -269,9 +269,9 @@ const STEPS = [
   { label: 'Objetivo', icon: Target },
   { label: 'Empresa e Produto', icon: Building2 },
   { label: 'Qualificação & Objeções', icon: Brain },
+  { label: 'ICP & Sinais', icon: Target },
   { label: 'Abordagens de Abertura', icon: Zap },
   { label: 'Objeções de Canal', icon: MessageSquare },
-  { label: 'ICP & Sinais', icon: Target },
   { label: 'Cenário & Dores', icon: Brain },
   { label: 'Gatilhos de Fechamento', icon: Zap },
   { label: 'Público-alvo', icon: Target },
@@ -1676,9 +1676,11 @@ function StepQualificacao({
 }
 
 // ─── Step 5 — Gatilhos de Fechamento ─────────────────────────────────────────
-function StepGatilhosFechamento({ form, onChange }: {
+function StepGatilhosFechamento({ form, onChange, objecoes, abordagens }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
+  objecoes: Objecao[]
+  abordagens: Abordagem[]
 }) {
   const [gerando, setGerando] = useState(false)
   const [erroGeracao, setErroGeracao] = useState('')
@@ -1711,6 +1713,9 @@ function StepGatilhosFechamento({ form, onChange }: {
         // Etapa 5b — cenário & dores
         cenario_dores: form['cenario-dores'],
         materiais_conteudo: form['materiais-conteudo'],
+        // Cascade — objeções de valor + abordagens de abertura
+        objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).filter(Boolean).join('\n'),
+        abordagens_contexto: abordagens.filter(a => a.selecionada && a.texto.trim()).map(a => a.texto).join(' | '),
       })
       const data = res.data as { gatilhos: string }
       if (data.gatilhos) onChange('gatilhos-fechamento', data.gatilhos)
@@ -2677,12 +2682,16 @@ function StepVozTom({ form, onChange }: { form: FormData; onChange: (k: keyof Fo
 
 
 function StepCalibracaoVoz({
-  form, onChange, objecoes, perguntas,
+  form, onChange, objecoes, perguntas, ligSucesso, ligInsucesso, abordagens, objecoesCanal,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
   objecoes: Objecao[]
   perguntas: string[]
+  ligSucesso: LigacaoRef[]
+  ligInsucesso: LigacaoRef[]
+  abordagens: Abordagem[]
+  objecoesCanal: ObjecaoCanal[]
 }) {
   const [gerando, setGerando] = useState(false)
   const [erroGeracao, setErroGeracao] = useState<string | null>(null)
@@ -2741,6 +2750,12 @@ function StepCalibracaoVoz({
         agendamento_tom: form['agendamento-tom'],
         agendamento_duracao: form['agendamento-duracao'],
         agendamento_recusa: form['agendamento-recusa'],
+        // Step 11 — Ligações de referência (resumos extraídos pela IA)
+        ligacoes_sucesso_resumos: ligSucesso.filter(l => l.resumo).map(l => l.resumo).join('\n---\n'),
+        ligacoes_insucesso_resumos: ligInsucesso.filter(l => l.resumo).map(l => l.resumo).join('\n---\n'),
+        // Step 4/5 — Abordagens aprovadas + objeções de canal com rebuttals
+        abordagens_contexto: abordagens.filter(a => a.selecionada && a.texto.trim()).map(a => a.texto).join(' | '),
+        objecoes_canal_contexto: objecoesCanal.filter(o => o.objecao && o.rebuttal).map(o => `"${o.objecao}" → "${o.rebuttal}"`).join('\n'),
       })
       const data = res.data as { pronuncia?: string; termos_tecnicos?: string; ritmo_tom?: string; palavras_proibidas?: string }
       if (data.pronuncia) onChange('voz-pronuncia', data.pronuncia)
@@ -2960,14 +2975,22 @@ function StepAbordagensAbertura({
         descricao_empresa: form['empresa-descricao'],
         diferenciais: form['empresa-diferenciais'],
         objecoes_comuns: form['empresa-objecoes-comuns'],
+        contexto_mercado: form['empresa-contexto-mercado'],
         produto: form['prod-nome'],
         descricao_produto: form['prod-descricao'],
         resultados_clientes: form['prod-resultados'],
         concorrentes: form['prod-concorrentes'],
+        info_adicional: form['prod-info-extra'],
         objetivo: form['objetivo'],
+        // Step 3 — ICP + sinais de compra
+        icp_cargo: form['icp-cargo-tipo'],
+        icp_porte: form['icp-porte-alvo'],
+        icp_segmento: form['icp-segmento-alvo'],
+        sinais_compra: form['gatilhos-customizados'],
         perguntas_qualificacao: perguntas.filter(Boolean).join(' | '),
         objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).filter(Boolean).join('\n'),
         script_abertura: form['script-abertura'],
+        materiais_conteudo: form['materiais-conteudo'],
       })
       const novas: Abordagem[] = (res.data.abordagens || []).map((a: { id: string; tipo: string; texto: string }) => ({
         ...a,
@@ -3091,12 +3114,46 @@ function StepObjecoesCanal({
   objecoes: Objecao[]
   perguntas: string[]
 }) {
-  const [gerandoRebuttals, setGerandoRebuttals] = useState(false)
-  const [erro, setErro] = useState('')
+  const [gerandoFixas, setGerandoFixas] = useState(false)
+  const [gerandoNovas, setGerandoNovas] = useState(false)
+  const [erroFixas, setErroFixas] = useState('')
+  const [erroNovas, setErroNovas] = useState('')
 
   const fixas = objecoesCanal.filter(o => o.fixo)
   const novas = objecoesCanal.filter(o => !o.fixo)
   const novasComObjecao = novas.filter(o => o.objecao.trim())
+  const jaGerouFixas = fixas.some(o => o.rebuttal.trim().length > 0)
+  const jaGerouNovas = novas.length > 0 && novas.every(o => o.rebuttal.trim().length > 0)
+
+  const cascadePayload = {
+    // Step 1 — objetivo do agente
+    objetivo: form['objetivo'],
+    // Step 2 — empresa e produto (completo)
+    empresa: form['empresa-nome'],
+    segmento: form['empresa-segmento'],
+    porte: form['empresa-porte'],
+    descricao_empresa: form['empresa-descricao'],
+    diferenciais: form['empresa-diferenciais'],
+    objecoes_comuns: form['empresa-objecoes-comuns'],
+    contexto_mercado: form['empresa-contexto-mercado'],
+    produto: form['prod-nome'],
+    descricao_produto: form['prod-descricao'],
+    resultados_clientes: form['prod-resultados'],
+    concorrentes: form['prod-concorrentes'],
+    info_adicional: form['prod-info-extra'],
+    // Step 2 — qualificação e objeções de valor
+    perguntas_qualificacao: perguntas.filter(Boolean).join(' | '),
+    objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).join('\n'),
+    // Step ICP — cargo/porte/segmento alvo + sinais de compra (pre-preenchidos pelo pesquisar-mercado ou seleção manual)
+    icp_cargo: form['icp-cargo-tipo'],
+    icp_porte: form['icp-porte-alvo'],
+    icp_segmento: form['icp-segmento-alvo'],
+    sinais_compra: form['gatilhos-customizados'],
+    // Step Abordagens — abordagens de abertura geradas
+    abordagens_contexto: abordagens.filter(a => a.selecionada && a.texto.trim()).map(a => a.texto).join(' | '),
+    // Materiais anexados — resumos processados pela IA (alimenta etapas 3-12)
+    materiais_conteudo: form['materiais-conteudo'],
+  }
 
   function atualizarRebuttal(id: string, valor: string) {
     onObjecoesCanalChange(objecoesCanal.map(o => o.id === id ? { ...o, rebuttal: valor } : o))
@@ -3115,24 +3172,13 @@ function StepObjecoesCanal({
     onObjecoesCanalChange(objecoesCanal.filter(o => o.id !== id))
   }
 
-  async function gerarRebuttals() {
-    if (!novasComObjecao.length) return
-    setGerandoRebuttals(true)
-    setErro('')
+  async function gerarRebuttalsFixas() {
+    setGerandoFixas(true)
+    setErroFixas('')
     try {
-      // @ts-ignore — sugerirRebuttalsCanal será adicionado ao api.ts
       const res = await claudeApi.sugerirRebuttalsCanal({
-        objecoes_novas: novasComObjecao.map(o => ({ id: o.id, objecao: o.objecao })),
-        empresa: form['empresa-nome'],
-        segmento: form['empresa-segmento'],
-        porte: form['empresa-porte'],
-        produto: form['prod-nome'],
-        resultados_clientes: form['prod-resultados'],
-        // Cascade etapa 3 — qualificação e objeções de valor
-        perguntas_qualificacao: perguntas.filter(Boolean).join(' | '),
-        objecoes_valor: objecoes.map(o => `"${o.objecao}" → "${o.rebuttal}"`).join('\n'),
-        // Cascade etapa 4 — abordagens de abertura aprovadas
-        abordagens_contexto: abordagens.filter(a => a.selecionada).map(a => a.texto).join(' | '),
+        objecoes_fixas: fixas.map(o => ({ id: o.id, objecao: o.objecao })),
+        ...cascadePayload,
       })
       const rebuttals: Array<{ id: string; rebuttal: string }> = res.data.rebuttals || []
       onObjecoesCanalChange(objecoesCanal.map(o => {
@@ -3141,9 +3187,31 @@ function StepObjecoesCanal({
       }))
     } catch (e) {
       const err = e as { response?: { data?: { error?: string } }; message?: string }
-      setErro(err?.response?.data?.error || err?.message || 'Erro ao gerar rebuttals.')
+      setErroFixas(err?.response?.data?.error || err?.message || 'Erro ao gerar rebuttals.')
     } finally {
-      setGerandoRebuttals(false)
+      setGerandoFixas(false)
+    }
+  }
+
+  async function gerarRebuttalsNovas() {
+    if (!novasComObjecao.length) return
+    setGerandoNovas(true)
+    setErroNovas('')
+    try {
+      const res = await claudeApi.sugerirRebuttalsCanal({
+        objecoes_novas: novasComObjecao.map(o => ({ id: o.id, objecao: o.objecao })),
+        ...cascadePayload,
+      })
+      const rebuttals: Array<{ id: string; rebuttal: string }> = res.data.rebuttals || []
+      onObjecoesCanalChange(objecoesCanal.map(o => {
+        const found = rebuttals.find(r => r.id === o.id)
+        return found ? { ...o, rebuttal: found.rebuttal } : o
+      }))
+    } catch (e) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string }
+      setErroNovas(err?.response?.data?.error || err?.message || 'Erro ao gerar rebuttals.')
+    } finally {
+      setGerandoNovas(false)
     }
   }
 
@@ -3151,12 +3219,47 @@ function StepObjecoesCanal({
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-xl font-bold text-gray-900">Objeções de Canal</h2>
-        <p className="text-sm text-gray-500 mt-1">São as objeções de <strong>processo</strong>, não de valor — quando o prospect não quer falar agora mas não rejeitou o produto. As 5 mais comuns já estão configuradas; edite as respostas se quiser.</p>
+        <p className="text-sm text-gray-500 mt-1">São as objeções de <strong>processo</strong> — quando o prospect quer adiar o contato, mas não rejeitou o produto. Nossa IA gera respostas personalizadas para o seu segmento.</p>
       </div>
+
+      {/* Banner Gerar com IA — fixas */}
+      <div className={`flex items-start justify-between gap-4 p-4 rounded-xl border ${jaGerouFixas ? 'border-brand/20 bg-brand/5' : 'border-brand/30 bg-brand/5'}`}>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Brain size={18} className="text-brand shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Respostas geradas pela IA</p>
+            <p className="text-xs text-gray-500 mt-0.5">Gera rebuttals adaptados ao seu segmento, produto e tom com base nas etapas anteriores. Você pode editar qualquer resposta depois.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={gerarRebuttalsFixas}
+          disabled={gerandoFixas}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${
+            jaGerouFixas
+              ? 'text-brand border border-brand/30 hover:bg-brand/10'
+              : 'text-white bg-brand hover:bg-brand/90 border border-brand'
+          }`}
+        >
+          {gerandoFixas ? (
+            <><Loader2 size={11} className="animate-spin" />Gerando...</>
+          ) : jaGerouFixas ? (
+            <><RefreshCw size={11} />Regerar</>
+          ) : (
+            <><Brain size={11} />Gerar com IA</>
+          )}
+        </button>
+      </div>
+
+      {erroFixas && (
+        <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <AlertCircle size={13} className="shrink-0" />{erroFixas}
+        </div>
+      )}
 
       {/* Objeções fixas */}
       <div className="flex flex-col gap-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Objeções padrão</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">5 objeções padrão</p>
         {fixas.map((o) => (
           <div key={o.id} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3 bg-white">
             <div>
@@ -3166,9 +3269,10 @@ function StepObjecoesCanal({
             <div>
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Resposta do agente</label>
               <textarea
-                className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10"
+                className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 placeholder:text-gray-400"
                 rows={3}
                 value={o.rebuttal}
+                placeholder="Clique em 'Gerar com IA' para criar a resposta personalizada para o seu segmento."
                 onChange={e => atualizarRebuttal(o.id, e.target.value)}
               />
             </div>
@@ -3176,7 +3280,7 @@ function StepObjecoesCanal({
         ))}
       </div>
 
-      {/* Objeções novas */}
+      {/* Objeções novas adicionadas pelo cliente */}
       {novas.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -3184,12 +3288,18 @@ function StepObjecoesCanal({
             {novasComObjecao.length > 0 && (
               <button
                 type="button"
-                onClick={gerarRebuttals}
-                disabled={gerandoRebuttals}
-                className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                onClick={gerarRebuttalsNovas}
+                disabled={gerandoNovas}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${
+                  jaGerouNovas
+                    ? 'text-brand border border-brand/30 hover:bg-brand/10'
+                    : 'text-white bg-brand hover:bg-brand/90 border border-brand'
+                }`}
               >
-                {gerandoRebuttals ? (
+                {gerandoNovas ? (
                   <><Loader2 size={11} className="animate-spin" />Gerando...</>
+                ) : jaGerouNovas ? (
+                  <><RefreshCw size={11} />Regerar</>
                 ) : (
                   <><Brain size={11} />Gerar com IA</>
                 )}
@@ -3197,12 +3307,12 @@ function StepObjecoesCanal({
             )}
           </div>
           {novas.map((o) => (
-            <div key={o.id} className="border border-violet-200 rounded-xl p-4 flex flex-col gap-3 bg-violet-50/30">
+            <div key={o.id} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3 bg-white">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
                   <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Objeção do prospect</label>
                   <textarea
-                    className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 bg-white"
+                    className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 bg-white placeholder:text-gray-400"
                     rows={2}
                     placeholder='Ex: "Já trabalhamos com outra empresa."'
                     value={o.objecao}
@@ -3216,18 +3326,18 @@ function StepObjecoesCanal({
               <div>
                 <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Resposta do agente</label>
                 <textarea
-                  className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 bg-white"
+                  className="w-full mt-1 text-sm text-gray-700 border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/10 bg-white placeholder:text-gray-400"
                   rows={3}
-                  placeholder="Como o agente responde... (ou clique em Gerar com IA)"
+                  placeholder="Escreva a resposta ou clique em 'Gerar com IA'."
                   value={o.rebuttal}
                   onChange={e => atualizarRebuttal(o.id, e.target.value)}
                 />
               </div>
             </div>
           ))}
-          {erro && (
+          {erroNovas && (
             <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              <AlertCircle size={13} className="shrink-0" />{erro}
+              <AlertCircle size={13} className="shrink-0" />{erroNovas}
             </div>
           )}
         </div>
@@ -3242,7 +3352,7 @@ function StepObjecoesCanal({
       </button>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p className="text-xs text-amber-700"><span className="font-semibold">Dica:</span> As 5 objeções padrão cobrem os casos mais comuns. Edite as respostas para o tom do seu segmento. Adicione objeções específicas do seu mercado e clique "Gerar com IA" para gerar os rebuttals.</p>
+        <p className="text-xs text-amber-700"><span className="font-semibold">Dica:</span> Nossa IA gera respostas personalizadas para as 5 objeções com base no seu segmento e tom. Você pode editar qualquer resposta e adicionar objeções específicas do seu mercado.</p>
       </div>
     </div>
   )
@@ -4406,15 +4516,8 @@ const CI_SYNC_KEY = 'etz_ultima_sync_ci'
 export default function OnboardingPage() {
   const [tela, setTela] = useState<'grid' | 'wizard'>('grid')
   const [agenteHorarios, setAgenteHorarios] = useState<AgenteMock | null>(null)
-  const [step, setStep] = useState(() => {
-    try { return Number(localStorage.getItem('etz_onboarding_step') || '0') } catch { return 0 }
-  })
-  const [form, setForm] = useState<FormData>(() => {
-    try {
-      const saved = localStorage.getItem('etz_onboarding_form')
-      return saved ? { ...INITIAL_FORM, ...JSON.parse(saved) } : INITIAL_FORM
-    } catch { return INITIAL_FORM }
-  })
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState<FormData>(INITIAL_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [activated, setActivated] = useState(false)
   const [activating, setActivating] = useState(false)
@@ -4428,64 +4531,26 @@ export default function OnboardingPage() {
   const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [promptStatuses, setPromptStatuses] = useState<Record<string, boolean>>({})
-  const [objecoes, setObjecoes] = useState<Objecao[]>(() => {
-    try { const s = localStorage.getItem('etz_onboarding_objecoes'); return s ? JSON.parse(s) : INITIAL_OBJECOES } catch { return INITIAL_OBJECOES }
-  })
+  const [objecoes, setObjecoes] = useState<Objecao[]>(INITIAL_OBJECOES)
   const ABORDAGENS_VAZIAS: Abordagem[] = [
     { id: 'a1', tipo: 'personalizado', texto: '', selecionada: true },
     { id: 'a2', tipo: 'personalizado', texto: '', selecionada: true },
     { id: 'a3', tipo: 'personalizado', texto: '', selecionada: true },
   ]
-  const [abordagens, setAbordagens] = useState<Abordagem[]>(() => {
-    try { const s = localStorage.getItem('etz_onboarding_abordagens'); return s ? JSON.parse(s) : ABORDAGENS_VAZIAS } catch { return ABORDAGENS_VAZIAS }
-  })
+  const [abordagens, setAbordagens] = useState<Abordagem[]>(ABORDAGENS_VAZIAS)
   const OBJECOES_CANAL_DEFAULTS: ObjecaoCanal[] = [
-    { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: 'Claro, posso mandar. Mas normalmente o que as empresas precisam varia tanto por volume e tipo que o e-mail fica genérico demais. É muito mais rápido o especialista te mostrar o cenário certo em 20 minutos. Você tem uma brecha essa semana?' },
-    { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: 'Posso sim. Só que mensagem de texto sempre fica pra depois, né? São só 20 minutos com o especialista — você sai com o cenário certinho pro seu volume. Qual horário fica melhor essa semana?' },
-    { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: 'Sem problema. Quando seria melhor — amanhã de manhã ou mais pro final da semana?' },
-    { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: 'Claro. Como ela se chama? Assim eu já peço por ela na próxima vez.' },
-    { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: 'Entendo. Com quem seria melhor eu falar — você tem o contato da pessoa que cuida disso?' },
+    { id: '1', fixo: true, objecao: 'Me manda um e-mail com informações primeiro.', rebuttal: '' },
+    { id: '2', fixo: true, objecao: 'Me manda no WhatsApp.', rebuttal: '' },
+    { id: '3', fixo: true, objecao: 'Me liga em outro momento / Tô ocupado agora.', rebuttal: '' },
+    { id: '4', fixo: true, objecao: 'Fala com minha assistente / secretária.', rebuttal: '' },
+    { id: '5', fixo: true, objecao: 'Não sou eu quem decide isso.', rebuttal: '' },
   ]
-  const [objecoesCanal, setObjecoesCanal] = useState<ObjecaoCanal[]>(() => {
-    try {
-      const s = localStorage.getItem('etz_onboarding_objecoes_canal')
-      if (!s) return OBJECOES_CANAL_DEFAULTS
-      const loaded: ObjecaoCanal[] = JSON.parse(s)
-      // Migração: dados antigos sem fixo:true voltam para defaults preservando rebuttals editados
-      if (!loaded.some(o => o.fixo)) {
-        return OBJECOES_CANAL_DEFAULTS.map((def, i) => ({
-          ...def,
-          rebuttal: loaded[i]?.rebuttal || def.rebuttal,
-        }))
-      }
-      return loaded
-    } catch { return OBJECOES_CANAL_DEFAULTS }
-  })
-  const [perguntas, setPerguntas] = useState<string[]>(() => {
-    try { const s = localStorage.getItem('etz_onboarding_perguntas'); return s ? JSON.parse(s) : ['', '', ''] } catch { return ['', '', ''] }
-  })
-  const [materiais, setMateriais] = useState<Material[]>(() => {
-    try {
-      const s = localStorage.getItem('etz_onboarding_materiais')
-      if (s) return JSON.parse(s).map((m: Material) => ({ ...m, file: null, extraindo: false, erro: null }))
-    } catch {}
-    return [{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }]
-  })
+  const [objecoesCanal, setObjecoesCanal] = useState<ObjecaoCanal[]>(OBJECOES_CANAL_DEFAULTS)
+  const [perguntas, setPerguntas] = useState<string[]>(['', '', ''])
+  const [materiais, setMateriais] = useState<Material[]>([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
   const [scriptFiles, setScriptFiles] = useState<File[]>([])
-  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>(() => {
-    try {
-      const s = localStorage.getItem('etz_onboarding_ligsucesso')
-      if (s) return JSON.parse(s).map((l: LigacaoRef) => ({ ...l, file: null, transcrevendo: false, erro: null }))
-    } catch {}
-    return [{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }]
-  })
-  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>(() => {
-    try {
-      const s = localStorage.getItem('etz_onboarding_liginsucesso')
-      if (s) return JSON.parse(s).map((l: LigacaoRef) => ({ ...l, file: null, transcrevendo: false, erro: null }))
-    } catch {}
-    return [{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }]
-  })
+  const [ligSucesso, setLigSucesso] = useState<LigacaoRef[]>([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+  const [ligInsucesso, setLigInsucesso] = useState<LigacaoRef[]>([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
   const [activatingStep, setActivatingStep] = useState(0)
   const [showBemVindo, setShowBemVindo] = useState(false)
 
@@ -4557,50 +4622,14 @@ export default function OnboardingPage() {
 
   const agentes: AgenteMock[] = agentesRaw.map((a, i) => normalizeAgente(a, i))
 
-  // Persiste estados complexos no localStorage sempre que mudam
-  useEffect(() => {
-    try { localStorage.setItem('etz_onboarding_objecoes', JSON.stringify(objecoes)) } catch {}
-  }, [objecoes])
-  useEffect(() => {
-    try { localStorage.setItem('etz_onboarding_abordagens', JSON.stringify(abordagens)) } catch {}
-  }, [abordagens])
-  useEffect(() => {
-    try { localStorage.setItem('etz_onboarding_objecoes_canal', JSON.stringify(objecoesCanal)) } catch {}
-  }, [objecoesCanal])
-  useEffect(() => {
-    try { localStorage.setItem('etz_onboarding_perguntas', JSON.stringify(perguntas)) } catch {}
-  }, [perguntas])
-  useEffect(() => {
-    try {
-      const serial = materiais.map(m => ({ tipo: m.tipo, texto: m.texto, analise: m.analise, textoRaw: m.textoRaw }))
-      localStorage.setItem('etz_onboarding_materiais', JSON.stringify(serial))
-    } catch {}
-  }, [materiais])
-  useEffect(() => {
-    try {
-      const serial = ligSucesso.map(l => ({ resultado: l.resultado, transcricao: l.transcricao, resumo: l.resumo }))
-      localStorage.setItem('etz_onboarding_ligsucesso', JSON.stringify(serial))
-    } catch {}
-  }, [ligSucesso])
-  useEffect(() => {
-    try {
-      const serial = ligInsucesso.map(l => ({ resultado: l.resultado, transcricao: l.transcricao, resumo: l.resumo }))
-      localStorage.setItem('etz_onboarding_liginsucesso', JSON.stringify(serial))
-    } catch {}
-  }, [ligInsucesso])
 
   function onChange(k: keyof FormData, v: string) {
-    setForm(prev => {
-      const next = { ...prev, [k]: v }
-      try { localStorage.setItem('etz_onboarding_form', JSON.stringify(next)) } catch {}
-      return next
-    })
+    setForm(prev => ({ ...prev, [k]: v }))
     setErrors(prev => ({ ...prev, [k]: undefined }))
   }
 
   function saveStep(s: number) {
     setStep(s)
-    try { localStorage.setItem('etz_onboarding_step', String(s)) } catch {}
   }
 
   function validate(): boolean {
@@ -4797,6 +4826,11 @@ export default function OnboardingPage() {
       tom: agente.tom || '',
     })
     setObjecoes(raw.objecoes && raw.objecoes.length > 0 ? raw.objecoes : INITIAL_OBJECOES)
+    setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
+    setAbordagens(ABORDAGENS_VAZIAS)
+    setObjecoesCanal(OBJECOES_CANAL_DEFAULTS)
+    setLigSucesso([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+    setLigInsucesso([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
     setEditandoId(agente.id)
     setStep(0)
     setActivated(false)
@@ -4877,13 +4911,12 @@ export default function OnboardingPage() {
   }
 
   function reset() {
-    try {
-      ['etz_onboarding_form','etz_onboarding_step','etz_onboarding_objecoes','etz_onboarding_perguntas','etz_onboarding_materiais','etz_onboarding_ligsucesso','etz_onboarding_liginsucesso','etz_onboarding_abordagens','etz_onboarding_objecoes_canal'].forEach(k => localStorage.removeItem(k))
-    } catch {}
     setForm(INITIAL_FORM)
     setObjecoes(INITIAL_OBJECOES)
     setPerguntas(['', '', ''])
     setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
+    setAbordagens(ABORDAGENS_VAZIAS)
+    setObjecoesCanal(OBJECOES_CANAL_DEFAULTS)
     setScriptFiles([])
     setLigSucesso([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
     setLigInsucesso([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
@@ -4977,6 +5010,13 @@ export default function OnboardingPage() {
                     }))
                     setShowBemVindo(false)
                     setForm(INITIAL_FORM)
+                    setObjecoes(INITIAL_OBJECOES)
+                    setPerguntas(['', '', ''])
+                    setMateriais([{ file: null, tipo: '', texto: '', analise: null, extraindo: false, erro: null }])
+                    setAbordagens(ABORDAGENS_VAZIAS)
+                    setObjecoesCanal(OBJECOES_CANAL_DEFAULTS)
+                    setLigSucesso([{ file: null, resultado: 'sucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
+                    setLigInsucesso([{ file: null, resultado: 'insucesso', transcricao: '', resumo: null, transcrevendo: false, erro: null }])
                     setStep(0)
                     setEditandoId(null)
                     setActivated(false)
@@ -5232,7 +5272,8 @@ export default function OnboardingPage() {
               onPerguntasChange={handlePerguntasChange}
             />
           )}
-          {step === 3 && (
+          {step === 3 && <Step3 form={form} onChange={onChange} />}
+          {step === 4 && (
             <StepAbordagensAbertura
               form={form}
               abordagens={abordagens}
@@ -5241,7 +5282,7 @@ export default function OnboardingPage() {
               perguntas={perguntas}
             />
           )}
-          {step === 4 && (
+          {step === 5 && (
             <StepObjecoesCanal
               form={form}
               objecoesCanal={objecoesCanal}
@@ -5251,9 +5292,8 @@ export default function OnboardingPage() {
               perguntas={perguntas}
             />
           )}
-          {step === 5 && <Step3 form={form} onChange={onChange} />}
           {step === 6 && <StepCenarioDores form={form} onChange={onChange} />}
-          {step === 7 && <StepGatilhosFechamento form={form} onChange={onChange} />}
+          {step === 7 && <StepGatilhosFechamento form={form} onChange={onChange} objecoes={objecoes} abordagens={abordagens} />}
           {step === 8 && <StepPublicoAlvo form={form} onChange={onChange} />}
           {step === 9 && <StepMetodologia form={form} onChange={onChange} />}
           {step === 10 && <StepScriptLigacao form={form} onChange={onChange} onScriptFilesChange={setScriptFiles} />}
@@ -5266,7 +5306,7 @@ export default function OnboardingPage() {
           )}
           {step === 12 && <StepVozTom form={form} onChange={onChange} />}
           {step === 13 && <StepAgendamento form={form} onChange={onChange} />}
-          {step === 14 && <StepCalibracaoVoz form={form} onChange={onChange} objecoes={objecoes} perguntas={perguntas} />}
+          {step === 14 && <StepCalibracaoVoz form={form} onChange={onChange} objecoes={objecoes} perguntas={perguntas} ligSucesso={ligSucesso} ligInsucesso={ligInsucesso} abordagens={abordagens} objecoesCanal={objecoesCanal} />}
           {step === 15 && (
             <Step4
               materiais={materiais}
