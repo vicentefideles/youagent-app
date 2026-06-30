@@ -173,6 +173,14 @@ const INITIAL_OBJECOES: Objecao[] = [
   { objecao: '', rebuttal: '', sequencia: '', rebuttal_sequencia: '' },
 ]
 
+const DRAFT_KEY = 'etz_onboarding_draft'
+function loadDraft(): Record<string, any> | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
 const SEGMENTOS = [
   'Agronegócio / Pecuária',
   'Automotivo / Concessionárias',
@@ -4558,10 +4566,16 @@ function AgenteCard({
 const CI_SYNC_KEY = 'etz_ultima_sync_ci'
 
 export default function OnboardingPage() {
-  const [tela, setTela] = useState<'grid' | 'wizard'>('grid')
+  const [tela, setTela] = useState<'grid' | 'wizard'>(() => {
+    const d = loadDraft(); return d?.tela === 'wizard' ? 'wizard' : 'grid'
+  })
   const [agenteHorarios, setAgenteHorarios] = useState<AgenteMock | null>(null)
-  const [step, setStep] = useState(0)
-  const [form, setForm] = useState<FormData>(INITIAL_FORM)
+  const [step, setStep] = useState<number>(() => {
+    const d = loadDraft(); return typeof d?.step === 'number' ? d.step : 0
+  })
+  const [form, setForm] = useState<FormData>(() => {
+    const d = loadDraft(); return d?.form ? { ...INITIAL_FORM, ...d.form } : INITIAL_FORM
+  })
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [activated, setActivated] = useState(false)
   const [activating, setActivating] = useState(false)
@@ -4641,6 +4655,31 @@ export default function OnboardingPage() {
 
   // Limpa feedback ao trocar de tela
   useEffect(() => { setSyncFeedback(null) }, [tela])
+
+  // Restaura arrays do draft na primeira montagem
+  useEffect(() => {
+    const d = loadDraft()
+    if (!d) return
+    if (d.objecoes?.length) setObjecoes(d.objecoes)
+    if (d.perguntas?.length) setPerguntas(d.perguntas)
+    if (d.abordagens?.length) setAbordagens(d.abordagens)
+    if (d.objecoesCanal?.length) setObjecoesCanal(d.objecoesCanal)
+    if (d.materiais?.length) setMateriais(d.materiais.map((m: any) => ({ ...m, file: null, extraindo: false, erro: null })))
+    if (d.ligSucesso?.length) setLigSucesso(d.ligSucesso.map((l: any) => ({ ...l, file: null, transcrevendo: false, erro: null })))
+    if (d.ligInsucesso?.length) setLigInsucesso(d.ligInsucesso.map((l: any) => ({ ...l, file: null, transcrevendo: false, erro: null })))
+  }, [])
+
+  // Persiste wizard no localStorage a cada mudança relevante
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        step, tela, form, perguntas, objecoes, abordagens, objecoesCanal,
+        materiais: materiais.map(m => ({ tipo: m.tipo, texto: m.texto, textoRaw: m.textoRaw, analise: m.analise })),
+        ligSucesso: ligSucesso.map(l => ({ resultado: l.resultado, transcricao: l.transcricao, resumo: l.resumo })),
+        ligInsucesso: ligInsucesso.map(l => ({ resultado: l.resultado, transcricao: l.transcricao, resumo: l.resumo })),
+      }))
+    } catch {}
+  }, [step, tela, form, perguntas, objecoes, abordagens, objecoesCanal, materiais, ligSucesso, ligInsucesso])
 
   const { data: agentesRaw = [], refetch: refetchAgentes } = useQuery({
     queryKey: ['agentes'],
@@ -5052,6 +5091,7 @@ export default function OnboardingPage() {
                       aceito_em: new Date().toISOString(),
                       user: localStorage.getItem('youagent_jwt') ? 'autenticado' : 'anonimo',
                     }))
+                    localStorage.removeItem(DRAFT_KEY)
                     setShowBemVindo(false)
                     setForm(INITIAL_FORM)
                     setObjecoes(INITIAL_OBJECOES)
