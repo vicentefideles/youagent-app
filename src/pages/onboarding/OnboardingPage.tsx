@@ -2477,6 +2477,21 @@ function LigacoesSection({
                 </div>
               )}
 
+              {/* Textarea manual — sempre visível, envia para etapa 16 mesmo sem upload */}
+              {!m.file && !m.transcrevendo && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-1">Descreva a ligação <span className="text-gray-400 font-normal">(ou suba o áudio acima para transcrição automática)</span></p>
+                  <textarea
+                    rows={5}
+                    value={m.transcricao}
+                    onChange={e => update(i, { transcricao: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40 bg-white"
+                    placeholder="Descreva o que aconteceu: argumentos usados, tom, objeções encontradas, como o prospect reagiu, o que levou ao resultado..."
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Este texto vai direto para o prompt final — o agente aprende com esse contexto.</p>
+                </div>
+              )}
+
               {/* Transcrevendo */}
               {m.transcrevendo && (
                 <div className="flex items-center gap-3 bg-brand-50 border border-brand-200 rounded-lg px-4 py-3">
