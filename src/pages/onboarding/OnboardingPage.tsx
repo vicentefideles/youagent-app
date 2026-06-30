@@ -2424,6 +2424,24 @@ function LigacoesSection({
     }
   }
 
+  async function handleAnalisarTexto(i: number) {
+    const text = itemsRef.current[i].transcricao.trim()
+    if (!text) return
+    update(i, { transcrevendo: true, erro: null, resumo: null })
+    try {
+      const ctx = {
+        empresa:   form['empresa-nome']     || '',
+        segmento:  form['empresa-segmento'] || '',
+        produto:   form['prod-nome']        || '',
+        icp_cargo: form['icp-cargo-tipo']   || '',
+      }
+      const { data } = await agentesApi.analisarLigacaoTexto(text, tipo, ctx)
+      update(i, { transcrevendo: false, resumo: data.resumo || null })
+    } catch {
+      update(i, { transcrevendo: false, erro: 'Não foi possível analisar o texto. Tente novamente.' })
+    }
+  }
+
   const tituloSecao = isSucesso
     ? 'Ligações que converteram — o agente aprende o que funciona'
     : 'Ligações que não converteram — o agente aprende o que evitar'
@@ -2477,18 +2495,55 @@ function LigacoesSection({
                 </div>
               )}
 
-              {/* Textarea manual — sempre visível, envia para etapa 16 mesmo sem upload */}
+              {/* Textarea manual — sempre visível. Aceita transcrição bruta ou descrição; botão "Analisar com IA" gera resumo estruturado via Haiku */}
               {!m.file && !m.transcrevendo && (
                 <div>
-                  <p className="text-xs font-medium text-gray-600 mb-1">Descreva a ligação <span className="text-gray-400 font-normal">(ou suba o áudio acima para transcrição automática)</span></p>
+                  <p className="text-xs font-medium text-gray-600 mb-1">
+                    Cole a transcrição da ligação
+                    <span className="text-gray-400 font-normal"> — a IA extrai os aprendizados mais valiosos automaticamente</span>
+                  </p>
                   <textarea
                     rows={5}
                     value={m.transcricao}
-                    onChange={e => update(i, { transcricao: e.target.value })}
+                    onChange={e => update(i, { transcricao: e.target.value, resumo: null })}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40 bg-white"
-                    placeholder="Descreva o que aconteceu: argumentos usados, tom, objeções encontradas, como o prospect reagiu, o que levou ao resultado..."
+                    placeholder="Cole aqui a transcrição completa da ligação. Clique em &quot;Analisar com IA&quot; e a IA identifica os momentos-chave, frases que funcionaram e padrões do prospect — para enriquecer o prompt do agente."
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Este texto vai direto para o prompt final — o agente aprende com esse contexto.</p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <p className="text-[10px] text-gray-400">
+                      {m.resumo
+                        ? 'Análise gerada pela IA — editável abaixo.'
+                        : 'Ou suba o áudio acima para transcrição automática + análise.'}
+                    </p>
+                    {m.transcricao.trim().length > 50 && !m.resumo && (
+                      <button type="button"
+                        onClick={() => handleAnalisarTexto(i)}
+                        className={`text-xs font-medium border rounded-md px-2.5 py-1 transition-colors bg-white ${isSucesso ? 'text-emerald-700 border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50' : 'text-amber-700 border-amber-200 hover:border-amber-400 hover:bg-amber-50'}`}>
+                        Analisar com IA →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Resumo gerado a partir de texto manual — sem arquivo */}
+              {!m.file && !m.transcrevendo && m.resumo && (
+                <div>
+                  <div className={`border ${colors.cardBg} rounded-lg px-3 py-2.5 flex items-start gap-2 mb-2`}>
+                    <Brain size={13} className={`shrink-0 mt-0.5 ${isSucesso ? 'text-emerald-600' : 'text-amber-600'}`} />
+                    <div className="flex-1">
+                      <p className={`text-xs font-semibold mb-1 ${colors.cardText}`}>Padrões extraídos — injetados no prompt final do agente:</p>
+                      <p className={`text-xs leading-relaxed ${colors.cardText}`}>{m.resumo}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs font-medium text-gray-600 mb-1">Aprendizados — editável:</p>
+                  <textarea
+                    rows={4}
+                    value={m.resumo}
+                    onChange={e => update(i, { resumo: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40 bg-white"
+                    placeholder="Edite os aprendizados se necessário..."
+                  />
                 </div>
               )}
 
@@ -2498,7 +2553,7 @@ function LigacoesSection({
                   <div className={`w-4 h-4 border-2 ${colors.spinnerBorder} border-t-transparent rounded-full animate-spin shrink-0`} />
                   <div>
                     <p className="text-sm font-medium text-brand-700">Analisando ligação real...</p>
-                    <p className="text-xs text-brand-500">Whisper transcreve o áudio · IA extrai os padrões específicos para o seu mercado</p>
+                    <p className="text-xs text-brand-500">IA extrai os padrões específicos para o seu mercado</p>
                   </div>
                 </div>
               )}

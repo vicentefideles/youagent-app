@@ -98,6 +98,15 @@ export const agentesApi = {
       timeout: 120000,
     })
   },
+  analisarLigacaoTexto: (
+    transcricao: string,
+    resultado: 'sucesso' | 'insucesso',
+    ctx?: { empresa?: string; segmento?: string; produto?: string; icp_cargo?: string }
+  ) => api.post('/agentes/analisar-ligacao-texto', {
+    transcricao,
+    resultado,
+    ...(ctx || {}),
+  }, { timeout: 60000 }),
 }
 
 // Campanhas
