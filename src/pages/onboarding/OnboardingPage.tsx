@@ -1044,16 +1044,6 @@ function Step1({
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Identificação</span>
         </div>
 
-        <Field label="Nome do agente" required error={errors['nome-agente']}>
-          <input
-            id="nome-agente"
-            className={inputCls}
-            value={form['nome-agente']}
-            onChange={e => onChange('nome-agente', e.target.value)}
-            placeholder="Ex: Maria — Prospecção SP"
-          />
-        </Field>
-
         <div className="grid grid-cols-2 gap-4">
           <Field label="Nome da empresa" required error={errors['empresa-nome']}>
             <input
@@ -2717,7 +2707,7 @@ function StepCalibracaoVoz({
       const res = await claudeApi.sugerirCalibracaoVoz({
         // Etapa 1
         objetivo: form['objetivo'],
-        nome_agente: form['nome-agente'],
+        nome_agente: VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz,
         // Etapa 2 — Empresa & Produto
         empresa: form['empresa-nome'],
         segmento: form['empresa-segmento'],
@@ -3533,7 +3523,7 @@ function Step4({
     try {
       const payload = {
         objetivo: form['objetivo'],
-        nome_agente: form['nome-agente'],
+        nome_agente: vozNome,
         empresa: form['empresa-nome'],
         segmento: form['empresa-segmento'],
         porte: form['empresa-porte'],
@@ -3770,8 +3760,8 @@ function Step4({
         <div>
           <h2 className="text-xl font-bold text-gray-900">
             {modoEdicao
-              ? `Agente ${form['nome-agente'] || form['empresa-nome']} atualizado!`
-              : `${form['nome-agente'] || form['empresa-nome']} está pronto!`}
+              ? `Agente ${vozNome || form['empresa-nome']} atualizado!`
+              : `${vozNome || form['empresa-nome']} está pronto!`}
           </h2>
           <p className="text-sm text-gray-500 mt-2 max-w-sm mx-auto">
             {modoEdicao
@@ -3839,7 +3829,7 @@ function Step4({
       {!gerando && !form['prompt_gerado'] && (() => {
         const etapas = [
           { num: 1,  label: 'Objetivo',               valido: !!form['objetivo'],                                                                                                                                                                                                                                                                                                                                                                                                                                                                          critico: true,  hint: 'Selecione o objetivo do agente' },
-          { num: 2,  label: 'Empresa & Produto',       valido: !!(form['nome-agente']?.trim() && form['empresa-nome']?.trim() && form['empresa-segmento']?.trim() && form['empresa-porte']?.trim() && form['empresa-descricao']?.trim() && form['empresa-diferenciais']?.trim() && form['empresa-objecoes-comuns']?.trim() && form['empresa-contexto-mercado']?.trim() && form['prod-nome']?.trim() && form['prod-descricao']?.trim() && form['prod-resultados']?.trim() && form['prod-info-extra']?.trim() && form['prod-concorrentes']?.trim() && materiais?.some(m => m.texto?.trim())), critico: true,  hint: 'Use "Pesquisar com IA" para preencher descrição, diferenciais, concorrentes e contexto — e adicione ao menos 1 material da empresa' },
+          { num: 2,  label: 'Empresa & Produto',       valido: !!(form['empresa-nome']?.trim() && form['empresa-segmento']?.trim() && form['empresa-porte']?.trim() && form['empresa-descricao']?.trim() && form['empresa-diferenciais']?.trim() && form['empresa-objecoes-comuns']?.trim() && form['empresa-contexto-mercado']?.trim() && form['prod-nome']?.trim() && form['prod-descricao']?.trim() && form['prod-resultados']?.trim() && form['prod-info-extra']?.trim() && form['prod-concorrentes']?.trim() && materiais?.some(m => m.texto?.trim())), critico: true,  hint: 'Use "Pesquisar com IA" para preencher descrição, diferenciais, concorrentes e contexto — e adicione ao menos 1 material da empresa' },
           { num: 3,  label: 'Qualificação & Objeções', valido: !!(perguntas.filter(Boolean).length >= 1 && objecoes.filter(o => o.objecao && o.rebuttal).length >= 2),                                                                                                                                                                                                                                                                                                                                                                                                                      critico: true,  hint: 'Adicione ao menos 1 pergunta de qualificação e 2 objeções com resposta — use "Gerar com IA" para preencher automaticamente' },
           { num: 4,  label: 'ICP & Sinais',            valido: !!(form['icp-cargo-tipo']?.trim() && form['icp-porte-alvo']?.trim() && form['icp-segmento-alvo']?.trim() && form['gatilhos-customizados']?.trim()),                                                                                                                                                                                                                                                                                                                                                                        critico: true,  hint: 'Preencha cargos-alvo, porte-alvo, segmento-alvo e sinais de compra' },
           { num: 5,  label: 'Abordagens de Abertura',  valido: !!(abordagens?.some(a => a.selecionada && a.texto.trim())),                                                                                                                                                                                                                                                                                                                                                                                                                                                               critico: true,  hint: 'Gere ou escreva ao menos 1 abordagem de abertura' },
@@ -4721,9 +4711,6 @@ export default function OnboardingPage() {
     const newErrors: Partial<Record<keyof FormData, string>> = {}
     // Step 0 = Objetivo — sem validação obrigatória
     // Step 1 = Empresa e Produto
-    if (step === 1 && !form['nome-agente'].trim()) {
-      newErrors['nome-agente'] = 'Nome do agente é obrigatório'
-    }
     if (step === 1 && !form['empresa-nome'].trim()) {
       newErrors['empresa-nome'] = 'Nome da empresa é obrigatório'
     }
@@ -4754,7 +4741,7 @@ export default function OnboardingPage() {
     setActivatingStep(0)
     setActivateError('')
     const payload = {
-      nome: form['nome-agente'] || form['empresa-nome'] + ' — Agente IA',
+      nome: (VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz) || form['empresa-nome'] + ' — Agente IA',
       empresa: form['empresa-nome'],
       cnpj: form['empresa-cnpj'],
       segmento: form['empresa-segmento'],
@@ -5337,7 +5324,7 @@ export default function OnboardingPage() {
             </div>
             <span className="text-xl font-bold text-gray-900">{editandoId ? 'Editar Agente' : 'Novo Agente de IA'}</span>
           </div>
-          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${form['nome-agente'] || form['empresa-nome']}` : `Configure seu agente de vendas autônomo em ${STEPS.length} etapas`}</p>
+          <p className="text-sm text-gray-500">{editandoId ? `Editando: ${VOZES_TELNYX.find(v => v.id === form.voz)?.nome || form['empresa-nome']}` : `Configure seu agente de vendas autônomo em ${STEPS.length} etapas`}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
