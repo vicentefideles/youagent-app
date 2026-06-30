@@ -3487,6 +3487,7 @@ function Step4({
   novoAgenteId,
   abordagens,
   objecoesCanal,
+  perguntas,
 }: {
   form: FormData
   onChange: (k: keyof FormData, v: string) => void
@@ -3503,6 +3504,7 @@ function Step4({
   novoAgenteId?: string
   abordagens?: Abordagem[]
   objecoesCanal?: ObjecaoCanal[]
+  perguntas: string[]
 }) {
   const navigate = useNavigate()
   const [gerando, setGerando] = useState(false)
@@ -5408,6 +5410,7 @@ export default function OnboardingPage() {
               novoAgenteId={novoAgenteId}
               abordagens={abordagens}
               objecoesCanal={objecoesCanal}
+              perguntas={perguntas}
             />
           )}
           {activateError && (
