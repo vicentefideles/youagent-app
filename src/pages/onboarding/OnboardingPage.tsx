@@ -5007,6 +5007,8 @@ export default function OnboardingPage() {
     'Empresa e produto',
     'Qualificação & Objeções',
     'ICP & Sinais de compra',
+    'Abordagens de Abertura',
+    'Objeções de Canal',
     'Cenário & Dores',
     'Gatilhos de Fechamento',
     'Público-alvo',
