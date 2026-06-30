@@ -3502,13 +3502,6 @@ function Step4({
   const [stepProgress, setStepProgress] = useState<number[]>([0, 0, 0, 0])
   const vozNome = VOZES_TELNYX.find(v => v.id === form.voz)?.nome ?? form.voz
 
-  // Gera automaticamente ao montar, se ainda não gerou
-  useEffect(() => {
-    if (!form['prompt_gerado'] && !gerando) {
-      gerarPrompt()
-    }
-  }, [])
-
   async function gerarPrompt() {
     setGerando(true)
     setErroGeracao('')
@@ -3579,7 +3572,7 @@ function Step4({
         voz_ritmo_tom: form['voz-ritmo-tom'],
         voz_palavras_proibidas: form['voz-palavras-proibidas'],
         abordagens_selecionadas: abordagens
-          ? abordagens.filter(a => a.selecionada).map(a => `[${a.tipo.toUpperCase()}] ${a.texto}`).join('\n')
+          ? abordagens.filter(a => a.selecionada && a.texto.trim()).map(a => `[${a.tipo.toUpperCase()}] ${a.texto}`).join('\n')
           : '',
         objecoes_canal: objecoesCanal
           ? objecoesCanal.filter(o => o.objecao && o.rebuttal).map(o => `- "${o.objecao}"\n  → "${o.rebuttal}"`).join('\n')
@@ -3821,39 +3814,93 @@ function Step4({
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Brain size={18} className="text-brand" />
-          <h3 className="text-base font-semibold text-gray-900">Prompt gerado pela IA</h3>
+          <h3 className="text-base font-semibold text-gray-900">
+            {form['prompt_gerado'] ? 'Prompt gerado pela IA' : 'Revisão Final & Geração do Prompt'}
+          </h3>
         </div>
         <p className="text-sm text-gray-500">
-          O sistema leu todas as informações que você preencheu e montou o prompt completo do agente.
-          Revise, edite se necessário, e ative.
+          {form['prompt_gerado']
+            ? 'Revise, edite se necessário e ative o agente.'
+            : 'Confirme as etapas preenchidas e clique em "Gerar Prompt Final" quando tudo estiver pronto.'}
         </p>
       </div>
 
-      {/* Aviso de qualidade */}
+      {/* Card de revisão das etapas + botão Gerar Prompt Final */}
       {!gerando && !form['prompt_gerado'] && (() => {
-        const avisos: string[] = []
-        const resultados = form['prod-resultados'] || ''
-        if (!resultados || !/\d/.test(resultados)) avisos.push('Adicione pelo menos 1 resultado com número ou percentual (etapa 2)')
-        const objecoesValidas = objecoes.filter(o => o.objecao && o.rebuttal)
-        if (objecoesValidas.length < 2) avisos.push(`Complete pelo menos 2 objeções com resposta — você tem ${objecoesValidas.length} (etapa 3)`)
-        const sinais = form['gatilhos-customizados'] || ''
-        const qtdSinais = sinais.split('\n').filter((s: string) => s.trim()).length
-        if (qtdSinais < 3) avisos.push(`Adicione pelo menos 3 sinais de compra — você tem ${qtdSinais} (etapa 4)`)
-        if (avisos.length === 0) return null
+        const etapas = [
+          { num: 1,  label: 'Objetivo',               valido: !!form['objetivo'],                                                                                                                                        critico: true,  hint: 'Selecione o objetivo do agente' },
+          { num: 2,  label: 'Empresa & Produto',       valido: !!(form['empresa-nome']?.trim() && form['prod-nome']?.trim()),                                                                                             critico: true,  hint: 'Preencha nome da empresa e do produto' },
+          { num: 3,  label: 'Qualificação & Objeções', valido: objecoes.filter(o => o.objecao && o.rebuttal).length >= 1 && [form['wiz-qualif-q1'], form['wiz-qualif-q2'], form['wiz-qualif-q3']].some(Boolean),         critico: true,  hint: 'Ao menos 1 objeção com resposta e 1 pergunta' },
+          { num: 4,  label: 'ICP & Sinais',            valido: !!(form['icp-cargo-tipo']?.trim() && form['gatilhos-customizados']?.trim()),                                                                               critico: true,  hint: 'Selecione cargos-alvo e sinais de compra' },
+          { num: 5,  label: 'Abordagens de Abertura',  valido: !!(abordagens?.some(a => a.selecionada && a.texto.trim())),                                                                                                critico: true,  hint: 'Gere ou escreva ao menos 1 abordagem de abertura' },
+          { num: 6,  label: 'Objeções de Canal',       valido: (objecoesCanal?.filter(o => o.objecao && o.rebuttal).length ?? 0) >= 3,                                                                                    critico: false, hint: 'Gere rebuttals para as objeções de canal' },
+          { num: 7,  label: 'Cenário & Dores',         valido: !!form['cenario-dores']?.trim(),                                                                                                                           critico: false, hint: 'Descreva o cenário e dores do público-alvo' },
+          { num: 8,  label: 'Gatilhos de Fechamento',  valido: !!form['gatilhos-fechamento']?.trim(),                                                                                                                     critico: false, hint: 'Adicione gatilhos de fechamento imediato' },
+          { num: 9,  label: 'Público-alvo',            valido: !!form['icp-cargo-tipo']?.trim(),                                                                                                                          critico: true,  hint: 'Selecione o público-alvo na etapa 9' },
+          { num: 10, label: 'Metodologia',             valido: !!form['metodologia']?.trim(),                                                                                                                             critico: true,  hint: 'Selecione a metodologia de vendas' },
+          { num: 11, label: 'Roteiro & Materiais',     valido: !!(form['script-ligacao']?.trim() || materiais?.some(m => m.texto?.trim())),                                                                               critico: false, hint: 'Adicione script de ligação ou materiais da empresa' },
+          { num: 12, label: 'Ligações de Referência',  valido: !!(ligacoesSucesso?.some(l => l.resumo || l.transcricao) || ligacoesInsucesso?.some(l => l.resumo || l.transcricao)),                                     critico: false, hint: 'Ligações reais melhoram muito a qualidade do prompt' },
+          { num: 13, label: 'Voz e Tom',               valido: !!(form['voz']?.trim() && form['tom']?.trim()),                                                                                                            critico: true,  hint: 'Selecione voz e tom do agente' },
+          { num: 14, label: 'Agendamento',             valido: !!form['agendamento-estrategia']?.trim(),                                                                                                                  critico: true,  hint: 'Defina a estratégia de agendamento' },
+          { num: 15, label: 'Calibração de Voz',       valido: !!(form['voz-pronuncia']?.trim() || form['voz-ritmo-tom']?.trim()),                                                                                        critico: false, hint: 'Use "Sugerir com IA" para calibrar pronúncia e ritmo' },
+        ]
+        const criticosFaltando = etapas.filter(e => e.critico && !e.valido)
+        const canGenerate = criticosFaltando.length === 0
+        const totalOk = etapas.filter(e => e.valido).length
         return (
-          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle size={14} className="text-amber-600" />
-              <p className="text-xs font-semibold text-amber-800">Para um prompt mais preciso, considere completar:</p>
+          <div className="flex flex-col gap-4">
+            {/* Grid de etapas */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-gray-50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-700">Etapas preenchidas</p>
+                <span className={`text-xs font-bold ${totalOk === 15 ? 'text-green-600' : 'text-brand'}`}>{totalOk}/15</span>
+              </div>
+              <div className="grid grid-cols-3 gap-px bg-gray-100">
+                {etapas.map(e => (
+                  <div key={e.num} className="bg-white px-3 py-2.5 flex items-start gap-2">
+                    <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      e.valido ? 'bg-green-100' : e.critico ? 'bg-red-100' : 'bg-amber-100'
+                    }`}>
+                      {e.valido
+                        ? <Check size={9} className="text-green-600" />
+                        : <span className={`text-[9px] font-bold leading-none ${e.critico ? 'text-red-600' : 'text-amber-500'}`}>!</span>
+                      }
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-[11px] font-medium leading-tight ${e.valido ? 'text-gray-700' : e.critico ? 'text-red-700' : 'text-amber-700'}`}>{e.num}. {e.label}</p>
+                      {!e.valido && <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{e.hint}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <ul className="space-y-1">
-              {avisos.map((a: string, i: number) => (
-                <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
-                  <span className="mt-0.5 flex-shrink-0">•</span><span>{a}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-[10px] text-amber-600 mt-2">Você pode gerar mesmo assim — é uma sugestão, não um bloqueio.</p>
+            {/* Aviso de campos críticos */}
+            {criticosFaltando.length > 0 && (
+              <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-red-800 mb-1">Complete para liberar a geração:</p>
+                  <ul className="space-y-0.5">
+                    {criticosFaltando.map(e => (
+                      <li key={e.num} className="text-xs text-red-700">• Etapa {e.num} — {e.label}: {e.hint}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+            {/* Botão Gerar Prompt Final */}
+            <button
+              type="button"
+              onClick={gerarPrompt}
+              disabled={!canGenerate}
+              className="flex items-center justify-center gap-2.5 w-full py-4 bg-violet-600 text-white font-semibold text-sm rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            >
+              <Brain size={18} />
+              Gerar Prompt Final
+            </button>
+            {!canGenerate && (
+              <p className="text-xs text-center text-gray-400 -mt-2">Preencha as etapas obrigatórias acima para liberar a geração</p>
+            )}
           </div>
         )
       })()}
@@ -3875,7 +3922,7 @@ function Step4({
           {/* Etapas do processo com barras de progresso */}
           <div className="space-y-2.5 mb-5">
             {[
-              { label: 'Lendo todas as 14 etapas preenchidas', detail: 'empresa, produto, ICP, scripts, roteiros, calibração de voz...' },
+              { label: 'Lendo todas as 15 etapas preenchidas', detail: 'empresa, produto, ICP, abordagens, objeções, ligações reais, calibração de voz...' },
               { label: 'Passagem 1 — Gerando o rascunho do prompt', detail: 'Opus 4.8 com raciocínio adaptativo monta as instruções base' },
               { label: 'Passagem 2 — Revisão e refinamento crítico', detail: 'Verifica especificidade, dados reais, objeções e sinais de compra' },
               { label: 'Entregando o prompt finalizado', detail: 'Pronto para revisar, editar e ativar' },
@@ -3930,7 +3977,7 @@ function Step4({
             <RefreshCw size={14} /> Tentar novamente
           </button>
         </div>
-      ) : (
+      ) : form['prompt_gerado'] ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Prompt do agente — editável</p>
@@ -3947,21 +3994,18 @@ function Step4({
             rows={20}
             value={form['prompt_gerado']}
             onChange={e => onChange('prompt_gerado', e.target.value)}
-            placeholder="O prompt será gerado automaticamente..."
           />
           <p className="text-xs text-gray-400">
             Edite livremente — este é exatamente o texto que o agente vai receber na Telnyx.
           </p>
-          {form['prompt_gerado'] && !gerando && (
-            <PainelValidacao
-              prompt={form['prompt_gerado']}
-              empresa={form['empresa-nome'] || ''}
-              produto={form['prod-nome'] || ''}
-              onPromptCorrigido={(novo) => onChange('prompt_gerado', novo)}
-            />
-          )}
+          <PainelValidacao
+            prompt={form['prompt_gerado']}
+            empresa={form['empresa-nome'] || ''}
+            produto={form['prod-nome'] || ''}
+            onPromptCorrigido={(novo) => onChange('prompt_gerado', novo)}
+          />
         </div>
-      )}
+      ) : null}
 
       {/* Badge CI */}
       <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">

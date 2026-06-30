@@ -360,7 +360,7 @@ export const claudeApi = {
   sugerirRebuttalsCanal: (data: Record<string, unknown>) =>
     api.post('/claude/sugerir-rebuttals-canal', data, { timeout: 60000 }),
   validarPrompt: (data: { prompt: string; empresa: string; produto: string }) =>
-    api.post('/claude/validar-prompt', data, { timeout: 60000 }),
+    api.post('/claude/validar-prompt', data, { timeout: 120000 }),
   gerarCross: (data: { gatilho: string; exemplos: string[] }) =>
     api.post('/claude/gerar-cross', data),
   scoreInteligencia: () => api.get('/claude/score-inteligencia'),
