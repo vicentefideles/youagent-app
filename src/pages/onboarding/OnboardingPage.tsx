@@ -1940,6 +1940,7 @@ function ScriptSlotCard({
   index,
   total,
   onTextoChange,
+  onAnaliseChange,
   onFileSelect,
   onRemoverArquivo,
   onRemoverSlot,
