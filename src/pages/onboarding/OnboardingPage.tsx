@@ -2601,12 +2601,16 @@ function LigacoesSection({
                       <p className={`text-xs leading-relaxed ${colors.cardText}`}>{m.resumo}</p>
                     </div>
                   </div>
-                  <p className="text-xs font-medium text-gray-600 mb-1">Aprendizados — editável:</p>
+                  <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isSucesso ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    <Check size={11} className="shrink-0" />
+                    Aprendizados — editável
+                    <span className={`font-normal ${isSucesso ? 'text-emerald-500' : 'text-amber-500'}`}>— este conteúdo vai para o prompt final</span>
+                  </p>
                   <textarea
                     rows={4}
                     value={m.resumo}
                     onChange={e => update(i, { resumo: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40 bg-white"
+                    className={`w-full border rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 ${isSucesso ? 'border-emerald-200 bg-emerald-50/40 focus:ring-emerald-100 focus:border-emerald-400' : 'border-amber-200 bg-amber-50/40 focus:ring-amber-100 focus:border-amber-400'}`}
                     placeholder="Edite os aprendizados se necessário..."
                   />
                 </div>
@@ -2654,15 +2658,18 @@ function LigacoesSection({
               {/* Textarea editável — aparece após transcrição, igual ao padrão das outras etapas */}
               {m.file && !m.transcrevendo && !m.erro && m.resumo && (
                 <div>
-                  <p className="text-xs font-medium text-gray-600 mb-1">Aprendizados — editável pelo agente:</p>
+                  <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isSucesso ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    <Check size={11} className="shrink-0" />
+                    Aprendizados — editável
+                    <span className={`font-normal ${isSucesso ? 'text-emerald-500' : 'text-amber-500'}`}>— este conteúdo vai para o prompt final</span>
+                  </p>
                   <textarea
                     rows={4}
                     value={m.resumo}
                     onChange={e => update(i, { resumo: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40 bg-white"
+                    className={`w-full border rounded-lg px-3 py-2 text-xs text-gray-700 leading-relaxed resize-none focus:outline-none focus:ring-2 ${isSucesso ? 'border-emerald-200 bg-emerald-50/40 focus:ring-emerald-100 focus:border-emerald-400' : 'border-amber-200 bg-amber-50/40 focus:ring-amber-100 focus:border-amber-400'}`}
                     placeholder="Edite os aprendizados extraídos se necessário..."
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Este texto vai direto para o prompt final — edite para corrigir ou complementar.</p>
                 </div>
               )}
 
