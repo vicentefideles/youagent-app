@@ -1949,6 +1949,7 @@ function ScriptSlotCard({
   index: number
   total: number
   onTextoChange: (id: string, texto: string) => void
+  onAnaliseChange: (id: string, analise: string) => void
   onFileSelect: (id: string, file: File) => void
   onRemoverArquivo: (id: string) => void
   onRemoverSlot: (id: string) => void
@@ -2046,26 +2047,31 @@ function ScriptSlotCard({
           </div>
         )}
 
-        {/* Textarea — sempre visível, pré-preenchido se arquivo extraído */}
-        <textarea
-          rows={slot.fileName && slot.texto ? 5 : 9}
-          value={slot.texto}
-          onChange={e => onTextoChange(slot.id, e.target.value)}
-          placeholder={`Cole o texto do script aqui ou envie um arquivo acima...
+        {/* Textarea — quando analise existe: editável e vai para o prompt. Caso contrário: entrada de texto */}
+        {slot.analise && !slot.extraindo ? (
+          <div>
+            <p className="text-xs font-medium text-emerald-700 mb-1 flex items-center gap-1">
+              <Check size={11} className="shrink-0" />
+              Análise do script — editável
+              <span className="text-emerald-500 font-normal">— este conteúdo vai para o prompt final</span>
+            </p>
+            <textarea
+              rows={9}
+              value={slot.analise}
+              onChange={e => onAnaliseChange(slot.id, e.target.value)}
+              className="border border-emerald-200 rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 resize-none text-gray-700 w-full bg-emerald-50/40"
+            />
+          </div>
+        ) : (
+          <textarea
+            rows={slot.fileName && slot.texto ? 5 : 9}
+            value={slot.texto}
+            onChange={e => onTextoChange(slot.id, e.target.value)}
+            placeholder={`Cole o texto do script aqui ou envie um arquivo acima...
 
 Ex: "Olá [Nome], aqui é [Agente] da [Empresa]. Ligando porque vocês [contexto]. Tem 2 minutos?"`}
-          className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300 w-full"
-        />
-
-        {/* Card de análise — exibido para texto manual (sem arquivo) */}
-        {!slot.fileName && !slot.extraindo && slot.analise && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
-            <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-emerald-700 mb-1">Padrões do script — injetados no prompt final do agente:</p>
-              <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{slot.analise}</p>
-            </div>
-          </div>
+            className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300 w-full"
+          />
         )}
 
         {/* Botão Analisar com IA — arquivo ou texto manual com ≥50 chars */}
@@ -2073,7 +2079,7 @@ Ex: "Olá [Nome], aqui é [Agente] da [Empresa]. Ligando porque vocês [contexto
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-gray-400">
               {slot.analise
-                ? 'Padrões extraídos — clique para re-analisar.'
+                ? 'Re-analise para melhorar os padrões extraídos.'
                 : 'Clique para extrair padrões do script com IA.'}
             </p>
             <button
@@ -2191,6 +2197,10 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
     updateSlot(id, { texto })
   }
 
+  function handleAnaliseChange(id: string, analise: string) {
+    updateSlot(id, { analise })
+  }
+
   function handleRemoverArquivo(id: string) {
     updateSlot(id, { fileName: null, analise: null, erro: null, texto: '' })
   }
@@ -2235,6 +2245,7 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
           index={index}
           total={slots.length}
           onTextoChange={handleTextoChange}
+          onAnaliseChange={handleAnaliseChange}
           onFileSelect={handleFileSelect}
           onRemoverArquivo={handleRemoverArquivo}
           onRemoverSlot={handleRemoverSlot}
