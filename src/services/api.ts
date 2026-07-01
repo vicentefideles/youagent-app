@@ -107,6 +107,13 @@ export const agentesApi = {
     resultado,
     ...(ctx || {}),
   }, { timeout: 60000 }),
+  analisarScript: (
+    texto: string,
+    ctx?: { empresa?: string; segmento?: string; produto?: string; icp_cargo?: string }
+  ) => api.post('/agentes/analisar-script', {
+    texto,
+    ...(ctx || {}),
+  }, { timeout: 60000 }),
 }
 
 // Campanhas

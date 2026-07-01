@@ -1943,6 +1943,7 @@ function ScriptSlotCard({
   onFileSelect,
   onRemoverArquivo,
   onRemoverSlot,
+  onAnalisarScript,
 }: {
   slot: ScriptSlot
   index: number
@@ -1951,6 +1952,7 @@ function ScriptSlotCard({
   onFileSelect: (id: string, file: File) => void
   onRemoverArquivo: (id: string) => void
   onRemoverSlot: (id: string) => void
+  onAnalisarScript: (id: string) => void
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -2054,6 +2056,34 @@ function ScriptSlotCard({
 Ex: "Olá [Nome], aqui é [Agente] da [Empresa]. Ligando porque vocês [contexto]. Tem 2 minutos?"`}
           className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-none text-gray-700 placeholder:text-gray-300 w-full"
         />
+
+        {/* Card de análise — exibido para texto manual (sem arquivo) */}
+        {!slot.fileName && !slot.extraindo && slot.analise && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
+            <Brain size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-emerald-700 mb-1">Padrões do script — injetados no prompt final do agente:</p>
+              <p className="text-xs text-emerald-700 whitespace-pre-line leading-relaxed">{slot.analise}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Botão Analisar com IA — arquivo ou texto manual com ≥50 chars */}
+        {!slot.extraindo && ((!!slot.fileName && !!slot.textoRaw) || (!slot.fileName && slot.texto.trim().length > 50)) && (
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-gray-400">
+              {slot.analise
+                ? 'Padrões extraídos — clique para re-analisar.'
+                : 'Clique para extrair padrões do script com IA.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => onAnalisarScript(slot.id)}
+              className="text-xs font-medium text-brand-600 border border-brand-200 hover:border-brand-400 hover:bg-brand-50 rounded-md px-2.5 py-1 transition-colors bg-white shrink-0">
+              {slot.analise ? 'Re-analisar →' : 'Analisar com IA →'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -2064,6 +2094,7 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
   onChange: (k: keyof FormData, v: string) => void
   onScriptFilesChange: (files: File[]) => void
 }) {
+  const slotsRef = React.useRef<ScriptSlot[]>([])
   const [slots, setSlots] = React.useState<ScriptSlot[]>(() => {
     const raw = form['script-ligacao'] || ''
     if (!raw) return [{ id: '1', fileName: null, texto: '', analise: null, extraindo: false, erro: null }]
@@ -2083,12 +2114,13 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
     }
     return parts.map((part, i) => parseSlot(part, i))
   })
+  React.useEffect(() => { slotsRef.current = slots }, [slots])
 
   // Sincroniza todos os textos dos slots para form['script-ligacao']
-  // Usa textoRaw (conteúdo bruto completo) quando disponível — caso contrário usa texto editável
+  // Prioridade: analise (coaching insights) → textoRaw (bruto) → texto (editável)
   function syncForm(updatedSlots: ScriptSlot[]) {
     const textos = updatedSlots.map((s, i) => {
-      const conteudo = (s.textoRaw || s.texto).trim()
+      const conteudo = (s.analise || s.textoRaw || s.texto).trim()
       return updatedSlots.length > 1 && conteudo
         ? `=== SCRIPT ${i + 1}${s.fileName ? ` (${s.fileName})` : ''} ===\n${conteudo}`
         : conteudo
@@ -2132,6 +2164,26 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
         || (err as { message?: string })?.message
         || 'Erro ao processar o arquivo. Cole o texto manualmente.'
       updateSlot(id, { extraindo: false, erro: msg, fileName: null })
+    }
+  }
+
+  async function handleAnalisarScript(id: string) {
+    const slot = slotsRef.current.find(s => s.id === id)
+    if (!slot) return
+    const textoParaAnalisar = (slot.textoRaw || slot.texto).trim()
+    if (!textoParaAnalisar) return
+    updateSlot(id, { extraindo: true, analise: null, erro: null })
+    try {
+      const ctx = {
+        empresa:   form['empresa-nome']     || '',
+        segmento:  form['empresa-segmento'] || '',
+        produto:   form['prod-nome']        || '',
+        icp_cargo: form['icp-cargo-tipo']   || '',
+      }
+      const { data } = await agentesApi.analisarScript(textoParaAnalisar, ctx)
+      updateSlot(id, { extraindo: false, analise: data.analise || null })
+    } catch {
+      updateSlot(id, { extraindo: false, erro: 'Não foi possível analisar o script. Tente novamente.' })
     }
   }
 
@@ -2186,6 +2238,7 @@ function StepScriptLigacao({ form, onChange, onScriptFilesChange }: {
           onFileSelect={handleFileSelect}
           onRemoverArquivo={handleRemoverArquivo}
           onRemoverSlot={handleRemoverSlot}
+          onAnalisarScript={handleAnalisarScript}
         />
       ))}
 
