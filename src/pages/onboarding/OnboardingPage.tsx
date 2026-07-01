@@ -396,8 +396,10 @@ const textareaCls =
 interface Material {
   file: File | null
   tipo: string
-  texto: string       // resumo Haiku (editável — alimenta etapas 3-12)
-  textoRaw?: string   // texto bruto completo (alimenta gerar-prompt)
+  // REGRA: texto (resumo Haiku, editável) é o que alimenta o prompt final — nunca textoRaw.
+  // Um bug anterior priorizava o campo bruto em Scripts/Ligações; corrigido — não repetir aqui.
+  texto: string       // resumo Haiku — editável, vai para o prompt final (gerar-prompt)
+  textoRaw?: string   // texto bruto completo — só referência interna, NÃO usado no prompt
   analise: string | null
   extraindo: boolean
   erro: string | null
@@ -1928,9 +1930,11 @@ function Step3({ form, onChange }: {
 type ScriptSlot = {
   id: string
   fileName: string | null
-  texto: string       // resumo editável (aparece no textarea)
-  textoRaw?: string   // texto bruto completo (vai para o prompt final)
-  analise: string | null
+  // REGRA: analise (padrões extraídos pela IA, editável) é o que alimenta o prompt final.
+  // syncForm prioriza analise || textoRaw || texto — nunca inverter essa ordem.
+  texto: string       // resumo curto exibido antes da análise (aparece no textarea inicial)
+  textoRaw?: string   // texto bruto completo — só referência interna, NÃO usado no prompt
+  analise: string | null // padrões extraídos pela IA — editável, vai para o prompt final
   extraindo: boolean
   erro: string | null
 }
@@ -2439,8 +2443,10 @@ function StepMetodologia({ form, onChange }: { form: FormData; onChange: (k: key
 interface LigacaoRef {
   file: File | null
   resultado: 'sucesso' | 'insucesso'
-  transcricao: string
-  resumo: string | null
+  // REGRA: resumo (aprendizados extraídos pela IA, editável) é o que alimenta o prompt final.
+  // Payload usa resumo || transcricao — nunca inverter essa ordem.
+  transcricao: string     // transcrição bruta (Whisper) ou texto colado manualmente — só referência
+  resumo: string | null   // aprendizados extraídos pela IA — editável, vai para o prompt final
   transcrevendo: boolean
   erro: string | null
 }
